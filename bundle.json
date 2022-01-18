@@ -1,0 +1,33 @@
+{
+    "name": "@ohos/python",
+    "description": "Python is a programming language that lets you work quickly and integrate systems more effectively.",
+    "version": "3.1",
+    "license": "Python Software Foundation V2",
+    "publishAs": "code-segment",
+    "segment": {
+        "destPath": "third_party/python"
+    },
+    "dirs": {},
+    "scripts": {},
+    "readmePath": {
+        "en": "README.rst"
+    },
+    "component": {
+        "name": "thirdparty_python",
+        "subsystem": "",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [],
+        "rom": "",
+        "ram": "",
+        "deps": {
+            "components": [],
+            "third_party": []
+        },
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
