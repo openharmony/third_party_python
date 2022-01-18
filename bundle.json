@@ -1,0 +1,42 @@
+{
+    "name": "@ohos/python",
+    "version": "",
+    "description": "Third-party open-source software python | 三方开源软件python",
+    "homePage": "https://gitee.com/openharmony",
+    "license": "Python Software Foundation V2",
+    "repository": "https://gitee.com/openharmony/third_party_python",
+    "domain": "os",
+    "language": "",
+    "publishAs": "code-segment",
+    "private": false,
+    "scripts": {},
+    "tags": [
+        "third_party"
+    ],
+    "keywords": [
+        "third-party",
+        "python"
+    ],
+    "envs": {},
+    "dirs": {},
+    "readmePath": {
+        "en": "README.RST"
+    },
+    "segment": {
+        "destPath": "third_party/python"
+    },
+    "component": {
+        "name": "thirdparty_python",
+        "subsystem": "",
+        "syscap": [],
+        "features": [],
+        "adapted_system_type": [],
+        "rom": "",
+        "ram": "",
+        "build": {
+            "sub_component": [],
+            "inner_kits": [],
+            "test": []
+        }
+    }
+}
