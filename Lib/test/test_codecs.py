@@ -11,7 +11,7 @@ from test import support
 
 try:
     import _testcapi
-except ImportError as exc:
+except ImportError:
     _testcapi = None
 
 try:
@@ -2181,6 +2181,18 @@ class CharmapTest(unittest.TestCase):
         self.assertEqual(
             codecs.charmap_decode(allbytes, "ignore", {}),
             ("", len(allbytes))
+        )
+
+        self.assertRaisesRegex(TypeError,
+            "character mapping must be in range\\(0x110000\\)",
+            codecs.charmap_decode,
+            b"\x00\x01\x02", "strict", {0: "A", 1: 'Bb', 2: -2}
+        )
+
+        self.assertRaisesRegex(TypeError,
+            "character mapping must be in range\\(0x110000\\)",
+            codecs.charmap_decode,
+            b"\x00\x01\x02", "strict", {0: "A", 1: 'Bb', 2: 999999999}
         )
 
     def test_decode_with_int2int_map(self):

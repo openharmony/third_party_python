@@ -694,7 +694,7 @@ compatible with the Python codec registry.
 
    .. method:: reset()
 
-      Flushes and resets the codec buffers used for keeping state.
+      Resets the codec buffers used for keeping internal state.
 
       Calling this method should ensure that the data on the output is put into
       a clean state that allows appending of new fresh data without having to
@@ -789,7 +789,7 @@ compatible with the Python codec registry.
 
    .. method:: reset()
 
-      Resets the codec buffers used for keeping state.
+      Resets the codec buffers used for keeping internal state.
 
       Note that no stream repositioning should take place. This method is
       primarily intended to be able to recover from decoding errors.
@@ -1198,7 +1198,8 @@ particular, the following variants typically exist:
 +-----------------+--------------------------------+--------------------------------+
 | mac_iceland     | maciceland                     | Icelandic                      |
 +-----------------+--------------------------------+--------------------------------+
-| mac_latin2      | maclatin2, maccentraleurope    | Central and Eastern Europe     |
+| mac_latin2      | maclatin2, maccentraleurope,   | Central and Eastern Europe     |
+|                 | mac_centeuro                   |                                |
 +-----------------+--------------------------------+--------------------------------+
 | mac_roman       | macroman, macintosh            | Western Europe                 |
 +-----------------+--------------------------------+--------------------------------+

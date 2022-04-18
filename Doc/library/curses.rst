@@ -112,14 +112,15 @@ The module :mod:`curses` defines the following functions:
 .. function:: color_content(color_number)
 
    Return the intensity of the red, green, and blue (RGB) components in the color
-   *color_number*, which must be between ``0`` and :const:`COLORS`.  Return a 3-tuple,
+   *color_number*, which must be between ``0`` and ``COLORS - 1``.  Return a 3-tuple,
    containing the R,G,B values for the given color, which will be between
    ``0`` (no component) and ``1000`` (maximum amount of component).
 
 
-.. function:: color_pair(color_number)
+.. function:: color_pair(pair_number)
 
-   Return the attribute value for displaying text in the specified color.  This
+   Return the attribute value for displaying text in the specified color pair.
+   Only the first 256 color pairs are supported. This
    attribute value can be combined with :const:`A_STANDOUT`, :const:`A_REVERSE`,
    and the other :const:`A_\*` attributes.  :func:`pair_number` is the counterpart
    to this function.
@@ -214,7 +215,7 @@ The module :mod:`curses` defines the following functions:
 .. function:: getmouse()
 
    After :meth:`~window.getch` returns :const:`KEY_MOUSE` to signal a mouse event, this
-   method should be call to retrieve the queued mouse event, represented as a
+   method should be called to retrieve the queued mouse event, represented as a
    5-tuple ``(id, x, y, z, bstate)``. *id* is an ID value used to distinguish
    multiple devices, and *x*, *y*, *z* are the event's coordinates.  (*z* is
    currently unused.)  *bstate* is an integer value whose bits will be set to
@@ -278,7 +279,7 @@ The module :mod:`curses` defines the following functions:
    Change the definition of a color, taking the number of the color to be changed
    followed by three RGB values (for the amounts of red, green, and blue
    components).  The value of *color_number* must be between ``0`` and
-   :const:`COLORS`.  Each of *r*, *g*, *b*, must be a value between ``0`` and
+   `COLORS - 1`.  Each of *r*, *g*, *b*, must be a value between ``0`` and
    ``1000``.  When :func:`init_color` is used, all occurrences of that color on the
    screen immediately change to the new definition.  This function is a no-op on
    most terminals; it is active only if :func:`can_change_color` returns ``True``.
@@ -291,7 +292,8 @@ The module :mod:`curses` defines the following functions:
    color number.  The value of *pair_number* must be between ``1`` and
    ``COLOR_PAIRS - 1`` (the ``0`` color pair is wired to white on black and cannot
    be changed).  The value of *fg* and *bg* arguments must be between ``0`` and
-   :const:`COLORS`.  If the color-pair was previously initialized, the screen is
+   ``COLORS - 1``, or, after calling :func:`use_default_colors`, ``-1``.
+   If the color-pair was previously initialized, the screen is
    refreshed and all occurrences of that color-pair are changed to the new
    definition.
 
@@ -441,7 +443,7 @@ The module :mod:`curses` defines the following functions:
 .. function:: pair_content(pair_number)
 
    Return a tuple ``(fg, bg)`` containing the colors for the requested color pair.
-   The value of *pair_number* must be between ``1`` and ``COLOR_PAIRS - 1``.
+   The value of *pair_number* must be between ``0`` and ``COLOR_PAIRS - 1``.
 
 
 .. function:: pair_number(attr)
@@ -511,6 +513,32 @@ The module :mod:`curses` defines the following functions:
    Save the current state of the terminal modes in a buffer, usable by
    :func:`resetty`.
 
+.. function:: get_escdelay()
+
+   Retrieves the value set by :func:`set_escdelay`.
+
+   .. versionadded:: 3.9
+
+.. function:: set_escdelay(ms)
+
+   Sets the number of milliseconds to wait after reading an escape character,
+   to distinguish between an individual escape character entered on the
+   keyboard from escape sequences sent by cursor and function keys.
+
+   .. versionadded:: 3.9
+
+.. function:: get_tabsize()
+
+   Retrieves the value set by :func:`set_tabsize`.
+
+   .. versionadded:: 3.9
+
+.. function:: set_tabsize(size)
+
+   Sets the number of columns used by the curses library when converting a tab
+   character to spaces as it adds the tab to a window.
+
+   .. versionadded:: 3.9
 
 .. function:: setsyx(y, x)
 
@@ -656,7 +684,7 @@ The module :mod:`curses` defines the following functions:
    foreground color on the default background.
 
 
-.. function:: wrapper(func, ...)
+.. function:: wrapper(func, /, *args, **kwargs)
 
    Initialize curses and call another callable object, *func*, which should be the
    rest of your curses-using application.  If the application raises an exception,
@@ -682,7 +710,7 @@ the following methods and attributes:
             window.addch(y, x, ch[, attr])
 
    Paint character *ch* at ``(y, x)`` with attributes *attr*, overwriting any
-   character previously painter at that location.  By default, the character
+   character previously painted at that location.  By default, the character
    position and attributes are the current settings for the window object.
 
    .. note::

@@ -111,9 +111,9 @@ process and user.
    to the environment made after this time are not reflected in ``os.environ``,
    except for changes made by modifying ``os.environ`` directly.
 
-   If the platform supports the :func:`putenv` function, this mapping may be used
-   to modify the environment as well as query the environment.  :func:`putenv` will
-   be called automatically when the mapping is modified.
+   This mapping may be used to modify the environment as well as query the
+   environment.  :func:`putenv` will be called automatically when the mapping
+   is modified.
 
    On Unix, keys and values use :func:`sys.getfilesystemencoding` and
    ``'surrogateescape'`` error handler. Use :data:`environb` if you would like
@@ -130,14 +130,13 @@ process and user.
       cause memory leaks.  Refer to the system documentation for
       :c:func:`putenv`.
 
-   If :func:`putenv` is not provided, a modified copy of this mapping  may be
-   passed to the appropriate process-creation functions to cause  child processes
-   to use a modified environment.
+   You can delete items in this mapping to unset environment variables.
+   :func:`unsetenv` will be called automatically when an item is deleted from
+   ``os.environ``, and when one of the :meth:`pop` or :meth:`clear` methods is
+   called.
 
-   If the platform supports the :func:`unsetenv` function, you can delete items in
-   this mapping to unset environment variables. :func:`unsetenv` will be called
-   automatically when an item is deleted from ``os.environ``, and when
-   one of the :meth:`pop` or :meth:`clear` methods is called.
+   .. versionchanged:: 3.9
+      Updated to support :pep:`584`'s merge (``|``) and update (``|=``) operators.
 
 
 .. data:: environb
@@ -151,6 +150,9 @@ process and user.
    ``True``.
 
    .. versionadded:: 3.2
+
+   .. versionchanged:: 3.9
+      Updated to support :pep:`584`'s merge (``|``) and update (``|=``) operators.
 
 
 .. function:: chdir(path)
@@ -439,19 +441,20 @@ process and user.
    changes to the environment affect subprocesses started with :func:`os.system`,
    :func:`popen` or :func:`fork` and :func:`execv`.
 
-   .. availability:: most flavors of Unix, Windows.
+   Assignments to items in ``os.environ`` are automatically translated into
+   corresponding calls to :func:`putenv`; however, calls to :func:`putenv`
+   don't update ``os.environ``, so it is actually preferable to assign to items
+   of ``os.environ``.
 
    .. note::
 
       On some platforms, including FreeBSD and Mac OS X, setting ``environ`` may
-      cause memory leaks. Refer to the system documentation for putenv.
-
-   When :func:`putenv` is supported, assignments to items in ``os.environ`` are
-   automatically translated into corresponding calls to :func:`putenv`; however,
-   calls to :func:`putenv` don't update ``os.environ``, so it is actually
-   preferable to assign to items of ``os.environ``.
+      cause memory leaks. Refer to the system documentation for :c:func:`putenv`.
 
    .. audit-event:: os.putenv key,value os.putenv
+
+   .. versionchanged:: 3.9
+      The function is now always available.
 
 
 .. function:: setegid(egid)
@@ -640,14 +643,15 @@ process and user.
    environment affect subprocesses started with :func:`os.system`, :func:`popen` or
    :func:`fork` and :func:`execv`.
 
-   When :func:`unsetenv` is supported, deletion of items in ``os.environ`` is
-   automatically translated into a corresponding call to :func:`unsetenv`; however,
-   calls to :func:`unsetenv` don't update ``os.environ``, so it is actually
-   preferable to delete items of ``os.environ``.
+   Deletion of items in ``os.environ`` is automatically translated into a
+   corresponding call to :func:`unsetenv`; however, calls to :func:`unsetenv`
+   don't update ``os.environ``, so it is actually preferable to delete items of
+   ``os.environ``.
 
    .. audit-event:: os.unsetenv key os.unsetenv
 
-   .. availability:: most flavors of Unix.
+   .. versionchanged:: 3.9
+      The function is now always available and is also available on Windows.
 
 
 .. _os-newstreams:
@@ -1147,7 +1151,8 @@ or `the MSDN <https://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windo
    Combine the functionality of :func:`os.readv` and :func:`os.pread`.
 
    .. availability:: Linux 2.6.30 and newer, FreeBSD 6.0 and newer,
-      OpenBSD 2.7 and newer. Using flags requires Linux 4.6 or newer.
+      OpenBSD 2.7 and newer, AIX 7.1 and newer. Using flags requires
+      Linux 4.6 or newer.
 
    .. versionadded:: 3.7
 
@@ -1215,7 +1220,8 @@ or `the MSDN <https://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windo
    Combine the functionality of :func:`os.writev` and :func:`os.pwrite`.
 
    .. availability:: Linux 2.6.30 and newer, FreeBSD 6.0 and newer,
-      OpenBSD 2.7 and newer. Using flags requires Linux 4.7 or newer.
+      OpenBSD 2.7 and newer, AIX 7.1 and newer. Using flags requires
+      Linux 4.7 or newer.
 
    .. versionadded:: 3.7
 
@@ -1261,27 +1267,27 @@ or `the MSDN <https://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windo
       :exc:`InterruptedError` exception (see :pep:`475` for the rationale).
 
 
-.. function:: sendfile(out, in, offset, count)
-              sendfile(out, in, offset, count, [headers], [trailers], flags=0)
+.. function:: sendfile(out_fd, in_fd, offset, count)
+              sendfile(out_fd, in_fd, offset, count, headers=(), trailers=(), flags=0)
 
-   Copy *count* bytes from file descriptor *in* to file descriptor *out*
+   Copy *count* bytes from file descriptor *in_fd* to file descriptor *out_fd*
    starting at *offset*.
-   Return the number of bytes sent. When EOF is reached return 0.
+   Return the number of bytes sent. When EOF is reached return ``0``.
 
    The first function notation is supported by all platforms that define
    :func:`sendfile`.
 
    On Linux, if *offset* is given as ``None``, the bytes are read from the
-   current position of *in* and the position of *in* is updated.
+   current position of *in_fd* and the position of *in_fd* is updated.
 
    The second case may be used on Mac OS X and FreeBSD where *headers* and
    *trailers* are arbitrary sequences of buffers that are written before and
-   after the data from *in* is written. It returns the same as the first case.
+   after the data from *in_fd* is written. It returns the same as the first case.
 
-   On Mac OS X and FreeBSD, a value of 0 for *count* specifies to send until
-   the end of *in* is reached.
+   On Mac OS X and FreeBSD, a value of ``0`` for *count* specifies to send until
+   the end of *in_fd* is reached.
 
-   All platforms support sockets as *out* file descriptor, and some platforms
+   All platforms support sockets as *out_fd* file descriptor, and some platforms
    allow other types (e.g. regular file, pipe) as well.
 
    Cross-platform applications should not use *headers*, *trailers* and *flags*
@@ -1295,6 +1301,9 @@ or `the MSDN <https://msdn.microsoft.com/en-us/library/z0kc8e3z.aspx>`_ on Windo
       :meth:`socket.socket.sendfile`.
 
    .. versionadded:: 3.3
+
+   .. versionchanged:: 3.9
+      Parameters *out* and *in* was renamed to *out_fd* and *in_fd*.
 
 
 .. function:: set_blocking(fd, blocking)
@@ -1828,6 +1837,8 @@ features:
    Return a list containing the names of the entries in the directory given by
    *path*.  The list is in arbitrary order, and does not include the special
    entries ``'.'`` and ``'..'`` even if they are present in the directory.
+   If a file is removed from or added to the directory during the call of
+   this function, whether a name for that file be included is unspecified.
 
    *path* may be a :term:`path-like object`.  If *path* is of type ``bytes``
    (directly or indirectly through the :class:`PathLike` interface),
@@ -1858,7 +1869,7 @@ features:
       Accepts a :term:`path-like object`.
 
 
-.. function:: lstat(path, \*, dir_fd=None)
+.. function:: lstat(path, *, dir_fd=None)
 
    Perform the equivalent of an :c:func:`lstat` system call on the given path.
    Similar to :func:`~os.stat`, but does not follow symbolic links. Return a
@@ -2233,7 +2244,9 @@ features:
    Return an iterator of :class:`os.DirEntry` objects corresponding to the
    entries in the directory given by *path*. The entries are yielded in
    arbitrary order, and the special entries ``'.'`` and ``'..'`` are not
-   included.
+   included.  If a file is removed from or added to the directory after
+   creating the iterator, whether an entry for that file be included is
+   unspecified.
 
    Using :func:`scandir` instead of :func:`listdir` can significantly
    increase the performance of code that also needs file type or file
@@ -2363,7 +2376,7 @@ features:
       On the first, uncached call, a system call is required on Windows but
       not on Unix.
 
-   .. method:: is_dir(\*, follow_symlinks=True)
+   .. method:: is_dir(*, follow_symlinks=True)
 
       Return ``True`` if this entry is a directory or a symbolic link pointing
       to a directory; return ``False`` if the entry is or points to any other
@@ -2387,7 +2400,7 @@ features:
       This method can raise :exc:`OSError`, such as :exc:`PermissionError`,
       but :exc:`FileNotFoundError` is caught and not raised.
 
-   .. method:: is_file(\*, follow_symlinks=True)
+   .. method:: is_file(*, follow_symlinks=True)
 
       Return ``True`` if this entry is a file or a symbolic link pointing to a
       file; return ``False`` if the entry is or points to a directory or other
@@ -2417,7 +2430,7 @@ features:
       This method can raise :exc:`OSError`, such as :exc:`PermissionError`,
       but :exc:`FileNotFoundError` is caught and not raised.
 
-   .. method:: stat(\*, follow_symlinks=True)
+   .. method:: stat(*, follow_symlinks=True)
 
       Return a :class:`stat_result` object for this entry. This method
       follows symbolic links by default; to stat a symbolic link add the
@@ -2449,7 +2462,7 @@ features:
       for :class:`bytes` paths on Windows.
 
 
-.. function:: stat(path, \*, dir_fd=None, follow_symlinks=True)
+.. function:: stat(path, *, dir_fd=None, follow_symlinks=True)
 
    Get the status of a file or a file descriptor. Perform the equivalent of a
    :c:func:`stat` system call on the given path. *path* may be specified as
@@ -2983,7 +2996,10 @@ features:
    *filenames* is a list of the names of the non-directory files in *dirpath*.
    Note that the names in the lists contain no path components.  To get a full path
    (which begins with *top*) to a file or directory in *dirpath*, do
-   ``os.path.join(dirpath, name)``.
+   ``os.path.join(dirpath, name)``.  Whether or not the lists are sorted
+   depends on the file system.  If a file is removed from or added to the
+   *dirpath* directory during generating the lists, whether a name for that
+   file be included is unspecified.
 
    If optional argument *topdown* is ``True`` or not specified, the triple for a
    directory is generated before the triples for any of its subdirectories
@@ -3052,6 +3068,8 @@ features:
           for name in dirs:
               os.rmdir(os.path.join(root, name))
 
+   .. audit-event:: os.walk top,topdown,onerror,followlinks os.walk
+
    .. versionchanged:: 3.5
       This function now calls :func:`os.scandir` instead of :func:`os.listdir`,
       making it faster by reducing the number of calls to :func:`os.stat`.
@@ -3110,6 +3128,8 @@ features:
               os.unlink(name, dir_fd=rootfd)
           for name in dirs:
               os.rmdir(name, dir_fd=rootfd)
+
+   .. audit-event:: os.fwalk top,topdown,onerror,follow_symlinks,dir_fd os.fwalk
 
    .. availability:: Unix.
 
@@ -3614,6 +3634,19 @@ written in Python, such as a mail server's external command delivery program.
    .. availability:: Unix.
 
 
+.. function:: pidfd_open(pid, flags=0)
+
+   Return a file descriptor referring to the process *pid*.  This descriptor can
+   be used to perform process management without races and signals.  The *flags*
+   argument is provided for future extensions; no flag values are currently
+   defined.
+
+   See the :manpage:`pidfd_open(2)` man page for more details.
+
+   .. availability:: Linux 5.3+
+   .. versionadded:: 3.9
+
+
 .. function:: plock(op)
 
    Lock program segments into memory.  The value of *op* (defined in
@@ -3641,6 +3674,11 @@ written in Python, such as a mail server's external command delivery program.
    subprocess was killed.)  On Windows systems, the return value
    contains the signed integer return code from the child process.
 
+   On Unix, :func:`waitstatus_to_exitcode` can be used to convert the ``close``
+   method result (exit status) into an exit code if it is not ``None``. On
+   Windows, the ``close`` method result is directly the exit code
+   (or ``None``).
+
    This is implemented using :class:`subprocess.Popen`; see that class's
    documentation for more powerful ways to manage and communicate with
    subprocesses.
@@ -3657,8 +3695,8 @@ written in Python, such as a mail server's external command delivery program.
    The positional-only arguments *path*, *args*, and *env* are similar to
    :func:`execve`.
 
-   The *path* parameter is the path to the executable file.The *path* should
-   contain a directory.Use :func:`posix_spawnp` to pass an executable file
+   The *path* parameter is the path to the executable file.  The *path* should
+   contain a directory.  Use :func:`posix_spawnp` to pass an executable file
    without directory.
 
    The *file_actions* argument may be a sequence of tuples describing actions
@@ -3944,6 +3982,10 @@ written in Python, such as a mail server's external command delivery program.
    to using this function.  See the :ref:`subprocess-replacements` section in
    the :mod:`subprocess` documentation for some helpful recipes.
 
+   On Unix, :func:`waitstatus_to_exitcode` can be used to convert the result
+   (exit status) into an exit code. On Windows, the result is directly the exit
+   code.
+
    .. audit-event:: os.system command os.system
 
    .. availability:: Unix, Windows.
@@ -3984,12 +4026,21 @@ written in Python, such as a mail server's external command delivery program.
    number is zero); the high bit of the low byte is set if a core file was
    produced.
 
+   :func:`waitstatus_to_exitcode` can be used to convert the exit status into an
+   exit code.
+
    .. availability:: Unix.
+
+   .. seealso::
+
+      :func:`waitpid` can be used to wait for the completion of a specific
+      child process and has more options.
 
 .. function:: waitid(idtype, id, options)
 
    Wait for the completion of one or more child processes.
-   *idtype* can be :data:`P_PID`, :data:`P_PGID` or :data:`P_ALL`.
+   *idtype* can be :data:`P_PID`, :data:`P_PGID`, :data:`P_ALL`, or
+   :data:`P_PIDFD` on Linux.
    *id* specifies the pid to wait on.
    *options* is constructed from the ORing of one or more of :data:`WEXITED`,
    :data:`WSTOPPED` or :data:`WCONTINUED` and additionally may be ORed with
@@ -4014,6 +4065,15 @@ written in Python, such as a mail server's external command delivery program.
 
    .. versionadded:: 3.3
 
+.. data:: P_PIDFD
+
+   This is a Linux-specific *idtype* that indicates that *id* is a file
+   descriptor that refers to a process.
+
+   .. availability:: Linux 5.4+
+
+   .. versionadded:: 3.9
+
 .. data:: WEXITED
           WSTOPPED
           WNOWAIT
@@ -4027,8 +4087,10 @@ written in Python, such as a mail server's external command delivery program.
 
 
 .. data:: CLD_EXITED
+          CLD_KILLED
           CLD_DUMPED
           CLD_TRAPPED
+          CLD_STOPPED
           CLD_CONTINUED
 
    These are the possible values for :attr:`si_code` in the result returned by
@@ -4037,6 +4099,9 @@ written in Python, such as a mail server's external command delivery program.
    .. availability:: Unix.
 
    .. versionadded:: 3.3
+
+   .. versionchanged:: 3.9
+      Added :data:`CLD_KILLED` and :data:`CLD_STOPPED` values.
 
 
 .. function:: waitpid(pid, options)
@@ -4066,6 +4131,9 @@ written in Python, such as a mail server's external command delivery program.
    id is known, not necessarily a child process. The :func:`spawn\* <spawnl>`
    functions called with :const:`P_NOWAIT` return suitable process handles.
 
+   :func:`waitstatus_to_exitcode` can be used to convert the exit status into an
+   exit code.
+
    .. versionchanged:: 3.5
       If the system call is interrupted and the signal handler does not raise an
       exception, the function now retries the system call instead of raising an
@@ -4081,6 +4149,9 @@ written in Python, such as a mail server's external command delivery program.
    information.  The option argument is the same as that provided to
    :func:`waitpid` and :func:`wait4`.
 
+   :func:`waitstatus_to_exitcode` can be used to convert the exit status into an
+   exitcode.
+
    .. availability:: Unix.
 
 
@@ -4092,7 +4163,40 @@ written in Python, such as a mail server's external command delivery program.
    resource usage information.  The arguments to :func:`wait4` are the same
    as those provided to :func:`waitpid`.
 
+   :func:`waitstatus_to_exitcode` can be used to convert the exit status into an
+   exitcode.
+
    .. availability:: Unix.
+
+
+.. function:: waitstatus_to_exitcode(status)
+
+   Convert a wait status to an exit code.
+
+   On Unix:
+
+   * If the process exited normally (if ``WIFEXITED(status)`` is true),
+     return the process exit status (return ``WEXITSTATUS(status)``):
+     result greater than or equal to 0.
+   * If the process was terminated by a signal (if ``WIFSIGNALED(status)`` is
+     true), return ``-signum`` where *signum* is the number of the signal that
+     caused the process to terminate (return ``-WTERMSIG(status)``):
+     result less than 0.
+   * Otherwise, raise a :exc:`ValueError`.
+
+   On Windows, return *status* shifted right by 8 bits.
+
+   On Unix, if the process is being traced or if :func:`waitpid` was called
+   with :data:`WUNTRACED` option, the caller must first check if
+   ``WIFSTOPPED(status)`` is true. This function must not be called if
+   ``WIFSTOPPED(status)`` is true.
+
+   .. seealso::
+
+      :func:`WIFEXITED`, :func:`WEXITSTATUS`, :func:`WIFSIGNALED`,
+      :func:`WTERMSIG`, :func:`WIFSTOPPED`, :func:`WSTOPSIG` functions.
+
+   .. versionadded:: 3.9
 
 
 .. data:: WNOHANG
