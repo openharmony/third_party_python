@@ -272,6 +272,12 @@ class TestUnpackingGeneralizations(GrammarTest):
     def test_dict_display_2(self):
         self.validate("""{**{}, 3:4, **{5:6, 7:8}}""")
 
+    def test_complex_star_expression(self):
+        self.validate("func(* [] or [1])")
+
+    def test_complex_double_star_expression(self):
+        self.validate("func(**{1: 3} if False else {x: x for x in range(3)})")
+
     def test_argument_unpacking_1(self):
         self.validate("""f(a, *b, *c, d)""")
 
@@ -538,7 +544,7 @@ class TestSetLiteral(GrammarTest):
 
 # Adapted from Python 3's Lib/test/test_unicode_identifiers.py and
 # Lib/test/test_tokenize.py:TokenizeTest.test_non_ascii_identifiers
-class TestIdentfier(GrammarTest):
+class TestIdentifier(GrammarTest):
     def test_non_ascii_identifiers(self):
         self.validate("Örter = 'places'\ngrün = 'green'")
         self.validate("蟒 = a蟒 = 锦蛇 = 1")
@@ -630,6 +636,7 @@ class TestLiterals(GrammarTest):
 
 
 class TestNamedAssignments(GrammarTest):
+    """Also known as the walrus operator."""
 
     def test_named_assignment_if(self):
         driver.parse_string("if f := x(): pass\n")
@@ -642,6 +649,30 @@ class TestNamedAssignments(GrammarTest):
 
     def test_named_assignment_listcomp(self):
         driver.parse_string("[(lastNum := num) == 1 for num in [1, 2, 3]]\n")
+
+
+class TestPositionalOnlyArgs(GrammarTest):
+
+    def test_one_pos_only_arg(self):
+        driver.parse_string("def one_pos_only_arg(a, /): pass\n")
+
+    def test_all_markers(self):
+        driver.parse_string(
+                "def all_markers(a, b=2, /, c, d=4, *, e=5, f): pass\n")
+
+    def test_all_with_args_and_kwargs(self):
+        driver.parse_string(
+                """def all_markers_with_args_and_kwargs(
+                           aa, b, /, _cc, d, *args, e, f_f, **kwargs,
+                   ):
+                       pass\n""")
+
+    def test_lambda_soup(self):
+        driver.parse_string(
+                "lambda a, b, /, c, d, *args, e, f, **kw: kw\n")
+
+    def test_only_positional_or_keyword(self):
+        driver.parse_string("def func(a,b,/,*,g,e=3): pass\n")
 
 
 class TestPickleableException(unittest.TestCase):

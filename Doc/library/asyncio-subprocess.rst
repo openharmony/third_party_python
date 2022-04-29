@@ -61,9 +61,9 @@ See also the `Examples`_ subsection.
 Creating Subprocesses
 =====================
 
-.. coroutinefunction:: create_subprocess_exec(program, \*args, stdin=None, \
+.. coroutinefunction:: create_subprocess_exec(program, *args, stdin=None, \
                           stdout=None, stderr=None, loop=None, \
-                          limit=None, \*\*kwds)
+                          limit=None, **kwds)
 
    Create a subprocess.
 
@@ -82,7 +82,7 @@ Creating Subprocesses
 
 .. coroutinefunction:: create_subprocess_shell(cmd, stdin=None, \
                           stdout=None, stderr=None, loop=None, \
-                          limit=None, \*\*kwds)
+                          limit=None, **kwds)
 
    Run the *cmd* shell command.
 
@@ -110,10 +110,8 @@ Creating Subprocesses
 
 .. note::
 
-   The default asyncio event loop implementation on **Windows** does not
-   support subprocesses. Subprocesses are available for Windows if a
-   :class:`ProactorEventLoop` is used.
-   See :ref:`Subprocess Support on Windows <asyncio-windows-subprocess>`
+   Subprocesses are available for Windows if a :class:`ProactorEventLoop` is
+   used. See :ref:`Subprocess Support on Windows <asyncio-windows-subprocess>`
    for details.
 
 .. seealso::

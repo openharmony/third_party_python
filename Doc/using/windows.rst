@@ -23,8 +23,8 @@ available for application-local distributions.
 
 As specified in :pep:`11`, a Python release only supports a Windows platform
 while Microsoft considers the platform under extended support. This means that
-Python |version| supports Windows Vista and newer. If you require Windows XP
-support then please install Python 3.4.
+Python |version| supports Windows 8.1 and newer. If you require Windows 7
+support, please install Python 3.8.
 
 There are a number of different installers available for Windows, each with
 certain benefits and downsides.
@@ -103,9 +103,9 @@ paths longer than this would not resolve and errors would result.
 
 In the latest versions of Windows, this limitation can be expanded to
 approximately 32,000 characters. Your administrator will need to activate the
-"Enable Win32 long paths" group policy, or set the registry value
-``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem@LongPathsEnabled``
-to ``1``.
+"Enable Win32 long paths" group policy, or set ``LongPathsEnabled`` to ``1``
+in the registry key
+``HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem``.
 
 This allows the :func:`open` function, the :mod:`os` module and most other
 path functionality to accept and return paths longer than 260 characters.
@@ -212,13 +212,13 @@ of available options is shown below.
 For example, to silently install a default, system-wide Python installation,
 you could use the following command (from an elevated command prompt)::
 
-    python-3.8.0.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    python-3.9.0.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
 
 To allow users to easily install a personal copy of Python without the test
 suite, you could provide a shortcut with the following command. This will
 display a simplified initial page and disallow customization::
 
-    python-3.8.0.exe InstallAllUsers=0 Include_launcher=0 Include_test=0
+    python-3.9.0.exe InstallAllUsers=0 Include_launcher=0 Include_test=0
         SimpleInstall=1 SimpleInstallDescription="Just for me, no test suite."
 
 (Note that omitting the launcher also omits file associations, and is only
@@ -255,13 +255,13 @@ where a large number of installations are going to be performed it is very
 useful to have a locally cached copy.
 
 Execute the following command from Command Prompt to download all possible
-required files.  Remember to substitute ``python-3.8.0.exe`` for the actual
+required files.  Remember to substitute ``python-3.9.0.exe`` for the actual
 name of your installer, and to create layouts in their own directories to
 avoid collisions between files with the same name.
 
 ::
 
-    python-3.8.0.exe /layout [optional target directory]
+    python-3.9.0.exe /layout [optional target directory]
 
 You may also specify the ``/quiet`` option to hide the progress display.
 
@@ -338,6 +338,11 @@ Because of restrictions on Microsoft Store apps, Python scripts may not have
 full write access to shared locations such as ``TEMP`` and the registry.
 Instead, it will write to a private copy. If your scripts must modify the
 shared locations, you will need to install the full installer.
+
+For more detail on the technical basis for these limitations, please consult
+Microsoft's documentation on packaged full-trust apps, currently available at
+`docs.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes
+<https://docs.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes>`_
 
 
 .. _windows-nuget:
@@ -525,7 +530,7 @@ To temporarily set environment variables, open Command Prompt and use the
 
 .. code-block:: doscon
 
-    C:\>set PATH=C:\Program Files\Python 3.8;%PATH%
+    C:\>set PATH=C:\Program Files\Python 3.9;%PATH%
     C:\>set PYTHONPATH=%PYTHONPATH%;C:\My_python_lib
     C:\>python
 
@@ -598,7 +603,7 @@ of your Python installation, delimited by a semicolon from other entries.  An
 example variable could look like this (assuming the first two entries already
 existed)::
 
-    C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\Python 3.8
+    C:\WINDOWS\system32;C:\WINDOWS;C:\Program Files\Python 3.9
 
 .. _win-utf8-mode:
 
@@ -1149,8 +1154,6 @@ For extension modules, consult :ref:`building-on-windows`.
       or "Creating Python extensions in C/C++ with SWIG and compiling them with
       MinGW gcc under Windows" or "Installing Python extension with distutils
       and without Microsoft Visual C++" by Sébastien Sauvage, 2003
-
-   `MingW -- Python extensions <http://www.mingw.org/wiki/FAQ#toc14>`_
 
 
 Other Platforms
