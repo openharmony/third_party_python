@@ -13,8 +13,8 @@
         "en": "README.rst"
     },
     "component": {
-        "name": "thirdparty_python",
-        "subsystem": "",
+        "name": "python",
+        "subsystem": "thirdparty",
         "syscap": [],
         "features": [],
         "adapted_system_type": [],
