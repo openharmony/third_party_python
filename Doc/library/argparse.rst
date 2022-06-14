@@ -57,7 +57,7 @@ be run at the command line and provides useful help messages:
    positional arguments:
     N           an integer for the accumulator
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --sum       sum the integers (default: find the max)
 
@@ -148,7 +148,8 @@ ArgumentParser objects
    as keyword arguments. Each parameter has its own more detailed description
    below, but in short they are:
 
-   * prog_ - The name of the program (default: ``sys.argv[0]``)
+   * prog_ - The name of the program (default:
+     ``os.path.basename(sys.argv[0])``)
 
    * usage_ - The string describing the program usage (default: generated from
      arguments added to parser)
@@ -217,14 +218,14 @@ The help for this program will display ``myprogram.py`` as the program name
    $ python myprogram.py --help
    usage: myprogram.py [-h] [--foo FOO]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO   foo help
    $ cd ..
    $ python subdir/myprogram.py --help
    usage: myprogram.py [-h] [--foo FOO]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO   foo help
 
@@ -235,7 +236,7 @@ To change this default behavior, another value can be supplied using the
    >>> parser.print_help()
    usage: myprogram [-h]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
 Note that the program name, whether determined from ``sys.argv[0]`` or from the
@@ -249,7 +250,7 @@ specifier.
    >>> parser.print_help()
    usage: myprogram [-h] [--foo FOO]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO   foo of the myprogram program
 
@@ -269,7 +270,7 @@ arguments it contains::
    positional arguments:
     bar          bar help
 
-   optional arguments:
+   options:
     -h, --help   show this help message and exit
     --foo [FOO]  foo help
 
@@ -284,7 +285,7 @@ The default message can be overridden with the ``usage=`` keyword argument::
    positional arguments:
     bar          bar help
 
-   optional arguments:
+   options:
     -h, --help   show this help message and exit
     --foo [FOO]  foo help
 
@@ -307,7 +308,7 @@ various arguments::
 
    A foo that bars
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
 By default, the description will be line-wrapped so that it fits within the
@@ -329,7 +330,7 @@ argument to :class:`ArgumentParser`::
 
    A foo that bars
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
    And that's how you'd foo a bar
@@ -403,7 +404,7 @@ epilog_ texts in command-line help messages::
 
    this description was indented weird but that is okay
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
    likewise for this epilog whose whitespace will be cleaned up and whose words
@@ -432,7 +433,7 @@ should not be line-wrapped::
       exactly the way
       I want it
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
 :class:`RawTextHelpFormatter` maintains whitespace for all sorts of help text,
@@ -454,7 +455,7 @@ default values to each of the argument help messages::
    positional arguments:
     bar         BAR! (default: [1, 2, 3])
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO   FOO! (default: 42)
 
@@ -473,7 +474,7 @@ as the regular formatter does)::
    positional arguments:
      float
 
-   optional arguments:
+   options:
      -h, --help  show this help message and exit
      --foo int
 
@@ -592,7 +593,7 @@ older arguments with the same option string.  To get this behavior, the value
    >>> parser.print_help()
    usage: PROG [-h] [-f FOO] [--foo FOO]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     -f FOO      old foo help
     --foo FOO   new foo help
@@ -623,7 +624,7 @@ help will be printed:
    $ python myprogram.py --help
    usage: myprogram.py [-h] [--foo FOO]
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO   foo help
 
@@ -636,7 +637,7 @@ This can be achieved by passing ``False`` as the ``add_help=`` argument to
    >>> parser.print_help()
    usage: PROG [--foo FOO]
 
-   optional arguments:
+   options:
     --foo FOO  foo help
 
 The help option is typically ``-h/--help``. The exception to this is
@@ -649,7 +650,7 @@ the help options::
    >>> parser.print_help()
    usage: PROG [+h]
 
-   optional arguments:
+   options:
      +h, ++help  show this help message and exit
 
 
@@ -659,7 +660,7 @@ exit_on_error
 Normally, when you pass an invalid argument list to the :meth:`~ArgumentParser.parse_args`
 method of an :class:`ArgumentParser`, it will exit with error info.
 
-If the user would like catch errors manually, the feature can be enable by setting
+If the user would like to catch errors manually, the feature can be enabled by setting
 ``exit_on_error`` to ``False``::
 
    >>> parser = argparse.ArgumentParser(exit_on_error=False)
@@ -853,6 +854,8 @@ is available in ``argparse`` and adds support for boolean actions such as
     >>> parser.parse_args(['--no-foo'])
     Namespace(foo=False)
 
+.. versionadded:: 3.9
+
 The recommended way to create a custom action is to extend :class:`Action`,
 overriding the ``__call__`` method and optionally the ``__init__`` and
 ``format_usage`` methods.
@@ -863,7 +866,7 @@ An example of a custom action::
    ...     def __init__(self, option_strings, dest, nargs=None, **kwargs):
    ...         if nargs is not None:
    ...             raise ValueError("nargs not allowed")
-   ...         super(FooAction, self).__init__(option_strings, dest, **kwargs)
+   ...         super().__init__(option_strings, dest, **kwargs)
    ...     def __call__(self, parser, namespace, values, option_string=None):
    ...         print('%r %r %r' % (namespace, values, option_string))
    ...         setattr(namespace, self.dest, values)
@@ -1102,7 +1105,7 @@ Anything with more interesting error-handling or resource management should be
 done downstream after the arguments are parsed.
 
 For example, JSON or YAML conversions have complex error cases that require
-better reporting than can be given by the ``type`` keyword.  An
+better reporting than can be given by the ``type`` keyword.  A
 :exc:`~json.JSONDecodeError` would not be well formatted and a
 :exc:`FileNotFound` exception would not be handled at all.
 
@@ -1203,7 +1206,7 @@ argument::
    positional arguments:
     bar     one of the bars to be frobbled
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo   foo the bars before frobbling
 
@@ -1221,7 +1224,7 @@ specifiers include the program name, ``%(prog)s`` and most keyword arguments to
    positional arguments:
     bar     the bar to frobble (default: 42)
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
 
 As the help string supports %-formatting, if you want a literal ``%`` to appear
@@ -1235,7 +1238,7 @@ setting the ``help`` value to ``argparse.SUPPRESS``::
    >>> parser.print_help()
    usage: frobble [-h]
 
-   optional arguments:
+   options:
      -h, --help  show this help message and exit
 
 
@@ -1262,7 +1265,7 @@ will be referred to as ``FOO``.  An example::
    positional arguments:
     bar
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo FOO
 
@@ -1279,7 +1282,7 @@ An alternative name can be specified with ``metavar``::
    positional arguments:
     XXX
 
-   optional arguments:
+   options:
     -h, --help  show this help message and exit
     --foo YYY
 
@@ -1297,7 +1300,7 @@ arguments::
    >>> parser.print_help()
    usage: PROG [-h] [-x X X] [--foo bar baz]
 
-   optional arguments:
+   options:
     -h, --help     show this help message and exit
     -x X X
     --foo bar baz
@@ -1701,7 +1704,7 @@ Sub-commands
          a     a help
          b     b help
 
-     optional arguments:
+     options:
        -h, --help  show this help message and exit
        --foo   foo help
 
@@ -1711,13 +1714,13 @@ Sub-commands
      positional arguments:
        bar     bar help
 
-     optional arguments:
+     options:
        -h, --help  show this help message and exit
 
      >>> parser.parse_args(['b', '--help'])
      usage: PROG b [-h] [--baz {X,Y,Z}]
 
-     optional arguments:
+     options:
        -h, --help     show this help message and exit
        --baz {X,Y,Z}  baz help
 
@@ -1734,7 +1737,7 @@ Sub-commands
      >>> parser.parse_args(['-h'])
      usage:  [-h] {foo,bar} ...
 
-     optional arguments:
+     options:
        -h, --help  show this help message and exit
 
      subcommands:

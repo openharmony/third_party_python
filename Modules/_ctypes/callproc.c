@@ -254,8 +254,6 @@ set_last_error(PyObject *self, PyObject *args)
     return set_error_internal(self, args, 1);
 }
 
-PyObject *ComError;
-
 static WCHAR *FormatError(DWORD code)
 {
     WCHAR *lpMsgBuf;
@@ -477,7 +475,7 @@ static void
 PyCArg_dealloc(PyCArgObject *self)
 {
     Py_XDECREF(self->obj);
-    PyObject_Del(self);
+    PyObject_Free(self);
 }
 
 static int
@@ -702,7 +700,6 @@ static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa)
         return 0;
     }
 
-#ifdef CTYPES_UNICODE
     if (PyUnicode_Check(obj)) {
         pa->ffi_type = &ffi_type_pointer;
         pa->value.p = PyUnicode_AsWideCharString(obj, NULL);
@@ -715,7 +712,6 @@ static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa)
         }
         return 0;
     }
-#endif
 
     {
         _Py_IDENTIFIER(_as_parameter_);
@@ -838,7 +834,7 @@ static int _call_function_pointer(int flags,
 #      define HAVE_FFI_PREP_CIF_VAR_RUNTIME false
 #   endif
 
-    /* Even on Apple-arm64 the calling convention for variadic functions conincides
+    /* Even on Apple-arm64 the calling convention for variadic functions coincides
      * with the standard calling convention in the case that the function called
      * only with its fixed arguments.   Thus, we do not need a special flag to be
      * set on variadic functions.   We treat a function as variadic if it is called
@@ -1349,7 +1345,6 @@ module. load_flags are as defined for LoadLibraryEx in the\n\
 Windows API.\n";
 static PyObject *load_library(PyObject *self, PyObject *args)
 {
-    const WCHAR *name;
     PyObject *nameobj;
     int load_flags = 0;
     HMODULE hMod;
@@ -1358,13 +1353,13 @@ static PyObject *load_library(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "U|i:LoadLibrary", &nameobj, &load_flags))
         return NULL;
 
-    name = _PyUnicode_AsUnicode(nameobj);
-    if (!name)
-        return NULL;
-
     if (PySys_Audit("ctypes.dlopen", "O", nameobj) < 0) {
         return NULL;
     }
+
+    WCHAR *name = PyUnicode_AsWideCharString(nameobj, NULL);
+    if (!name)
+        return NULL;
 
     Py_BEGIN_ALLOW_THREADS
     /* bpo-36085: Limit DLL search directories to avoid pre-loading
@@ -1374,6 +1369,7 @@ static PyObject *load_library(PyObject *self, PyObject *args)
     err = hMod ? 0 : GetLastError();
     Py_END_ALLOW_THREADS
 
+    PyMem_Free(name);
     if (err == ERROR_MOD_NOT_FOUND) {
         PyErr_Format(PyExc_FileNotFoundError,
                      ("Could not find module '%.500S' (or one of its "
@@ -1446,26 +1442,49 @@ copy_com_pointer(PyObject *self, PyObject *args)
     return r;
 }
 #else
-
+#ifdef __APPLE__
 #ifdef HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH
+#define HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH_RUNTIME \
+    __builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
+#else
+// Support the deprecated case of compiling on an older macOS version
+static void *libsystem_b_handle;
+static bool (*_dyld_shared_cache_contains_path)(const char *path);
+
+__attribute__((constructor)) void load_dyld_shared_cache_contains_path(void) {
+    libsystem_b_handle = dlopen("/usr/lib/libSystem.B.dylib", RTLD_LAZY);
+    if (libsystem_b_handle != NULL) {
+        _dyld_shared_cache_contains_path = dlsym(libsystem_b_handle, "_dyld_shared_cache_contains_path");
+    }
+}
+
+__attribute__((destructor)) void unload_dyld_shared_cache_contains_path(void) {
+    if (libsystem_b_handle != NULL) {
+        dlclose(libsystem_b_handle);
+    }
+}
+#define HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH_RUNTIME \
+    _dyld_shared_cache_contains_path != NULL
+#endif
+
 static PyObject *py_dyld_shared_cache_contains_path(PyObject *self, PyObject *args)
 {
      PyObject *name, *name2;
      char *name_str;
 
-     if (__builtin_available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)) {
+     if (HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH_RUNTIME) {
          int r;
 
          if (!PyArg_ParseTuple(args, "O", &name))
              return NULL;
-    
+
          if (name == Py_None)
              Py_RETURN_FALSE;
-    
+
          if (PyUnicode_FSConverter(name, &name2) == 0)
              return NULL;
          name_str = PyBytes_AS_STRING(name2);
-    
+
          r = _dyld_shared_cache_contains_path(name_str);
          Py_DECREF(name2);
 
@@ -1996,7 +2015,7 @@ PyMethodDef _ctypes_module_methods[] = {
     {"dlclose", py_dl_close, METH_VARARGS, "dlclose a library"},
     {"dlsym", py_dl_sym, METH_VARARGS, "find symbol in shared library"},
 #endif
-#ifdef HAVE_DYLD_SHARED_CACHE_CONTAINS_PATH
+#ifdef __APPLE__
      {"_dyld_shared_cache_contains_path", py_dyld_shared_cache_contains_path, METH_VARARGS, "check if path is in the shared cache"},
 #endif
     {"alignment", align_func, METH_O, alignment_doc},

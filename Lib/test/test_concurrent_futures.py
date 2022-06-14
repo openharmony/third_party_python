@@ -1,9 +1,9 @@
 from test import support
+from test.support import import_helper
+from test.support import threading_helper
 
 # Skip tests if _multiprocessing wasn't built.
-support.import_module('_multiprocessing')
-# Skip tests if sem_open implementation is broken.
-support.skip_if_broken_multiprocessing_synchronize()
+import_helper.import_module('_multiprocessing')
 
 from test.support import hashlib_helper
 from test.support.script_helper import assert_python_ok
@@ -25,7 +25,7 @@ from concurrent import futures
 from concurrent.futures._base import (
     PENDING, RUNNING, CANCELLED, CANCELLED_AND_NOTIFIED, FINISHED, Future,
     BrokenExecutor)
-from concurrent.futures.process import BrokenProcessPool
+from concurrent.futures.process import BrokenProcessPool, _check_system_limits
 from multiprocessing import get_context
 
 import multiprocessing.process
@@ -101,11 +101,11 @@ def make_dummy_object(_):
 
 class BaseTestCase(unittest.TestCase):
     def setUp(self):
-        self._thread_key = support.threading_setup()
+        self._thread_key = threading_helper.threading_setup()
 
     def tearDown(self):
         support.reap_children()
-        support.threading_cleanup(*self._thread_key)
+        threading_helper.threading_cleanup(*self._thread_key)
 
 
 class ExecutorMixin:
@@ -159,6 +159,10 @@ class ProcessPoolForkMixin(ExecutorMixin):
     ctx = "fork"
 
     def get_context(self):
+        try:
+            _check_system_limits()
+        except NotImplementedError:
+            self.skipTest("ProcessPoolExecutor unavailable on this system")
         if sys.platform == "win32":
             self.skipTest("require unix system")
         return super().get_context()
@@ -168,12 +172,23 @@ class ProcessPoolSpawnMixin(ExecutorMixin):
     executor_type = futures.ProcessPoolExecutor
     ctx = "spawn"
 
+    def get_context(self):
+        try:
+            _check_system_limits()
+        except NotImplementedError:
+            self.skipTest("ProcessPoolExecutor unavailable on this system")
+        return super().get_context()
+
 
 class ProcessPoolForkserverMixin(ExecutorMixin):
     executor_type = futures.ProcessPoolExecutor
     ctx = "forkserver"
 
     def get_context(self):
+        try:
+            _check_system_limits()
+        except NotImplementedError:
+            self.skipTest("ProcessPoolExecutor unavailable on this system")
         if sys.platform == "win32":
             self.skipTest("require unix system")
         return super().get_context()
@@ -448,6 +463,7 @@ class ThreadPoolShutdownTest(ThreadPoolMixin, ExecutorShutdownTest, BaseTestCase
         executor.map(abs, range(-5, 5))
         threads = executor._threads
         del executor
+        support.gc_collect()  # For PyPy or other GCs.
 
         for t in threads:
             self.assertRegex(t.name, r'^SpecialPool_[0-4]$')
@@ -458,6 +474,7 @@ class ThreadPoolShutdownTest(ThreadPoolMixin, ExecutorShutdownTest, BaseTestCase
         executor.map(abs, range(-5, 5))
         threads = executor._threads
         del executor
+        support.gc_collect()  # For PyPy or other GCs.
 
         for t in threads:
             # Ensure that our default name is reasonably sane and unique when
@@ -520,6 +537,7 @@ class ProcessPoolShutdownTest(ExecutorShutdownTest):
         call_queue = executor._call_queue
         executor_manager_thread = executor._executor_manager_thread
         del executor
+        support.gc_collect()  # For PyPy or other GCs.
 
         # Make sure that all the executor resources were properly cleaned by
         # the shutdown process
@@ -561,6 +579,14 @@ create_executor_tests(ProcessPoolShutdownTest,
 
 
 class WaitTests:
+    def test_20369(self):
+        # See https://bugs.python.org/issue20369
+        future = self.executor.submit(time.sleep, 1.5)
+        done, not_done = futures.wait([future, future],
+                            return_when=futures.ALL_COMPLETED)
+        self.assertEqual({future}, done)
+        self.assertEqual(set(), not_done)
+
 
     def test_first_completed(self):
         future1 = self.executor.submit(mul, 21, 2)
@@ -744,6 +770,7 @@ class AsCompletedTests:
                 futures_list.remove(future)
                 wr = weakref.ref(future)
                 del future
+                support.gc_collect()  # For PyPy or other GCs.
                 self.assertIsNone(wr())
 
         futures_list[0].set_result("test")
@@ -751,6 +778,7 @@ class AsCompletedTests:
             futures_list.remove(future)
             wr = weakref.ref(future)
             del future
+            support.gc_collect()  # For PyPy or other GCs.
             self.assertIsNone(wr())
             if futures_list:
                 futures_list[0].set_result("test")
@@ -850,6 +878,7 @@ class ExecutorTest:
         for obj in self.executor.map(make_dummy_object, range(10)):
             wr = weakref.ref(obj)
             del obj
+            support.gc_collect()  # For PyPy or other GCs.
             self.assertIsNone(wr())
 
 
@@ -889,6 +918,20 @@ class ThreadPoolExecutorTest(ThreadPoolMixin, ExecutorTest, BaseTestCase):
         executor.submit(mul, 3, 14).result()
         self.assertEqual(len(executor._threads), 1)
         executor.shutdown(wait=True)
+
+    @unittest.skipUnless(hasattr(os, 'register_at_fork'), 'need os.register_at_fork')
+    def test_hang_global_shutdown_lock(self):
+        # bpo-45021: _global_shutdown_lock should be reinitialized in the child
+        # process, otherwise it will never exit
+        def submit(pool):
+            pool.submit(submit, pool)
+
+        with futures.ThreadPoolExecutor(1) as pool:
+            pool.submit(submit, pool)
+
+            for _ in range(50):
+                with futures.ProcessPoolExecutor(1, mp_context=get_context('fork')) as workers:
+                    workers.submit(tuple)
 
 
 class ProcessPoolExecutorTest(ExecutorTest):
@@ -1494,16 +1537,10 @@ class FutureTests(BaseTestCase):
         self.assertEqual(f.exception(), e)
 
 
-_threads_key = None
-
 def setUpModule():
-    global _threads_key
-    _threads_key = support.threading_setup()
-
-
-def tearDownModule():
-    support.threading_cleanup(*_threads_key)
-    multiprocessing.util._cleanup_tests()
+    unittest.addModuleCleanup(multiprocessing.util._cleanup_tests)
+    thread_info = threading_helper.threading_setup()
+    unittest.addModuleCleanup(threading_helper.threading_cleanup, *thread_info)
 
 
 if __name__ == "__main__":

@@ -220,10 +220,14 @@ The module :mod:`curses` defines the following functions:
    multiple devices, and *x*, *y*, *z* are the event's coordinates.  (*z* is
    currently unused.)  *bstate* is an integer value whose bits will be set to
    indicate the type of event, and will be the bitwise OR of one or more of the
-   following constants, where *n* is the button number from 1 to 4:
+   following constants, where *n* is the button number from 1 to 5:
    :const:`BUTTONn_PRESSED`, :const:`BUTTONn_RELEASED`, :const:`BUTTONn_CLICKED`,
    :const:`BUTTONn_DOUBLE_CLICKED`, :const:`BUTTONn_TRIPLE_CLICKED`,
    :const:`BUTTON_SHIFT`, :const:`BUTTON_CTRL`, :const:`BUTTON_ALT`.
+
+   .. versionchanged:: 3.10
+      The ``BUTTON5_*`` constants are now exposed if they are provided by the
+      underlying curses library.
 
 
 .. function:: getsyx()
@@ -243,6 +247,15 @@ The module :mod:`curses` defines the following functions:
 
    Return ``True`` if the terminal can display colors; otherwise, return ``False``.
 
+.. function:: has_extended_color_support()
+
+   Return ``True`` if the module supports extended colors; otherwise, return
+   ``False``. Extended color support allows more than 256 color pairs for
+   terminals that support more than 16 colors (e.g. xterm-256color).
+
+   Extended color support requires ncurses version 6.1 or later.
+
+   .. versionadded:: 3.10
 
 .. function:: has_ic()
 
@@ -901,6 +914,9 @@ the following methods and attributes:
    enclosed by the given window, returning ``True`` or ``False``.  It is useful for
    determining what subset of the screen windows enclose the location of a mouse
    event.
+
+   .. versionchanged:: 3.10
+      Previously it returned ``1`` or ``0`` instead of ``True`` or ``False``.
 
 
 .. attribute:: window.encoding
