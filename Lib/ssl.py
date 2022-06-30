@@ -18,9 +18,10 @@ Functions:
                           seconds past the Epoch (the time values
                           returned from time.time())
 
-  fetch_server_certificate (HOST, PORT) -- fetch the certificate provided
-                          by the server running on HOST at port PORT.  No
-                          validation of the certificate is performed.
+  get_server_certificate (addr, ssl_version, ca_certs, timeout) -- Retrieve the
+                          certificate from the server at the specified
+                          address and return it as a PEM-encoded string
+
 
 Integer constants:
 
@@ -94,6 +95,7 @@ import sys
 import os
 from collections import namedtuple
 from enum import Enum as _Enum, IntEnum as _IntEnum, IntFlag as _IntFlag
+from enum import _simple_enum
 
 import _ssl             # if we can't import it, let the error propagate
 
@@ -104,7 +106,7 @@ from _ssl import (
     SSLSyscallError, SSLEOFError, SSLCertVerificationError
     )
 from _ssl import txt2obj as _txt2obj, nid2obj as _nid2obj
-from _ssl import RAND_status, RAND_add, RAND_bytes, RAND_pseudo_bytes
+from _ssl import RAND_status, RAND_add, RAND_bytes
 try:
     from _ssl import RAND_egd
 except ImportError:
@@ -117,7 +119,6 @@ from _ssl import (
     HAS_TLSv1_1, HAS_TLSv1_2, HAS_TLSv1_3
 )
 from _ssl import _DEFAULT_CIPHERS, _OPENSSL_API_VERSION
-
 
 _IntEnum._convert_(
     '_SSLMethod', __name__,
@@ -155,7 +156,8 @@ _PROTOCOL_NAMES = {value: name for name, value in _SSLMethod.__members__.items()
 _SSLv2_IF_EXISTS = getattr(_SSLMethod, 'PROTOCOL_SSLv2', None)
 
 
-class TLSVersion(_IntEnum):
+@_simple_enum(_IntEnum)
+class TLSVersion:
     MINIMUM_SUPPORTED = _ssl.PROTO_MINIMUM_SUPPORTED
     SSLv3 = _ssl.PROTO_SSLv3
     TLSv1 = _ssl.PROTO_TLSv1
@@ -165,7 +167,8 @@ class TLSVersion(_IntEnum):
     MAXIMUM_SUPPORTED = _ssl.PROTO_MAXIMUM_SUPPORTED
 
 
-class _TLSContentType(_IntEnum):
+@_simple_enum(_IntEnum)
+class _TLSContentType:
     """Content types (record layer)
 
     See RFC 8446, section B.1
@@ -179,7 +182,8 @@ class _TLSContentType(_IntEnum):
     INNER_CONTENT_TYPE = 0x101
 
 
-class _TLSAlertType(_IntEnum):
+@_simple_enum(_IntEnum)
+class _TLSAlertType:
     """Alert types for TLSContentType.ALERT messages
 
     See RFC 8466, section B.2
@@ -220,7 +224,8 @@ class _TLSAlertType(_IntEnum):
     NO_APPLICATION_PROTOCOL = 120
 
 
-class _TLSMessageType(_IntEnum):
+@_simple_enum(_IntEnum)
+class _TLSMessageType:
     """Message types (handshake protocol)
 
     See RFC 8446, section B.3
@@ -275,7 +280,7 @@ CertificateError = SSLCertVerificationError
 def _dnsname_match(dn, hostname):
     """Matching according to RFC 6125, section 6.4.3
 
-    - Hostnames are compared lower case.
+    - Hostnames are compared lower-case.
     - For IDNA, both dn and hostname must be encoded as IDN A-label (ACE).
     - Partial wildcards like 'www*.example.org', multiple wildcards, sole
       wildcard or wildcards in labels other then the left-most label are not
@@ -363,71 +368,9 @@ def _ipaddress_match(cert_ipaddress, host_ip):
     (section 1.7.2 - "Out of Scope").
     """
     # OpenSSL may add a trailing newline to a subjectAltName's IP address,
-    # commonly woth IPv6 addresses. Strip off trailing \n.
+    # commonly with IPv6 addresses. Strip off trailing \n.
     ip = _inet_paton(cert_ipaddress.rstrip())
     return ip == host_ip
-
-
-def match_hostname(cert, hostname):
-    """Verify that *cert* (in decoded format as returned by
-    SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 and RFC 6125
-    rules are followed.
-
-    The function matches IP addresses rather than dNSNames if hostname is a
-    valid ipaddress string. IPv4 addresses are supported on all platforms.
-    IPv6 addresses are supported on platforms with IPv6 support (AF_INET6
-    and inet_pton).
-
-    CertificateError is raised on failure. On success, the function
-    returns nothing.
-    """
-    warnings.warn(
-        "ssl.match_hostname() is deprecated",
-        category=DeprecationWarning,
-        stacklevel=2
-    )
-    if not cert:
-        raise ValueError("empty or no certificate, match_hostname needs a "
-                         "SSL socket or SSL context with either "
-                         "CERT_OPTIONAL or CERT_REQUIRED")
-    try:
-        host_ip = _inet_paton(hostname)
-    except ValueError:
-        # Not an IP address (common case)
-        host_ip = None
-    dnsnames = []
-    san = cert.get('subjectAltName', ())
-    for key, value in san:
-        if key == 'DNS':
-            if host_ip is None and _dnsname_match(value, hostname):
-                return
-            dnsnames.append(value)
-        elif key == 'IP Address':
-            if host_ip is not None and _ipaddress_match(value, host_ip):
-                return
-            dnsnames.append(value)
-    if not dnsnames:
-        # The subject is only checked when there is no dNSName entry
-        # in subjectAltName
-        for sub in cert.get('subject', ()):
-            for key, value in sub:
-                # XXX according to RFC 2818, the most specific Common Name
-                # must be used.
-                if key == 'commonName':
-                    if _dnsname_match(value, hostname):
-                        return
-                    dnsnames.append(value)
-    if len(dnsnames) > 1:
-        raise CertificateError("hostname %r "
-            "doesn't match either of %s"
-            % (hostname, ', '.join(map(repr, dnsnames))))
-    elif len(dnsnames) == 1:
-        raise CertificateError("hostname %r "
-            "doesn't match %r"
-            % (hostname, dnsnames[0]))
-    else:
-        raise CertificateError("no appropriate commonName or "
-            "subjectAltName fields were found")
 
 
 DefaultVerifyPaths = namedtuple("DefaultVerifyPaths",

@@ -233,17 +233,22 @@ Multiple commands may be entered on a single line, separated by ``;;``.  (A
 single ``;`` is not used as it is the separator for multiple commands in a line
 that is passed to the Python parser.)  No intelligence is applied to separating
 the commands; the input is split at the first ``;;`` pair, even if it is in the
-middle of a quoted string.
+middle of a quoted string. A workaround for strings with double semicolons
+is to use implicit string concatenation ``';'';'`` or ``";"";"``.
 
 .. index::
    pair: .pdbrc; file
    triple: debugger; configuration; file
 
 If a file :file:`.pdbrc` exists in the user's home directory or in the current
-directory, it is read in and executed as if it had been typed at the debugger
-prompt.  This is particularly useful for aliases.  If both files exist, the one
-in the home directory is read first and aliases defined there can be overridden
-by the local file.
+directory, it is read with ``'utf-8'`` encoding and executed as if it had been
+typed at the debugger prompt.  This is particularly useful for aliases.  If both
+files exist, the one in the home directory is read first and aliases defined there
+can be overridden by the local file.
+
+.. versionchanged:: 3.11
+   :file:`.pdbrc` is now read with ``'utf-8'`` encoding. Previously, it was read
+   with the system locale encoding.
 
 .. versionchanged:: 3.2
    :file:`.pdbrc` can now contain commands that continue debugging, such as
