@@ -66,7 +66,6 @@ Note:If the text contains special characters, please escape them according to th
 				<policyitem type="compatibility" name="LGPLStyleLicense" path="Doc/faq/gui.rst" desc="faq资料文档，不会导致软件要采用GPL"/>
 				<policyitem type="compatibility" name="GPLStyleLicense" path="config.guess" desc="三方库构建配置脚本，自研代码中不使用。"/>
 				<policyitem type="compatibility" name="GPLStyleLicense" path="config.sub" desc="三方库构建配置脚本，自研代码中不使用。"/>
-				<policyitem type="compatibility" name="FSFAP" path="m4/.*" desc="兼容license"/>
 				<policyitem type="license" name="GPLStyleLicense" path="config.guess" desc="三方库构建配置脚本，自研代码中不使用。"/>
 				<policyitem type="license" name="GPLStyleLicense" path="config.sub" desc="三方库构建配置脚本，自研代码中不使用。"/>
 			</policy>
@@ -81,8 +80,6 @@ Note:If the text contains special characters, please escape them according to th
 				<filteritem type="filepath" name="Modules/.*" desc="Licensed to PSF under a Contributor Agreement."/>
 				<filteritem type="filepath" name="Tools/.*" desc="Licensed to PSF under a Contributor Agreement."/>
 				<filteritem type="filepath" name="PC/.*" desc="Licensed to PSF under a Contributor Agreement."/>
-				<filteritem type="filepath" name="m4/ax_c_float_words_bigendian.m4" desc="FSFAP, 兼容license"/>
-				<filteritem type="filepath" name="m4/ax_check_openssl.m4" desc="FSFAP, 兼容license"/>
 				<filteritem type="filepath" name="Makefile.pre.in" desc="资料文件"/>
 				<filteritem type="filepath" name="Mac/README.rst" desc="README文件"/>
 				<filteritem type="filepath" name="Mac/BuildScript/README.rst" desc="README文件"/>
@@ -95,6 +92,7 @@ Note:If the text contains special characters, please escape them according to th
 				<filteritem type="filepath" name="Python/dynamic_annotations.c"/>
 				<filteritem type="filepath" name="Python/getopt.c"/>
 				<filteritem type="filepath" name="Objects/dictobject.c"/>
+				<filteritem type="filepath" name="PCbuild/prepare_libffi.bat"/>
 			</filefilter>
 			<filefilter name="binaryFileTypePolicyFilter" desc="Filters for binary file policies">
 				<filteritem type="filename" name="*.exe|*.whl|*.gif|*.ico|*.png|*.doc"/>

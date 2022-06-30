@@ -13,7 +13,7 @@ import re
 import types
 import decimal
 import unittest
-from test.support import temp_cwd, use_old_parser
+from test.support.os_helper import temp_cwd
 from test.support.script_helper import assert_python_failure
 
 a_global = 'global variable'
@@ -212,11 +212,6 @@ f'{a * f"-{x()}-"}'"""
         self.assertEqual(call.col_offset, 11)
 
     def test_ast_line_numbers_duplicate_expression(self):
-        """Duplicate expression
-
-        NOTE: this is currently broken, always sets location of the first
-        expression.
-        """
         expr = """
 a = 10
 f'{a * x()} {a * x()} {a * x()}'
@@ -266,9 +261,9 @@ f'{a * x()} {a * x()} {a * x()}'
         self.assertEqual(binop.lineno, 3)
         self.assertEqual(binop.left.lineno, 3)
         self.assertEqual(binop.right.lineno, 3)
-        self.assertEqual(binop.col_offset, 3)  # FIXME: this is wrong
-        self.assertEqual(binop.left.col_offset, 3)  # FIXME: this is wrong
-        self.assertEqual(binop.right.col_offset, 7)  # FIXME: this is wrong
+        self.assertEqual(binop.col_offset, 13)
+        self.assertEqual(binop.left.col_offset, 13)
+        self.assertEqual(binop.right.col_offset, 17)
         # check the third binop location
         binop = t.body[1].value.values[4].value
         self.assertEqual(type(binop), ast.BinOp)
@@ -278,9 +273,32 @@ f'{a * x()} {a * x()} {a * x()}'
         self.assertEqual(binop.lineno, 3)
         self.assertEqual(binop.left.lineno, 3)
         self.assertEqual(binop.right.lineno, 3)
-        self.assertEqual(binop.col_offset, 3)  # FIXME: this is wrong
-        self.assertEqual(binop.left.col_offset, 3)  # FIXME: this is wrong
-        self.assertEqual(binop.right.col_offset, 7)  # FIXME: this is wrong
+        self.assertEqual(binop.col_offset, 23)
+        self.assertEqual(binop.left.col_offset, 23)
+        self.assertEqual(binop.right.col_offset, 27)
+
+    def test_ast_numbers_fstring_with_formatting(self):
+
+        t = ast.parse('f"Here is that pesky {xxx:.3f} again"')
+        self.assertEqual(len(t.body), 1)
+        self.assertEqual(t.body[0].lineno, 1)
+
+        self.assertEqual(type(t.body[0]), ast.Expr)
+        self.assertEqual(type(t.body[0].value), ast.JoinedStr)
+        self.assertEqual(len(t.body[0].value.values), 3)
+
+        self.assertEqual(type(t.body[0].value.values[0]), ast.Constant)
+        self.assertEqual(type(t.body[0].value.values[1]), ast.FormattedValue)
+        self.assertEqual(type(t.body[0].value.values[2]), ast.Constant)
+
+        _, expr, _ = t.body[0].value.values
+
+        name = expr.value
+        self.assertEqual(type(name), ast.Name)
+        self.assertEqual(name.lineno, 1)
+        self.assertEqual(name.end_lineno, 1)
+        self.assertEqual(name.col_offset, 22)
+        self.assertEqual(name.end_col_offset, 25)
 
     def test_ast_line_numbers_multiline_fstring(self):
         # See bpo-30465 for details.
@@ -578,8 +596,7 @@ x = (
                              # This looks like a nested format spec.
                              ])
 
-        err_msg = "invalid syntax" if use_old_parser() else "f-string: invalid syntax"
-        self.assertAllRaise(SyntaxError, err_msg,
+        self.assertAllRaise(SyntaxError, "f-string: invalid syntax",
                             [# Invalid syntax inside a nested spec.
                              "f'{4:{/5}}'",
                              ])
@@ -653,8 +670,7 @@ x = (
         #  are added around it. But we shouldn't go from an invalid
         #  expression to a valid one. The added parens are just
         #  supposed to allow whitespace (including newlines).
-        err_msg = "invalid syntax" if use_old_parser() else "f-string: invalid syntax"
-        self.assertAllRaise(SyntaxError, err_msg,
+        self.assertAllRaise(SyntaxError, 'f-string: invalid syntax',
                             ["f'{,}'",
                              "f'{,}'",  # this is (,), which is an error
                              ])
@@ -663,9 +679,12 @@ x = (
                             ["f'{3)+(4}'",
                              ])
 
-        self.assertAllRaise(SyntaxError, 'EOL while scanning string literal',
+        self.assertAllRaise(SyntaxError, 'unterminated string literal',
                             ["f'{\n}'",
                              ])
+    def test_newlines_before_syntax_error(self):
+        self.assertAllRaise(SyntaxError, "invalid syntax",
+                ["f'{.}'", "\nf'{.}'", "\n\nf'{.}'"])
 
     def test_backslashes_in_string_part(self):
         self.assertEqual(f'\t', '\t')
@@ -772,8 +791,7 @@ x = (
 
         # lambda doesn't work without parens, because the colon
         #  makes the parser think it's a format_spec
-        err_msg = "invalid syntax" if use_old_parser() else "f-string: invalid syntax"
-        self.assertAllRaise(SyntaxError, err_msg,
+        self.assertAllRaise(SyntaxError, 'f-string: invalid syntax',
                             ["f'{lambda x:x}'",
                              ])
 
@@ -926,12 +944,7 @@ x = (
                              "Bf''",
                              "BF''",]
         double_quote_cases = [case.replace("'", '"') for case in single_quote_cases]
-        error_msg = (
-            'invalid syntax'
-            if use_old_parser()
-            else 'unexpected EOF while parsing'
-        )
-        self.assertAllRaise(SyntaxError, error_msg,
+        self.assertAllRaise(SyntaxError, 'invalid syntax',
                             single_quote_cases + double_quote_cases)
 
     def test_leading_trailing_spaces(self):
@@ -995,7 +1008,7 @@ x = (
                              ])
 
     def test_assignment(self):
-        self.assertAllRaise(SyntaxError, 'invalid syntax',
+        self.assertAllRaise(SyntaxError, r'invalid syntax',
                             ["f'' = 3",
                              "f'{0}' = x",
                              "f'{x}' = x",
@@ -1111,12 +1124,11 @@ x = (
                              r"f'{1000:j}'",
                             ])
 
-    @unittest.skipIf(use_old_parser(), "The old parser only supports <fstring> as the filename")
     def test_filename_in_syntaxerror(self):
         # see issue 38964
         with temp_cwd() as cwd:
             file_path = os.path.join(cwd, 't.py')
-            with open(file_path, 'w') as f:
+            with open(file_path, 'w', encoding="utf-8") as f:
                 f.write('f"{a b}"') # This generates a SyntaxError
             _, _, stderr = assert_python_failure(file_path,
                                                  PYTHONIOENCODING='ascii')
@@ -1258,8 +1270,7 @@ x = (
         self.assertEqual(x, 10)
 
     def test_invalid_syntax_error_message(self):
-        err_msg = "invalid syntax" if use_old_parser() else "f-string: invalid syntax"
-        with self.assertRaisesRegex(SyntaxError, err_msg):
+        with self.assertRaisesRegex(SyntaxError, "f-string: invalid syntax"):
             compile("f'{a $ b}'", "?", "exec")
 
     def test_with_two_commas_in_format_specifier(self):
@@ -1281,6 +1292,15 @@ x = (
         error_msg = re.escape("Cannot specify both ',' and '_'.")
         with self.assertRaisesRegex(ValueError, error_msg):
             f'{1:_,}'
+
+    def test_syntax_error_for_starred_expressions(self):
+        error_msg = re.escape("cannot use starred expression here")
+        with self.assertRaisesRegex(SyntaxError, error_msg):
+            compile("f'{*a}'", "?", "exec")
+
+        error_msg = re.escape("cannot use double starred expression here")
+        with self.assertRaisesRegex(SyntaxError, error_msg):
+            compile("f'{**a}'", "?", "exec")
 
 if __name__ == '__main__':
     unittest.main()
