@@ -330,10 +330,9 @@ property::
    10 b'Hi\x00lo\x00\x00\x00\x00\x00'
    >>>
 
-The :func:`create_string_buffer` function replaces the :func:`c_buffer` function
-(which is still available as an alias), as well as the :func:`c_string` function
-from earlier ctypes releases.  To create a mutable memory block containing
-unicode characters of the C type :c:type:`wchar_t` use the
+The :func:`create_string_buffer` function replaces the old :func:`c_buffer`
+function (which is still available as an alias).  To create a mutable memory
+block containing unicode characters of the C type :c:type:`wchar_t`, use the
 :func:`create_unicode_buffer` function.
 
 
@@ -1088,7 +1087,9 @@ size, we show only how this table can be read with :mod:`ctypes`::
    >>> class struct_frozen(Structure):
    ...     _fields_ = [("name", c_char_p),
    ...                 ("code", POINTER(c_ubyte)),
-   ...                 ("size", c_int)]
+   ...                 ("size", c_int),
+   ...                 ("get_code", POINTER(c_ubyte)),  # Function pointer
+   ...                ]
    ...
    >>>
 
@@ -1096,7 +1097,7 @@ We have defined the :c:type:`struct _frozen` data type, so we can get the pointe
 to the table::
 
    >>> FrozenTable = POINTER(struct_frozen)
-   >>> table = FrozenTable.in_dll(pythonapi, "PyImport_FrozenModules")
+   >>> table = FrozenTable.in_dll(pythonapi, "_PyImport_FrozenBootstrap")
    >>>
 
 Since ``table`` is a ``pointer`` to the array of ``struct_frozen`` records, we
@@ -1112,9 +1113,7 @@ hit the ``NULL`` entry::
    ...
    _frozen_importlib 31764
    _frozen_importlib_external 41499
-   __hello__ 161
-   __phello__ -161
-   __phello__.spam 161
+   zipimport 12345
    >>>
 
 The fact that standard Python has a frozen module and a frozen package
@@ -1360,10 +1359,6 @@ way is to instantiate one of the following classes:
    Windows only: Instances of this class represent loaded shared libraries,
    functions in these libraries use the ``stdcall`` calling convention, and are
    assumed to return :c:type:`int` by default.
-
-   On Windows CE only the standard calling convention is used, for convenience the
-   :class:`WinDLL` and :class:`OleDLL` use the standard calling convention on this
-   platform.
 
 The Python :term:`global interpreter lock` is released before calling any
 function exported by these libraries, and reacquired afterwards.
@@ -1665,8 +1660,7 @@ See :ref:`ctypes-callback-functions` for examples.
 .. function:: WINFUNCTYPE(restype, *argtypes, use_errno=False, use_last_error=False)
 
    Windows only: The returned function prototype creates functions that use the
-   ``stdcall`` calling convention, except on Windows CE where
-   :func:`WINFUNCTYPE` is the same as :func:`CFUNCTYPE`.  The function will
+   ``stdcall`` calling convention.  The function will
    release the GIL during the call.  *use_errno* and *use_last_error* have the
    same meaning as above.
 
@@ -2391,6 +2385,18 @@ Structured data types
    Abstract base class for unions in native byte order.
 
 
+.. class:: BigEndianUnion(*args, **kw)
+
+   Abstract base class for unions in *big endian* byte order.
+
+   .. versionadded:: 3.11
+
+.. class:: LittleEndianUnion(*args, **kw)
+
+   Abstract base class for unions in *little endian* byte order.
+
+   .. versionadded:: 3.11
+
 .. class:: BigEndianStructure(*args, **kw)
 
    Abstract base class for structures in *big endian* byte order.
@@ -2400,8 +2406,8 @@ Structured data types
 
    Abstract base class for structures in *little endian* byte order.
 
-Structures with non-native byte order cannot contain pointer type fields, or any
-other data types containing pointer type fields.
+Structures and unions with non-native byte order cannot contain pointer type
+fields, or any other data types containing pointer type fields.
 
 
 .. class:: Structure(*args, **kw)
@@ -2513,7 +2519,7 @@ Arrays and pointers
    Abstract base class for arrays.
 
    The recommended way to create concrete array types is by multiplying any
-   :mod:`ctypes` data type with a positive integer.  Alternatively, you can subclass
+   :mod:`ctypes` data type with a non-negative integer.  Alternatively, you can subclass
    this type and define :attr:`_length_` and :attr:`_type_` class variables.
    Array elements can be read and written using standard
    subscript and slice accesses; for slice reads, the resulting object is

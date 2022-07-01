@@ -218,9 +218,9 @@ A comprehension in an :keyword:`!async def` function may consist of either a
 :keyword:`!for` or :keyword:`!async for` clause following the leading
 expression, may contain additional :keyword:`!for` or :keyword:`!async for`
 clauses, and may also use :keyword:`await` expressions.
-If a comprehension contains either :keyword:`!async for` clauses
-or :keyword:`!await` expressions it is called an
-:dfn:`asynchronous comprehension`.  An asynchronous comprehension may
+If a comprehension contains either :keyword:`!async for` clauses or
+:keyword:`!await` expressions or other asynchronous comprehensions it is called
+an :dfn:`asynchronous comprehension`.  An asynchronous comprehension may
 suspend the execution of the coroutine function in which it appears.
 See also :pep:`530`.
 
@@ -229,6 +229,11 @@ See also :pep:`530`.
 
 .. versionchanged:: 3.8
    ``yield`` and ``yield from`` prohibited in the implicitly nested scope.
+
+.. versionchanged:: 3.11
+   Asynchronous comprehensions are now allowed inside comprehensions in
+   asynchronous functions. Outer comprehensions implicitly become
+   asynchronous.
 
 
 .. _lists:
@@ -556,13 +561,26 @@ is already executing raises a :exc:`ValueError` exception.
    could receive the value.
 
 
-.. method:: generator.throw(type[, value[, traceback]])
+.. method:: generator.throw(value)
+            generator.throw(type[, value[, traceback]])
 
-   Raises an exception of type ``type`` at the point where the generator was paused,
+   Raises an exception at the point where the generator was paused,
    and returns the next value yielded by the generator function.  If the generator
    exits without yielding another value, a :exc:`StopIteration` exception is
    raised.  If the generator function does not catch the passed-in exception, or
    raises a different exception, then that exception propagates to the caller.
+
+   In typical use, this is called with a single exception instance similar to the
+   way the :keyword:`raise` keyword is used.
+
+   For backwards compatibility, however, the second signature is
+   supported, following a convention from older versions of Python.
+   The *type* argument should be an exception class, and *value*
+   should be an exception instance. If the *value* is not provided, the
+   *type* constructor is called to get an instance. If *traceback*
+   is provided, it is set on the exception, otherwise any existing
+   :attr:`~BaseException.__traceback__` attribute stored in *value* may
+   be cleared.
 
 .. index:: exception: GeneratorExit
 
@@ -810,30 +828,44 @@ Subscriptions
    object: dictionary
    pair: sequence; item
 
-Subscription of a sequence (string, tuple or list) or mapping (dictionary)
-object usually selects an item from the collection:
+The subscription of an instance of a :ref:`container class <sequence-types>`
+will generally select an element from the container. The subscription of a
+:term:`generic class <generic type>` will generally return a
+:ref:`GenericAlias <types-genericalias>` object.
 
 .. productionlist:: python-grammar
    subscription: `primary` "[" `expression_list` "]"
 
-The primary must evaluate to an object that supports subscription (lists or
-dictionaries for example).  User-defined objects can support subscription by
-defining a :meth:`__getitem__` method.
+When an object is subscripted, the interpreter will evaluate the primary and
+the expression list.
 
-For built-in objects, there are two types of objects that support subscription:
+The primary must evaluate to an object that supports subscription. An object
+may support subscription through defining one or both of
+:meth:`~object.__getitem__` and :meth:`~object.__class_getitem__`. When the
+primary is subscripted, the evaluated result of the expression list will be
+passed to one of these methods. For more details on when ``__class_getitem__``
+is called instead of ``__getitem__``, see :ref:`classgetitem-versus-getitem`.
 
-If the primary is a mapping, the expression list must evaluate to an object
-whose value is one of the keys of the mapping, and the subscription selects the
-value in the mapping that corresponds to that key.  (The expression list is a
-tuple except if it has exactly one item.)
+If the expression list contains at least one comma, it will evaluate to a
+:class:`tuple` containing the items of the expression list. Otherwise, the
+expression list will evaluate to the value of the list's sole member.
 
-If the primary is a sequence, the expression list must evaluate to an integer
-or a slice (as discussed in the following section).
+For built-in objects, there are two types of objects that support subscription
+via :meth:`~object.__getitem__`:
+
+1. Mappings. If the primary is a :term:`mapping`, the expression list must
+   evaluate to an object whose value is one of the keys of the mapping, and the
+   subscription selects the value in the mapping that corresponds to that key.
+   An example of a builtin mapping class is the :class:`dict` class.
+2. Sequences. If the primary is a :term:`sequence`, the expression list must
+   evaluate to an :class:`int` or a :class:`slice` (as discussed in the
+   following section). Examples of builtin sequence classes include the
+   :class:`str`, :class:`list` and :class:`tuple` classes.
 
 The formal syntax makes no special provision for negative indices in
-sequences; however, built-in sequences all provide a :meth:`__getitem__`
+:term:`sequences <sequence>`. However, built-in sequences all provide a :meth:`~object.__getitem__`
 method that interprets negative indices by adding the length of the sequence
-to the index (so that ``x[-1]`` selects the last item of ``x``).  The
+to the index so that, for example, ``x[-1]`` selects the last item of ``x``. The
 resulting value must be a nonnegative integer less than the number of items in
 the sequence, and the subscription selects the item whose index is that value
 (counting from zero). Since the support for negative indices and slicing
@@ -844,13 +876,9 @@ this method will need to explicitly add that support.
    single: character
    pair: string; item
 
-A string's items are characters.  A character is not a separate data type but a
+A :class:`string <str>` is a special kind of sequence whose items are
+*characters*. A character is not a separate data type but a
 string of exactly one character.
-
-Subscription of certain :term:`classes <class>` or :term:`types <type>`
-creates a :ref:`generic alias <types-genericalias>`.
-In this case, user-defined classes can support subscription by providing a
-:meth:`__class_getitem__` classmethod.
 
 
 .. _slicings:
@@ -958,8 +986,8 @@ formal parameters.  If there are N positional arguments, they are placed in the
 first N slots.  Next, for each keyword argument, the identifier is used to
 determine the corresponding slot (if the identifier is the same as the first
 formal parameter name, the first slot is used, and so on).  If the slot is
-already filled, a :exc:`TypeError` exception is raised. Otherwise, the value of
-the argument is placed in the slot, filling it (even if the expression is
+already filled, a :exc:`TypeError` exception is raised. Otherwise, the
+argument is placed in the slot, filling it (even if the expression is
 ``None``, it fills the slot).  When all arguments have been processed, the slots
 that are still unfilled are filled with the corresponding default value from the
 function definition.  (Default values are calculated, once, when the function is
@@ -1019,7 +1047,7 @@ keyword arguments (and any ``**expression`` arguments -- see below).  So::
    1 2
 
 It is unusual for both keyword arguments and the ``*expression`` syntax to be
-used in the same call, so in practice this confusion does not arise.
+used in the same call, so in practice this confusion does not often arise.
 
 .. index::
    single: **; in function calls
@@ -1416,6 +1444,8 @@ evaluated at most once.
 Note that ``a op1 b op2 c`` doesn't imply any kind of comparison between *a* and
 *c*, so that, e.g., ``x < y > z`` is perfectly legal (though perhaps not
 pretty).
+
+.. _expressions-value-comparisons:
 
 Value comparisons
 -----------------
@@ -1868,7 +1898,7 @@ precedence and have a left-to-right chaining feature as described in the
 | ``x[index]``, ``x[index:index]``,             | Subscription, slicing,              |
 | ``x(arguments...)``, ``x.attribute``          | call, attribute reference           |
 +-----------------------------------------------+-------------------------------------+
-| :keyword:`await` ``x``                        | Await expression                    |
+| :keyword:`await x <await>`                    | Await expression                    |
 +-----------------------------------------------+-------------------------------------+
 | ``**``                                        | Exponentiation [#]_                 |
 +-----------------------------------------------+-------------------------------------+
@@ -1892,7 +1922,7 @@ precedence and have a left-to-right chaining feature as described in the
 | :keyword:`is`, :keyword:`is not`, ``<``,      | tests and identity tests            |
 | ``<=``, ``>``, ``>=``, ``!=``, ``==``         |                                     |
 +-----------------------------------------------+-------------------------------------+
-| :keyword:`not` ``x``                          | Boolean NOT                         |
+| :keyword:`not x <not>`                        | Boolean NOT                         |
 +-----------------------------------------------+-------------------------------------+
 | :keyword:`and`                                | Boolean AND                         |
 +-----------------------------------------------+-------------------------------------+

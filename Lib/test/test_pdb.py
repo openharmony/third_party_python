@@ -13,6 +13,7 @@ import linecache
 
 from contextlib import ExitStack, redirect_stdout
 from io import StringIO
+from test import support
 from test.support import os_helper
 # This little helper class is essential for testing pdb under doctest.
 from test.test_doctest import _FakeInput
@@ -260,6 +261,9 @@ def test_pdb_breakpoint_commands():
     ...     'tbreak 5',
     ...     'continue',  # will stop at temporary breakpoint
     ...     'break',     # make sure breakpoint is gone
+    ...     'commands 10',  # out of range
+    ...     'commands a',   # display help
+    ...     'commands 4',   # already deleted
     ...     'continue',
     ... ]):
     ...    test_function()
@@ -319,6 +323,14 @@ def test_pdb_breakpoint_commands():
     > <doctest test.test_pdb.test_pdb_breakpoint_commands[0]>(5)test_function()
     -> print(3)
     (Pdb) break
+    (Pdb) commands 10
+    *** cannot set commands: Breakpoint number 10 out of range
+    (Pdb) commands a
+    *** Usage: commands [bnum]
+            ...
+            end
+    (Pdb) commands 4
+    *** cannot set commands: Breakpoint 4 already deleted
     (Pdb) continue
     3
     4
@@ -362,7 +374,7 @@ def test_pdb_breakpoints_preserved_across_interactive_sessions():
     1   breakpoint   keep yes   at ...test_pdb.py:...
     2   breakpoint   keep yes   at ...test_pdb.py:...
     (Pdb) break pdb.find_function
-    Breakpoint 3 at ...pdb.py:94
+    Breakpoint 3 at ...pdb.py:97
     (Pdb) break
     Num Type         Disp Enb   Where
     1   breakpoint   keep yes   at ...test_pdb.py:...
@@ -1351,11 +1363,57 @@ def test_pdb_issue_43318():
     4
     """
 
+def test_pdb_issue_gh_91742():
+    """See GH-91742
 
+    >>> def test_function():
+    ...    __author__ = "pi"
+    ...    __version__ = "3.14"
+    ...
+    ...    def about():
+    ...        '''About'''
+    ...        print(f"Author: {__author__!r}",
+    ...            f"Version: {__version__!r}",
+    ...            sep=" ")
+    ...
+    ...    import pdb; pdb.Pdb(nosigint=True, readrc=False).set_trace()
+    ...    about()
+
+
+    >>> reset_Breakpoint()
+    >>> with PdbTestInput([  # doctest: +NORMALIZE_WHITESPACE
+    ...     'step',
+    ...     'next',
+    ...     'next',
+    ...     'jump 5',
+    ...     'continue'
+    ... ]):
+    ...     test_function()
+    > <doctest test.test_pdb.test_pdb_issue_gh_91742[0]>(12)test_function()
+    -> about()
+    (Pdb) step
+    --Call--
+    > <doctest test.test_pdb.test_pdb_issue_gh_91742[0]>(5)about()
+    -> def about():
+    (Pdb) next
+    > <doctest test.test_pdb.test_pdb_issue_gh_91742[0]>(7)about()
+    -> print(f"Author: {__author__!r}",
+    (Pdb) next
+    > <doctest test.test_pdb.test_pdb_issue_gh_91742[0]>(8)about()
+    -> f"Version: {__version__!r}",
+    (Pdb) jump 5
+    > <doctest test.test_pdb.test_pdb_issue_gh_91742[0]>(5)about()
+    -> def about():
+    (Pdb) continue
+    Author: 'pi' Version: '3.14'
+    """
+@support.requires_subprocess()
 class PdbTestCase(unittest.TestCase):
     def tearDown(self):
         os_helper.unlink(os_helper.TESTFN)
 
+    @unittest.skipIf(sys.flags.safe_path,
+                     'PYTHONSAFEPATH changes default sys.path')
     def _run_pdb(self, pdb_args, commands):
         self.addCleanup(os_helper.rmtree, '__pycache__')
         cmd = [sys.executable, '-m', 'pdb'] + pdb_args
@@ -1462,6 +1520,27 @@ def bœr():
         stdout, stderr = proc.communicate(b'quit\n')
         self.assertNotIn(b'SyntaxError', stdout,
                          "Got a syntax error running test script under PDB")
+
+    def test_issue46434(self):
+        # Temporarily patch in an extra help command which doesn't have a
+        # docstring to emulate what happens in an embeddable distribution
+        script = """
+            def do_testcmdwithnodocs(self, arg):
+                pass
+
+            import pdb
+            pdb.Pdb.do_testcmdwithnodocs = do_testcmdwithnodocs
+        """
+        commands = """
+            continue
+            help testcmdwithnodocs
+        """
+        stdout, stderr = self.run_pdb_script(script, commands)
+        output = (stdout or '') + (stderr or '')
+        self.assertNotIn('AttributeError', output,
+                         'Calling help on a command with no docs should be handled gracefully')
+        self.assertIn("*** No help for 'testcmdwithnodocs'; __doc__ string missing", output,
+                      'Calling help on a command with no docs should print an error')
 
     def test_issue13183(self):
         script = """
@@ -1626,6 +1705,40 @@ def bœr():
             finally:
                 if save_home is not None:
                     os.environ["HOME"] = save_home
+
+    def test_read_pdbrc_with_ascii_encoding(self):
+        script = textwrap.dedent("""
+            import pdb; pdb.Pdb().set_trace()
+            print('hello')
+        """)
+        save_home = os.environ.pop('HOME', None)
+        try:
+            with os_helper.temp_cwd():
+                with open('.pdbrc', 'w', encoding='utf-8') as f:
+                    f.write("Fran\u00E7ais")
+
+                with open('main.py', 'w', encoding='utf-8') as f:
+                    f.write(script)
+
+                cmd = [sys.executable, 'main.py']
+                env = {'PYTHONIOENCODING': 'ascii'}
+                if sys.platform == 'win32':
+                    env['PYTHONLEGACYWINDOWSSTDIO'] = 'non-empty-string'
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stdin=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env={**os.environ, **env}
+                )
+                with proc:
+                    stdout, stderr = proc.communicate(b'c\n')
+                    self.assertIn(b"UnicodeEncodeError: \'ascii\' codec can\'t encode character "
+                                  b"\'\\xe7\' in position 21: ordinal not in range(128)", stderr)
+
+        finally:
+            if save_home is not None:
+                os.environ['HOME'] = save_home
 
     def test_header(self):
         stdout = StringIO()
@@ -1931,14 +2044,10 @@ class ChecklineTests(unittest.TestCase):
                 self.assertFalse(db.checkline(os_helper.TESTFN, lineno))
 
 
-def load_tests(*args):
+def load_tests(loader, tests, pattern):
     from test import test_pdb
-    suites = [
-        unittest.makeSuite(PdbTestCase),
-        unittest.makeSuite(ChecklineTests),
-        doctest.DocTestSuite(test_pdb)
-    ]
-    return unittest.TestSuite(suites)
+    tests.addTest(doctest.DocTestSuite(test_pdb))
+    return tests
 
 
 if __name__ == '__main__':

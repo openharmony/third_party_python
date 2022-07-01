@@ -5,7 +5,7 @@
     "License File": "LICENSE",
     "Version Number": "3.10.2",
     "Owner": "anguanglin@huawei.com",
-    "Upstream URL": "https://www.python.org/ftp/python/3.10.2/Python-3.10.2.tgz",
+    "Upstream URL": "https://github.com/python/cpython.git",
     "Description": "Python is a programming language that lets you work quickly and integrate systems more effectively."
   }
 ]

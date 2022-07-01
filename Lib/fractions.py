@@ -1,7 +1,7 @@
 # Originally contributed by Sjoerd Mullender.
 # Significantly modified by Jeffrey Yasskin <jyasskin at gmail.com>.
 
-"""Fraction, infinite-precision, real numbers."""
+"""Fraction, infinite-precision, rational numbers."""
 
 from decimal import Decimal
 import math
@@ -21,17 +21,17 @@ _PyHASH_MODULUS = sys.hash_info.modulus
 _PyHASH_INF = sys.hash_info.inf
 
 _RATIONAL_FORMAT = re.compile(r"""
-    \A\s*                      # optional whitespace at the start, then
-    (?P<sign>[-+]?)            # an optional sign, then
-    (?=\d|\.\d)                # lookahead for digit or .digit
-    (?P<num>\d*)               # numerator (possibly empty)
-    (?:                        # followed by
-       (?:/(?P<denom>\d+))?    # an optional denominator
-    |                          # or
-       (?:\.(?P<decimal>\d*))? # an optional fractional part
-       (?:E(?P<exp>[-+]?\d+))? # and optional exponent
+    \A\s*                                 # optional whitespace at the start,
+    (?P<sign>[-+]?)                       # an optional sign, then
+    (?=\d|\.\d)                           # lookahead for digit or .digit
+    (?P<num>\d*|\d+(_\d+)*)               # numerator (possibly empty)
+    (?:                                   # followed by
+       (?:/(?P<denom>\d+(_\d+)*))?        # an optional denominator
+    |                                     # or
+       (?:\.(?P<decimal>d*|\d+(_\d+)*))?  # an optional fractional part
+       (?:E(?P<exp>[-+]?\d+(_\d+)*))?     # and optional exponent
     )
-    \s*\Z                      # and optional whitespace to finish
+    \s*\Z                                 # and optional whitespace to finish
 """, re.VERBOSE | re.IGNORECASE)
 
 
@@ -122,6 +122,7 @@ class Fraction(numbers.Rational):
                     denominator = 1
                     decimal = m.group('decimal')
                     if decimal:
+                        decimal = decimal.replace('_', '')
                         scale = 10**len(decimal)
                         numerator = numerator * scale + int(decimal)
                         denominator *= scale
@@ -244,14 +245,16 @@ class Fraction(numbers.Rational):
                 break
             p0, q0, p1, q1 = p1, q1, p0+a*p1, q2
             n, d = d, n-a*d
-
         k = (max_denominator-q0)//q1
-        bound1 = Fraction(p0+k*p1, q0+k*q1)
-        bound2 = Fraction(p1, q1)
-        if abs(bound2 - self) <= abs(bound1-self):
-            return bound2
+
+        # Determine which of the candidates (p0+k*p1)/(q0+k*q1) and p1/q1 is
+        # closer to self. The distance between them is 1/(q1*(q0+k*q1)), while
+        # the distance from p1/q1 to self is d/(q1*self._denominator). So we
+        # need to compare 2*(q0+k*q1) with self._denominator/d.
+        if 2*d*(q0+k*q1) <= self._denominator:
+            return Fraction(p1, q1, _normalize=False)
         else:
-            return bound1
+            return Fraction(p0+k*p1, q0+k*q1, _normalize=False)
 
     @property
     def numerator(a):
@@ -593,8 +596,15 @@ class Fraction(numbers.Rational):
         """abs(a)"""
         return Fraction(abs(a._numerator), a._denominator, _normalize=False)
 
+    def __int__(a, _index=operator.index):
+        """int(a)"""
+        if a._numerator < 0:
+            return _index(-(-a._numerator // a._denominator))
+        else:
+            return _index(a._numerator // a._denominator)
+
     def __trunc__(a):
-        """trunc(a)"""
+        """math.trunc(a)"""
         if a._numerator < 0:
             return -(-a._numerator // a._denominator)
         else:
@@ -735,7 +745,7 @@ class Fraction(numbers.Rational):
     # support for pickling, copy, and deepcopy
 
     def __reduce__(self):
-        return (self.__class__, (str(self),))
+        return (self.__class__, (self._numerator, self._denominator))
 
     def __copy__(self):
         if type(self) == Fraction:

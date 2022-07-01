@@ -56,7 +56,7 @@ Are there tools to help find bugs or perform static analysis?
 
 Yes.
 
-`Pylint <https://www.pylint.org/>`_ and
+`Pylint <https://pylint.pycqa.org/en/latest/index.html>`_ and
 `Pyflakes <https://github.com/PyCQA/pyflakes>`_ do basic checking that will
 help you catch bugs sooner.
 
@@ -78,7 +78,7 @@ set of modules required by a program and bind these modules together with a
 Python binary to produce a single executable.
 
 One is to use the freeze tool, which is included in the Python source tree as
-``Tools/freeze``. It converts Python byte code to C arrays; a C compiler you can
+``Tools/freeze``. It converts Python byte code to C arrays; with a C compiler you can
 embed all your modules into a new program, which is then linked with the
 standard Python modules.
 
@@ -409,8 +409,9 @@ What is the difference between arguments and parameters?
 
 :term:`Parameters <parameter>` are defined by the names that appear in a
 function definition, whereas :term:`arguments <argument>` are the values
-actually passed to a function when calling it.  Parameters define what types of
-arguments a function can accept.  For example, given the function definition::
+actually passed to a function when calling it.  Parameters define what
+:term:`kind of arguments <parameter>` a function can accept.  For
+example, given the function definition::
 
    def func(foo, bar=None, **kwargs):
        pass
@@ -1819,7 +1820,7 @@ for ``None``.  This reads like plain English in code and avoids confusion with
 other objects that may have boolean values that evaluate to false.
 
 2) Detecting optional arguments can be tricky when ``None`` is a valid input
-value.  In those situations, you can create an singleton sentinel object
+value.  In those situations, you can create a singleton sentinel object
 guaranteed to be distinct from other objects.  For example, here is how
 to implement a method that behaves like :meth:`dict.pop`::
 
@@ -1908,7 +1909,7 @@ The *cached_property* approach only works with methods that do not take
 any arguments.  It does not create a reference to the instance.  The
 cached method result will be kept only as long as the instance is alive.
 
-The advantage is that when an instance is not longer used, the cached
+The advantage is that when an instance is no longer used, the cached
 method result will be released right away.  The disadvantage is that if
 instances accumulate, so too will the accumulated method results.  They
 can grow without bound.
@@ -1951,9 +1952,9 @@ relevant instance attributes are mutable, the *cached_property* approach
 can't be made to work because it cannot detect changes to the
 attributes.
 
-The *lru_cache* approach can be made to work, but the class needs to define the
-*__eq__* and *__hash__* methods so the cache can detect relevant attribute
-updates::
+To make the *lru_cache* approach work when the *station_id* is mutable,
+the class needs to define the *__eq__* and *__hash__* methods so that
+the cache can detect relevant attribute updates::
 
     class Weather:
         "Example with a mutable station identifier"
