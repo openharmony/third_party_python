@@ -12,7 +12,6 @@ class BuildTestCase(support.TempdirManager,
                     support.LoggingSilencer,
                     unittest.TestCase):
 
-    @unittest.skipUnless(sys.executable, "test requires sys.executable")
     def test_finalize_options(self):
         pkg_dir, dist = self.create_dist()
         cmd = build(dist)
@@ -51,7 +50,7 @@ class BuildTestCase(support.TempdirManager,
         self.assertEqual(cmd.executable, os.path.normpath(sys.executable))
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(BuildTestCase)
+    return unittest.makeSuite(BuildTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

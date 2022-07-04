@@ -1,4 +1,4 @@
-from test.test_importlib import util
+from .. import util
 import sys
 import unittest
 from test import support

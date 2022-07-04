@@ -11,7 +11,6 @@ import unittest
 
 from test import support
 from test.support import os_helper
-from test.support import threading_helper
 from test.libregrtest.cmdline import Namespace
 from test.libregrtest.save_env import saved_test_environment
 from test.libregrtest.utils import clear_caches, format_duration, print_warning
@@ -80,11 +79,6 @@ class EnvChanged(Failed):
     def __str__(self) -> str:
         return f"{self.name} failed (env changed)"
 
-    # Convert Passed to EnvChanged
-    @staticmethod
-    def from_passed(other):
-        return EnvChanged(other.name, other.duration_sec, other.xml_data)
-
 
 class RefLeak(Failed):
     def __str__(self) -> str:
@@ -144,7 +138,7 @@ STDTESTS = [
 NOTTESTS = set()
 
 
-# Storage of uncollectable objects
+# used by --findleaks, store for gc.garbage
 FOUND_GARBAGE = []
 
 
@@ -185,9 +179,7 @@ def _runtest(ns: Namespace, test_name: str) -> TestResult:
 
     output_on_failure = ns.verbose3
 
-    use_timeout = (
-        ns.timeout is not None and threading_helper.can_start_thread
-    )
+    use_timeout = (ns.timeout is not None)
     if use_timeout:
         faulthandler.dump_traceback_later(ns.timeout, exit=True)
 
@@ -204,30 +196,18 @@ def _runtest(ns: Namespace, test_name: str) -> TestResult:
             stream = io.StringIO()
             orig_stdout = sys.stdout
             orig_stderr = sys.stderr
-            print_warning = support.print_warning
-            orig_print_warnings_stderr = print_warning.orig_stderr
-
-            output = None
             try:
                 sys.stdout = stream
                 sys.stderr = stream
-                # print_warning() writes into the temporary stream to preserve
-                # messages order. If support.environment_altered becomes true,
-                # warnings will be written to sys.stderr below.
-                print_warning.orig_stderr = stream
-
                 result = _runtest_inner(ns, test_name,
                                         display_failure=False)
                 if not isinstance(result, Passed):
                     output = stream.getvalue()
+                    orig_stderr.write(output)
+                    orig_stderr.flush()
             finally:
                 sys.stdout = orig_stdout
                 sys.stderr = orig_stderr
-                print_warning.orig_stderr = orig_print_warnings_stderr
-
-            if output is not None:
-                sys.stderr.write(output)
-                sys.stderr.flush()
         else:
             # Tell tests to be moderately quiet
             support.verbose = ns.verbose
@@ -287,7 +267,7 @@ def save_env(ns: Namespace, test_name: str):
 
 def _runtest_inner2(ns: Namespace, test_name: str) -> bool:
     # Load the test function, run the test function, handle huntrleaks
-    # to detect leaks.
+    # and findleaks to detect leaks
 
     abstest = get_abs_module(ns, test_name)
 
@@ -317,13 +297,9 @@ def _runtest_inner2(ns: Namespace, test_name: str) -> bool:
                 test_runner()
                 refleak = False
     finally:
-        # First kill any dangling references to open files etc.
-        # This can also issue some ResourceWarnings which would otherwise get
-        # triggered during the following test run, and possibly produce
-        # failures.
-        support.gc_collect()
-
         cleanup_test_droppings(test_name, ns.verbose)
+
+    support.gc_collect()
 
     if gc.garbage:
         support.environment_altered = True
@@ -354,7 +330,6 @@ def _runtest_inner(
 
     try:
         clear_caches()
-        support.gc_collect()
 
         with save_env(ns, test_name):
             refleak = _runtest_inner2(ns, test_name)
@@ -398,6 +373,11 @@ def _runtest_inner(
 
 
 def cleanup_test_droppings(test_name: str, verbose: int) -> None:
+    # First kill any dangling references to open files etc.
+    # This can also issue some ResourceWarnings which would otherwise get
+    # triggered during the following test run, and possibly produce failures.
+    support.gc_collect()
+
     # Try to clean up junk commonly left behind.  While tests shouldn't leave
     # any files or directories behind, when a test fails that can be tedious
     # for it to arrange.  The consequences can be especially nasty on Windows,

@@ -3,7 +3,7 @@
 import subprocess
 import sys
 import os
-from test.support import script_helper, requires_subprocess
+from test.support import script_helper
 import unittest
 from unittest import mock
 
@@ -69,7 +69,6 @@ class TestScriptHelper(unittest.TestCase):
             self.assertNotIn('-E', popen_command)
 
 
-@requires_subprocess()
 class TestScriptHelperEnvironment(unittest.TestCase):
     """Code coverage for interpreter_requires_environment()."""
 

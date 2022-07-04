@@ -147,7 +147,7 @@ for the feature and property names.
 .. data:: property_xml_string
 
    | value: ``"http://xml.org/sax/properties/xml-string"``
-   | data type: Bytes
+   | data type: String
    | description: The literal string of characters that was the source for the
      current event.
    | access: read-only

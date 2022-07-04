@@ -4,11 +4,6 @@
 .. module:: spwd
    :platform: Unix
    :synopsis: The shadow password database (getspnam() and friends).
-   :deprecated:
-
-.. deprecated-removed:: 3.11 3.13
-   The :mod:`spwd` module is deprecated
-   (see :pep:`PEP 594 <594#spwd>` for details and alternatives).
 
 --------------
 

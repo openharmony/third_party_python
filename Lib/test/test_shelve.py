@@ -1,9 +1,11 @@
 import unittest
 import dbm
-import shelve
-import pickle
 import os
+import shelve
+import glob
+import pickle
 
+from test import support
 from test.support import os_helper
 from collections.abc import MutableMapping
 from test.test_dbm import dbm_iterator
@@ -61,11 +63,10 @@ class TestCase(unittest.TestCase):
         else:
             self.fail('Closed shelf should not find a key')
 
-    def test_open_template(self, filename=None, protocol=None):
+    def test_open_template(self, protocol=None):
         os.mkdir(self.dirname)
         self.addCleanup(os_helper.rmtree, self.dirname)
-        s = shelve.open(filename=filename if filename is not None else self.fn,
-                        protocol=protocol)
+        s = shelve.open(self.fn, protocol=protocol)
         try:
             s['key1'] = (1,2,3,4)
             self.assertEqual(s['key1'], (1,2,3,4))
@@ -80,15 +81,6 @@ class TestCase(unittest.TestCase):
 
     def test_proto2_file_shelf(self):
         self.test_open_template(protocol=2)
-
-    def test_pathlib_path_file_shelf(self):
-        self.test_open_template(filename=os_helper.FakePath(self.fn))
-
-    def test_bytes_path_file_shelf(self):
-        self.test_open_template(filename=os.fsencode(self.fn))
-
-    def test_pathlib_bytes_path_file_shelf(self):
-        self.test_open_template(filename=os_helper.FakePath(os.fsencode(self.fn)))
 
     def test_in_memory_shelf(self):
         d1 = byteskeydict()

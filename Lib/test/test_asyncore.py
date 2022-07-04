@@ -18,9 +18,10 @@ from io import BytesIO
 if support.PGO:
     raise unittest.SkipTest("test is not helpful for PGO")
 
-support.requires_working_socket(module=True)
-
-asyncore = warnings_helper.import_deprecated('asyncore')
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', DeprecationWarning)
+    import asyncore
 
 
 HAS_UNIX_SOCKETS = hasattr(socket, 'AF_UNIX')
@@ -76,7 +77,8 @@ def capture_server(evt, buf, serv):
         pass
     else:
         n = 200
-        for _ in support.busy_retry(support.SHORT_TIMEOUT):
+        start = time.monotonic()
+        while n > 0 and time.monotonic() - start < 3.0:
             r, w, e = select.select([conn], [], [], 0.1)
             if r:
                 n -= 1
@@ -85,8 +87,7 @@ def capture_server(evt, buf, serv):
                 buf.write(data.replace(b'\n', b''))
                 if b'\n' in data:
                     break
-            if n <= 0:
-                break
+            time.sleep(0.01)
 
         conn.close()
     finally:

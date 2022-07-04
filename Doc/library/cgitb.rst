@@ -3,7 +3,6 @@
 
 .. module:: cgitb
    :synopsis: Configurable traceback handler for CGI scripts.
-   :deprecated:
 
 .. moduleauthor:: Ka-Ping Yee <ping@lfw.org>
 .. sectionauthor:: Fred L. Drake, Jr. <fdrake@acm.org>
@@ -15,10 +14,6 @@
    single: CGI; tracebacks
    single: exceptions; in CGI scripts
    single: tracebacks; in CGI scripts
-
-.. deprecated-removed:: 3.11 3.13
-   The :mod:`cgitb` module is deprecated
-   (see :pep:`PEP 594 <594#cgitb>` for details).
 
 --------------
 

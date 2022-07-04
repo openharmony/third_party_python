@@ -47,7 +47,7 @@
    when researching a change.
 
 This article explains the new features in Python 3.10, compared to 3.9.
-Python 3.10 was released on October 4, 2021.
+
 For full details, see the :ref:`changelog <changelog>`.
 
 Summary -- Release highlights
@@ -1019,7 +1019,7 @@ You can specify keyword-only on a per-field basis:
 
 .. code-block:: python
 
-    from dataclasses import dataclass, field
+    from dataclasses import dataclass
 
     @dataclass
     class Birthday:
@@ -1082,17 +1082,6 @@ encodings
 :func:`encodings.normalize_encoding` now ignores non-ASCII characters.
 (Contributed by Hai Shi in :issue:`39337`.)
 
-enum
-----
-
-:class:`Enum` :func:`__repr__` now returns ``enum_name.member_name`` and
-:func:`__str__` now returns ``member_name``.  Stdlib enums available as
-module constants have a :func:`repr` of ``module_name.member_name``.
-(Contributed by Ethan Furman in :issue:`40066`.)
-
-Add :class:`enum.StrEnum` for enums where all members are strings.
-(Contributed by Ethan Furman in :issue:`41816`.)
-
 fileinput
 ---------
 
@@ -1148,18 +1137,10 @@ IDLE and idlelib
 ----------------
 
 Make IDLE invoke :func:`sys.excepthook` (when started without '-n').
-User hooks were previously ignored.  (Contributed by Ken Hilton in
+User hooks were previously ignored.  (Patch by Ken Hilton in
 :issue:`43008`.)
 
-Rearrange the settings dialog.  Split the General tab into Windows
-and Shell/Ed tabs.  Move help sources, which extend the Help menu, to the
-Extensions tab.  Make space for new options and shorten the dialog. The
-latter makes the dialog better fit small screens.  (Contributed by Terry Jan
-Reedy in :issue:`40468`.)  Move the indent space setting from the Font tab to
-the new Windows tab.  (Contributed by Mark Roseman and Terry Jan Reedy in
-:issue:`33962`.)
-
-The changes above were backported to a 3.9 maintenance release.
+This change was backported to a 3.9 maintenance release.
 
 Add a Shell sidebar.  Move the primary prompt ('>>>') to the sidebar.
 Add secondary prompts ('...') to the sidebar.  Left click and optional
@@ -1172,19 +1153,17 @@ in :issue:`37903`.)
 
 Use spaces instead of tabs to indent interactive code.  This makes
 interactive code entries 'look right'.  Making this feasible was a
-major motivation for adding the shell sidebar.  (Contributed by
+major motivation for adding the shell sidebar.  Contributed by
 Terry Jan Reedy in :issue:`37892`.)
+
+We expect to backport these shell changes to a future 3.9 maintenance
+release.
 
 Highlight the new :ref:`soft keywords <soft-keywords>` :keyword:`match`,
 :keyword:`case <match>`, and :keyword:`_ <wildcard-patterns>` in
 pattern-matching statements. However, this highlighting is not perfect
 and will be incorrect in some rare cases, including some ``_``-s in
 ``case`` patterns.  (Contributed by Tal Einat in :issue:`44010`.)
-
-New in 3.10 maintenance releases.
-
-Apply syntax highlighting to `.pyi` files. (Contributed by Alex
-Waygood and Terry Jan Reedy in :issue:`45447`.)
 
 importlib.metadata
 ------------------
@@ -1222,12 +1201,6 @@ now call :func:`inspect.get_annotations` to retrieve annotations. This means
 :func:`inspect.signature` and :func:`inspect.Signature.from_callable` can
 also now un-stringize stringized annotations.
 (Contributed by Larry Hastings in :issue:`43817`.)
-
-itertools
----------
-
-Add :func:`itertools.pairwise()`.
-(Contributed by Raymond Hettinger in :issue:`38200`.)
 
 linecache
 ---------
@@ -1510,6 +1483,13 @@ functions internally.  For more details, please see their respective
 documentation.
 (Contributed by Adam Goldschmidt, Senthil Kumaran and Ken Jin in :issue:`42967`.)
 
+The presence of newline or tab characters in parts of a URL allows for some
+forms of attacks. Following the WHATWG specification that updates :rfc:`3986`,
+ASCII newline ``\n``, ``\r`` and tab ``\t`` characters are stripped from the
+URL by the parser in :mod:`urllib.parse` preventing such attacks. The removal
+characters are controlled by a new module level variable
+``urllib.parse._UNSAFE_URL_BYTES_TO_REMOVE``. (See :issue:`43882`)
+
 xml
 ---
 
@@ -1746,7 +1726,7 @@ Deprecated
 
   * ``threading.Thread.setDaemon`` => :attr:`threading.Thread.daemon`
 
-  (Contributed by Jelle Zijlstra in :gh:`87889`.)
+  (Contributed by Jelle Zijlstra in :issue:`21574`.)
 
 * :meth:`pathlib.Path.link_to` is deprecated and slated for removal in
   Python 3.12. Use :meth:`pathlib.Path.hardlink_to` instead.
@@ -2025,8 +2005,8 @@ Build Changes
 
 * The ``configure`` script now uses the ``pkg-config`` utility, if available,
   to detect the location of Tcl/Tk headers and libraries.  As before, those
-  locations can be explicitly specified with the ``--with-tcltk-includes``
-  and ``--with-tcltk-libs`` configuration options.
+  locations can be explicitly specified with the :option:`--with-tcltk-includes`
+  and :option:`--with-tcltk-libs` configuration options.
   (Contributed by Manolis Stamatogiannakis in :issue:`42603`.)
 
 * Add :option:`--with-openssl-rpath` option to ``configure`` script. The option

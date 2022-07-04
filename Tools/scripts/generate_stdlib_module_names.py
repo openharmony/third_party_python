@@ -1,6 +1,5 @@
 # This script lists the names of standard library modules
 # to update Python/stdlib_mod_names.h
-import _imp
 import os.path
 import re
 import subprocess
@@ -12,6 +11,7 @@ SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 STDLIB_PATH = os.path.join(SRC_DIR, 'Lib')
 MODULES_SETUP = os.path.join(SRC_DIR, 'Modules', 'Setup')
 SETUP_PY = os.path.join(SRC_DIR, 'setup.py')
+TEST_EMBED = os.path.join(SRC_DIR, 'Programs', '_testembed')
 
 IGNORE = {
     '__init__',
@@ -21,9 +21,6 @@ IGNORE = {
     # Test modules and packages
     '__hello__',
     '__phello__',
-    '__hello_alias__',
-    '__phello_alias__',
-    '__hello_only__',
     '_ctypes_test',
     '_testbuffer',
     '_testcapi',
@@ -35,6 +32,7 @@ IGNORE = {
     '_xxtestfuzz',
     'distutils.tests',
     'idlelib.idle_test',
+    'lib2to3.tests',
     'test',
     'xxlimited',
     'xxlimited_35',
@@ -116,21 +114,16 @@ def list_modules_setup_extensions(names):
 # List frozen modules of the PyImport_FrozenModules list (Python/frozen.c).
 # Use the "./Programs/_testembed list_frozen" command.
 def list_frozen(names):
-    submodules = set()
-    for name in _imp._frozen_module_names():
-        # To skip __hello__, __hello_alias__ and etc.
-        if name.startswith('__'):
-            continue
-        if '.' in name:
-            submodules.add(name)
-        else:
-            names.add(name)
-    # Make sure all frozen submodules have a known parent.
-    for name in list(submodules):
-        if name.partition('.')[0] in names:
-            submodules.remove(name)
-    if submodules:
-        raise Exception(f'unexpected frozen submodules: {sorted(submodules)}')
+    args = [TEST_EMBED, 'list_frozen']
+    proc = subprocess.run(args, stdout=subprocess.PIPE, text=True)
+    exitcode = proc.returncode
+    if exitcode:
+        cmd = ' '.join(args)
+        print(f"{cmd} failed with exitcode {exitcode}")
+        sys.exit(exitcode)
+    for line in proc.stdout.splitlines():
+        name = line.strip()
+        names.add(name)
 
 
 def list_modules():

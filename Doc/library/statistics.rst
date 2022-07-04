@@ -43,7 +43,7 @@ or sample.
 
 =======================  ===============================================================
 :func:`mean`             Arithmetic mean ("average") of data.
-:func:`fmean`            Fast, floating point arithmetic mean, with optional weighting.
+:func:`fmean`            Fast, floating point arithmetic mean.
 :func:`geometric_mean`   Geometric mean of data.
 :func:`harmonic_mean`    Harmonic mean of data.
 :func:`median`           Median (middle value) of data.
@@ -129,7 +129,7 @@ However, for reading convenience, most of the examples show sorted sequences.
       ``mean(data)`` is equivalent to calculating the true population mean μ.
 
 
-.. function:: fmean(data, weights=None)
+.. function:: fmean(data)
 
    Convert *data* to floats and compute the arithmetic mean.
 
@@ -142,24 +142,7 @@ However, for reading convenience, most of the examples show sorted sequences.
       >>> fmean([3.5, 4.0, 5.25])
       4.25
 
-   Optional weighting is supported.  For example, a professor assigns a
-   grade for a course by weighting quizzes at 20%, homework at 20%, a
-   midterm exam at 30%, and a final exam at 30%:
-
-   .. doctest::
-
-      >>> grades = [85, 92, 83, 91]
-      >>> weights = [0.20, 0.20, 0.30, 0.30]
-      >>> fmean(grades, weights)
-      87.6
-
-   If *weights* is supplied, it must be the same length as the *data* or
-   a :exc:`ValueError` will be raised.
-
    .. versionadded:: 3.8
-
-   .. versionchanged:: 3.11
-      Added support for *weights*.
 
 
 .. function:: geometric_mean(data)
@@ -644,7 +627,7 @@ However, for reading convenience, most of the examples show sorted sequences.
 
    .. versionadded:: 3.10
 
-.. function:: linear_regression(x, y, /, *, proportional=False)
+.. function:: linear_regression(x, y, /)
 
    Return the slope and intercept of `simple linear regression
    <https://en.wikipedia.org/wiki/Simple_linear_regression>`_
@@ -678,18 +661,8 @@ However, for reading convenience, most of the examples show sorted sequences.
       >>> round(slope * 2019 + intercept)
       16
 
-   If *proportional* is true, the independent variable *x* and the
-   dependent variable *y* are assumed to be directly proportional.
-   The data is fit to a line passing through the origin.
-   Since the *intercept* will always be 0.0, the underlying linear
-   function simplifies to:
-
-      *y = slope \* x + noise*
-
    .. versionadded:: 3.10
 
-   .. versionchanged:: 3.11
-      Added support for *proportional*.
 
 Exceptions
 ----------
@@ -798,7 +771,7 @@ of applications in statistics.
        Compute the inverse cumulative distribution function, also known as the
        `quantile function <https://en.wikipedia.org/wiki/Quantile_function>`_
        or the `percent-point
-       <https://web.archive.org/web/20190203145224/https://www.statisticshowto.datasciencecentral.com/inverse-distribution-function/>`_
+       <https://www.statisticshowto.datasciencecentral.com/inverse-distribution-function/>`_
        function.  Mathematically, it is written ``x : P(X <= x) = p``.
 
        Finds the value *x* of the random variable *X* such that the
@@ -947,7 +920,7 @@ probability that the Python room will stay within its capacity limits?
 Normal distributions commonly arise in machine learning problems.
 
 Wikipedia has a `nice example of a Naive Bayesian Classifier
-<https://en.wikipedia.org/wiki/Naive_Bayes_classifier#Person_classification>`_.
+<https://en.wikipedia.org/wiki/Naive_Bayes_classifier#Sex_classification>`_.
 The challenge is to predict a person's gender from measurements of normally
 distributed features including height, weight, and foot size.
 

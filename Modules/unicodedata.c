@@ -2,6 +2,7 @@
 
    unicodedata -- Provides access to the Unicode database.
 
+   Data was extracted from the UnicodeData.txt file.
    The current version number is reported in the unidata_version constant.
 
    Written by Marc-Andre Lemburg (mal@lemburg.com).
@@ -12,10 +13,6 @@
 
    ------------------------------------------------------------------------ */
 
-#ifndef Py_BUILD_CORE_BUILTIN
-#  define Py_BUILD_CORE_MODULE 1
-#endif
-
 #define PY_SSIZE_T_CLEAN
 
 #include "Python.h"
@@ -23,6 +20,11 @@
 #include "structmember.h"         // PyMemberDef
 
 #include <stdbool.h>
+
+_Py_IDENTIFIER(NFC);
+_Py_IDENTIFIER(NFD);
+_Py_IDENTIFIER(NFKC);
+_Py_IDENTIFIER(NFKD);
 
 /*[clinic input]
 module unicodedata
@@ -806,10 +808,6 @@ is_normalized_quickcheck(PyObject *self, PyObject *input, bool nfc, bool k,
         return NO;
     }
 
-    if (PyUnicode_IS_ASCII(input)) {
-        return YES;
-    }
-
     Py_ssize_t i, len;
     int kind;
     const void *data;
@@ -884,17 +882,17 @@ unicodedata_UCD_is_normalized_impl(PyObject *self, PyObject *form,
     PyObject *cmp;
     int match = 0;
 
-    if (PyUnicode_CompareWithASCIIString(form, "NFC") == 0) {
+    if (_PyUnicode_EqualToASCIIId(form, &PyId_NFC)) {
         nfc = true;
     }
-    else if (PyUnicode_CompareWithASCIIString(form, "NFKC") == 0) {
+    else if (_PyUnicode_EqualToASCIIId(form, &PyId_NFKC)) {
         nfc = true;
         k = true;
     }
-    else if (PyUnicode_CompareWithASCIIString(form, "NFD") == 0) {
+    else if (_PyUnicode_EqualToASCIIId(form, &PyId_NFD)) {
         /* matches default values for `nfc` and `k` */
     }
-    else if (PyUnicode_CompareWithASCIIString(form, "NFKD") == 0) {
+    else if (_PyUnicode_EqualToASCIIId(form, &PyId_NFKD)) {
         k = true;
     }
     else {
@@ -947,7 +945,7 @@ unicodedata_UCD_normalize_impl(PyObject *self, PyObject *form,
         return input;
     }
 
-    if (PyUnicode_CompareWithASCIIString(form, "NFC") == 0) {
+    if (_PyUnicode_EqualToASCIIId(form, &PyId_NFC)) {
         if (is_normalized_quickcheck(self, input,
                                      true,  false, true) == YES) {
             Py_INCREF(input);
@@ -955,7 +953,7 @@ unicodedata_UCD_normalize_impl(PyObject *self, PyObject *form,
         }
         return nfc_nfkc(self, input, 0);
     }
-    if (PyUnicode_CompareWithASCIIString(form, "NFKC") == 0) {
+    if (_PyUnicode_EqualToASCIIId(form, &PyId_NFKC)) {
         if (is_normalized_quickcheck(self, input,
                                      true,  true,  true) == YES) {
             Py_INCREF(input);
@@ -963,7 +961,7 @@ unicodedata_UCD_normalize_impl(PyObject *self, PyObject *form,
         }
         return nfc_nfkc(self, input, 1);
     }
-    if (PyUnicode_CompareWithASCIIString(form, "NFD") == 0) {
+    if (_PyUnicode_EqualToASCIIId(form, &PyId_NFD)) {
         if (is_normalized_quickcheck(self, input,
                                      false, false, true) == YES) {
             Py_INCREF(input);
@@ -971,7 +969,7 @@ unicodedata_UCD_normalize_impl(PyObject *self, PyObject *form,
         }
         return nfd_nfkd(self, input, 0);
     }
-    if (PyUnicode_CompareWithASCIIString(form, "NFKD") == 0) {
+    if (_PyUnicode_EqualToASCIIId(form, &PyId_NFKD)) {
         if (is_normalized_quickcheck(self, input,
                                      false, true,  true) == YES) {
             Py_INCREF(input);
@@ -1044,9 +1042,9 @@ is_unified_ideograph(Py_UCS4 code)
 {
     return
         (0x3400 <= code && code <= 0x4DBF)   || /* CJK Ideograph Extension A */
-        (0x4E00 <= code && code <= 0x9FFF)   || /* CJK Ideograph */
-        (0x20000 <= code && code <= 0x2A6DF) || /* CJK Ideograph Extension B */
-        (0x2A700 <= code && code <= 0x2B738) || /* CJK Ideograph Extension C */
+        (0x4E00 <= code && code <= 0x9FFC)   || /* CJK Ideograph */
+        (0x20000 <= code && code <= 0x2A6DD) || /* CJK Ideograph Extension B */
+        (0x2A700 <= code && code <= 0x2B734) || /* CJK Ideograph Extension C */
         (0x2B740 <= code && code <= 0x2B81D) || /* CJK Ideograph Extension D */
         (0x2B820 <= code && code <= 0x2CEA1) || /* CJK Ideograph Extension E */
         (0x2CEB0 <= code && code <= 0x2EBE0) || /* CJK Ideograph Extension F */
@@ -1392,8 +1390,8 @@ corresponding character.  If not found, KeyError is raised.
 
 static PyObject *
 unicodedata_UCD_lookup_impl(PyObject *self, const char *name,
-                            Py_ssize_t name_length)
-/*[clinic end generated code: output=7f03fc4959b242f6 input=a557be0f8607a0d6]*/
+                            Py_ssize_clean_t name_length)
+/*[clinic end generated code: output=765cb8186788e6be input=a557be0f8607a0d6]*/
 {
     Py_UCS4 code;
     unsigned int index;

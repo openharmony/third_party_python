@@ -318,7 +318,7 @@ class RegisterTestCase(BasePyPIRCCommandTestCase):
 
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(RegisterTestCase)
+    return unittest.makeSuite(RegisterTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

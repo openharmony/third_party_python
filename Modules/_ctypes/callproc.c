@@ -54,11 +54,6 @@
 
  */
 
-#ifndef Py_BUILD_CORE_BUILTIN
-#  define Py_BUILD_CORE_MODULE 1
-#endif
-#define NEEDS_PY_IDENTIFIER
-
 #include "Python.h"
 #include "structmember.h"         // PyMemberDef
 
@@ -535,8 +530,8 @@ PyCArg_repr(PyCArgObject *self)
         }
 
 /* Hm, are these 'z' and 'Z' codes useful at all?
-   Shouldn't they be replaced by the functionality of create_string_buffer()
-   and c_wstring() ?
+   Shouldn't they be replaced by the functionality of c_string
+   and c_wstring ?
 */
     case 'z':
     case 'Z':
@@ -831,7 +826,7 @@ static int _call_function_pointer(int flags,
         cc = FFI_STDCALL;
 #endif
 
-#   ifdef USING_APPLE_OS_LIBFFI
+#   if USING_APPLE_OS_LIBFFI
 #      define HAVE_FFI_PREP_CIF_VAR_RUNTIME __builtin_available(macos 10.15, ios 13, watchos 6, tvos 13, *)
 #   elif HAVE_FFI_PREP_CIF_VAR
 #      define HAVE_FFI_PREP_CIF_VAR_RUNTIME true
@@ -1124,6 +1119,14 @@ GetComError(HRESULT errcode, GUID *riid, IUnknown *pIunk)
 #endif
 
 /*
+ * bpo-13097: Max number of arguments _ctypes_callproc will accept.
+ *
+ * This limit is enforced for the `alloca()` call in `_ctypes_callproc`,
+ * to avoid allocating a massive buffer on the stack.
+ */
+#define CTYPES_MAX_ARGCOUNT 1024
+
+/*
  * Requirements, must be ensured by the caller:
  * - argtuple is tuple of arguments
  * - argtypes is either NULL, or a tuple of the same size as argtuple
@@ -1165,7 +1168,11 @@ PyObject *_ctypes_callproc(PPROC pProc,
         return NULL;
     }
 
-    args = alloca(sizeof(struct argument) * argcount);
+    args = (struct argument *)alloca(sizeof(struct argument) * argcount);
+    if (!args) {
+        PyErr_NoMemory();
+        return NULL;
+    }
     memset(args, 0, sizeof(struct argument) * argcount);
     argtype_count = argtypes ? PyTuple_GET_SIZE(argtypes) : 0;
 #ifdef MS_WIN32
@@ -1212,12 +1219,7 @@ PyObject *_ctypes_callproc(PPROC pProc,
         }
     }
 
-    if (restype == Py_None) {
-        rtype = &ffi_type_void;
-    } else {
-        rtype = _ctypes_get_ffi_type(restype);
-    }
-
+    rtype = _ctypes_get_ffi_type(restype);
     resbuf = alloca(max(rtype->size, sizeof(ffi_arg)));
 
 #ifdef _Py_MEMORY_SANITIZER
@@ -1310,11 +1312,11 @@ _parse_voidp(PyObject *obj, void **address)
 
 #ifdef MS_WIN32
 
-PyDoc_STRVAR(format_error_doc,
+static const char format_error_doc[] =
 "FormatError([integer]) -> string\n\
 \n\
 Convert a win32 error code into a string. If the error code is not\n\
-given, the return value of a call to GetLastError() is used.\n");
+given, the return value of a call to GetLastError() is used.\n";
 static PyObject *format_error(PyObject *self, PyObject *args)
 {
     PyObject *result;
@@ -1334,13 +1336,13 @@ static PyObject *format_error(PyObject *self, PyObject *args)
     return result;
 }
 
-PyDoc_STRVAR(load_library_doc,
+static const char load_library_doc[] =
 "LoadLibrary(name, load_flags) -> handle\n\
 \n\
 Load an executable (usually a DLL), and return a handle to it.\n\
 The handle may be used to locate exported functions in this\n\
 module. load_flags are as defined for LoadLibraryEx in the\n\
-Windows API.\n");
+Windows API.\n";
 static PyObject *load_library(PyObject *self, PyObject *args)
 {
     PyObject *nameobj;
@@ -1385,10 +1387,10 @@ static PyObject *load_library(PyObject *self, PyObject *args)
 #endif
 }
 
-PyDoc_STRVAR(free_library_doc,
+static const char free_library_doc[] =
 "FreeLibrary(handle) -> void\n\
 \n\
-Free the handle of an executable previously loaded by LoadLibrary.\n");
+Free the handle of an executable previously loaded by LoadLibrary.\n";
 static PyObject *free_library(PyObject *self, PyObject *args)
 {
     void *hMod;
@@ -1408,8 +1410,8 @@ static PyObject *free_library(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(copy_com_pointer_doc,
-"CopyComPointer(src, dst) -> HRESULT value\n");
+static const char copy_com_pointer_doc[] =
+"CopyComPointer(src, dst) -> HRESULT value\n";
 
 static PyObject *
 copy_com_pointer(PyObject *self, PyObject *args)
@@ -1647,10 +1649,10 @@ call_cdeclfunction(PyObject *self, PyObject *args)
 /*****************************************************************
  * functions
  */
-PyDoc_STRVAR(sizeof_doc,
+static const char sizeof_doc[] =
 "sizeof(C type) -> integer\n"
 "sizeof(C instance) -> integer\n"
-"Return the size in bytes of a C instance");
+"Return the size in bytes of a C instance";
 
 static PyObject *
 sizeof_func(PyObject *self, PyObject *obj)
@@ -1668,10 +1670,10 @@ sizeof_func(PyObject *self, PyObject *obj)
     return NULL;
 }
 
-PyDoc_STRVAR(alignment_doc,
+static const char alignment_doc[] =
 "alignment(C type) -> integer\n"
 "alignment(C instance) -> integer\n"
-"Return the alignment requirements of a C instance");
+"Return the alignment requirements of a C instance";
 
 static PyObject *
 align_func(PyObject *self, PyObject *obj)
@@ -1691,10 +1693,10 @@ align_func(PyObject *self, PyObject *obj)
     return NULL;
 }
 
-PyDoc_STRVAR(byref_doc,
+static const char byref_doc[] =
 "byref(C instance[, offset=0]) -> byref-object\n"
 "Return a pointer lookalike to a C instance, only usable\n"
-"as function argument");
+"as function argument";
 
 /*
  * We must return something which can be converted to a parameter,
@@ -1735,9 +1737,9 @@ byref(PyObject *self, PyObject *args)
     return (PyObject *)parg;
 }
 
-PyDoc_STRVAR(addressof_doc,
+static const char addressof_doc[] =
 "addressof(C instance) -> integer\n"
-"Return the address of the C instance internal buffer");
+"Return the address of the C instance internal buffer";
 
 static PyObject *
 addressof(PyObject *self, PyObject *obj)

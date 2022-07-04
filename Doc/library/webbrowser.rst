@@ -174,9 +174,6 @@ Notes:
 .. versionadded:: 3.3
    Support for Chrome/Chromium has been added.
 
-.. deprecated-removed:: 3.11 3.13
-   :class:`MacOSX` is deprecated, use :class:`MacOSXOSAScript` instead.
-
 Here are some simple examples::
 
    url = 'https://docs.python.org/'
@@ -195,11 +192,6 @@ Browser Controller Objects
 
 Browser controllers provide these methods which parallel three of the
 module-level convenience functions:
-
-
-.. attribute:: name
-
-   System-dependent name for the browser.
 
 
 .. method:: controller.open(url, new=0, autoraise=True)

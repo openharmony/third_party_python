@@ -5,7 +5,7 @@ the test_suite() function there returns a test suite that's ready to
 be run.
 """
 
-import unittest
+import warnings
 from test import support
 from test.support import warnings_helper
 
@@ -23,8 +23,6 @@ def load_tests(*_):
 def tearDownModule():
     support.reap_children()
 
-if support.check_sanitizer(address=True):
-    raise unittest.SkipTest("Exposes ASAN flakiness in GitHub CI")
 
 if __name__ == "__main__":
     unittest.main()

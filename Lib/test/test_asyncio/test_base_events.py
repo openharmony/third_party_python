@@ -18,9 +18,10 @@ from test import support
 from test.support.script_helper import assert_python_ok
 from test.support import os_helper
 from test.support import socket_helper
-import warnings
+
 
 MOCK_ANY = mock.ANY
+PY34 = sys.version_info >= (3, 4)
 
 
 def tearDownModule():
@@ -223,14 +224,14 @@ class BaseEventLoopTests(test_utils.TestCase):
         self.loop.set_default_executor(executor)
         self.assertIs(executor, self.loop._default_executor)
 
-    def test_set_default_executor_error(self):
+    def test_set_default_executor_deprecation_warnings(self):
         executor = mock.Mock()
 
-        msg = 'executor must be ThreadPoolExecutor instance'
-        with self.assertRaisesRegex(TypeError, msg):
+        with self.assertWarns(DeprecationWarning):
             self.loop.set_default_executor(executor)
 
-        self.assertIsNone(self.loop._default_executor)
+        # Avoid cleaning up the executor mock
+        self.loop._default_executor = None
 
     def test_call_soon(self):
         def cb():
@@ -254,8 +255,6 @@ class BaseEventLoopTests(test_utils.TestCase):
         self.assertIsInstance(h, asyncio.TimerHandle)
         self.assertIn(h, self.loop._scheduled)
         self.assertNotIn(h, self.loop._ready)
-        with self.assertRaises(TypeError, msg="delay must not be None"):
-            self.loop.call_later(None, cb)
 
     def test_call_later_negative_delays(self):
         calls = []
@@ -287,8 +286,6 @@ class BaseEventLoopTests(test_utils.TestCase):
         # tolerate a difference of +800 ms because some Python buildbots
         # are really slow
         self.assertLessEqual(dt, 0.9, dt)
-        with self.assertRaises(TypeError, msg="when cannot be None"):
-            self.loop.call_at(None, cb)
 
     def check_thread(self, loop, debug):
         def cb():
@@ -595,10 +592,18 @@ class BaseEventLoopTests(test_utils.TestCase):
             self.loop.run_forever()
             fut = None # Trigger Future.__del__ or futures._TracebackLogger
             support.gc_collect()
-            # Future.__del__ in logs error with an actual exception context
-            log.error.assert_called_with(
-                test_utils.MockPattern('.*exception was never retrieved'),
-                exc_info=(ZeroDivisionError, MOCK_ANY, MOCK_ANY))
+            if PY34:
+                # Future.__del__ in Python 3.4 logs error with
+                # an actual exception context
+                log.error.assert_called_with(
+                    test_utils.MockPattern('.*exception was never retrieved'),
+                    exc_info=(ZeroDivisionError, MOCK_ANY, MOCK_ANY))
+            else:
+                # futures._TracebackLogger logs only textual traceback
+                log.error.assert_called_with(
+                    test_utils.MockPattern(
+                        '.*exception was never retrieved.*ZeroDiv'),
+                    exc_info=False)
 
     def test_set_exc_handler_invalid(self):
         with self.assertRaisesRegex(TypeError, 'A callable object or None'):
@@ -795,17 +800,6 @@ class BaseEventLoopTests(test_utils.TestCase):
         # make warnings quiet
         task._log_destroy_pending = False
         coro.close()
-
-    def test_create_task_error_closes_coro(self):
-        async def test():
-            pass
-        loop = asyncio.new_event_loop()
-        loop.close()
-        with warnings.catch_warnings(record=True) as w:
-            with self.assertRaises(RuntimeError):
-                asyncio.ensure_future(test(), loop=loop)
-            self.assertEqual(len(w), 0)
-
 
     def test_create_named_task_with_default_factory(self):
         async def test():
@@ -1451,51 +1445,44 @@ class BaseEventLoopWithSelectorTests(test_utils.TestCase):
         self.loop._make_ssl_transport.side_effect = mock_make_ssl_transport
         ANY = mock.ANY
         handshake_timeout = object()
-        shutdown_timeout = object()
         # First try the default server_hostname.
         self.loop._make_ssl_transport.reset_mock()
         coro = self.loop.create_connection(
                 MyProto, 'python.org', 80, ssl=True,
-                ssl_handshake_timeout=handshake_timeout,
-                ssl_shutdown_timeout=shutdown_timeout)
+                ssl_handshake_timeout=handshake_timeout)
         transport, _ = self.loop.run_until_complete(coro)
         transport.close()
         self.loop._make_ssl_transport.assert_called_with(
             ANY, ANY, ANY, ANY,
             server_side=False,
             server_hostname='python.org',
-            ssl_handshake_timeout=handshake_timeout,
-            ssl_shutdown_timeout=shutdown_timeout)
+            ssl_handshake_timeout=handshake_timeout)
         # Next try an explicit server_hostname.
         self.loop._make_ssl_transport.reset_mock()
         coro = self.loop.create_connection(
                 MyProto, 'python.org', 80, ssl=True,
                 server_hostname='perl.com',
-                ssl_handshake_timeout=handshake_timeout,
-                ssl_shutdown_timeout=shutdown_timeout)
+                ssl_handshake_timeout=handshake_timeout)
         transport, _ = self.loop.run_until_complete(coro)
         transport.close()
         self.loop._make_ssl_transport.assert_called_with(
             ANY, ANY, ANY, ANY,
             server_side=False,
             server_hostname='perl.com',
-            ssl_handshake_timeout=handshake_timeout,
-            ssl_shutdown_timeout=shutdown_timeout)
+            ssl_handshake_timeout=handshake_timeout)
         # Finally try an explicit empty server_hostname.
         self.loop._make_ssl_transport.reset_mock()
         coro = self.loop.create_connection(
                 MyProto, 'python.org', 80, ssl=True,
                 server_hostname='',
-                ssl_handshake_timeout=handshake_timeout,
-                ssl_shutdown_timeout=shutdown_timeout)
+                ssl_handshake_timeout=handshake_timeout)
         transport, _ = self.loop.run_until_complete(coro)
         transport.close()
         self.loop._make_ssl_transport.assert_called_with(
                 ANY, ANY, ANY, ANY,
                 server_side=False,
                 server_hostname='',
-                ssl_handshake_timeout=handshake_timeout,
-                ssl_shutdown_timeout=shutdown_timeout)
+                ssl_handshake_timeout=handshake_timeout)
 
     def test_create_connection_no_ssl_server_hostname_errors(self):
         # When not using ssl, server_hostname must be None.
@@ -1612,11 +1599,11 @@ class BaseEventLoopWithSelectorTests(test_utils.TestCase):
         coro = self.loop.create_datagram_endpoint(
             MyDatagramProto, local_addr='localhost')
         self.assertRaises(
-            TypeError, self.loop.run_until_complete, coro)
+            AssertionError, self.loop.run_until_complete, coro)
         coro = self.loop.create_datagram_endpoint(
             MyDatagramProto, local_addr=('localhost', 1, 2, 3))
         self.assertRaises(
-            TypeError, self.loop.run_until_complete, coro)
+            AssertionError, self.loop.run_until_complete, coro)
 
     def test_create_datagram_endpoint_connect_err(self):
         self.loop.sock_connect = mock.Mock()
@@ -1815,6 +1802,32 @@ class BaseEventLoopWithSelectorTests(test_utils.TestCase):
         self.loop.run_until_complete(protocol.done)
         self.assertEqual('CLOSED', protocol.state)
 
+    def test_create_datagram_endpoint_reuse_address_error(self):
+        # bpo-37228: Ensure that explicit passing of `reuse_address=True`
+        # raises an error, as it is not safe to use SO_REUSEADDR when using UDP
+
+        coro = self.loop.create_datagram_endpoint(
+            lambda: MyDatagramProto(create_future=True, loop=self.loop),
+            local_addr=('127.0.0.1', 0),
+            reuse_address=True)
+
+        with self.assertRaises(ValueError):
+            self.loop.run_until_complete(coro)
+
+    def test_create_datagram_endpoint_reuse_address_warning(self):
+        # bpo-37228: Deprecate *reuse_address* parameter
+
+        coro = self.loop.create_datagram_endpoint(
+            lambda: MyDatagramProto(create_future=True, loop=self.loop),
+            local_addr=('127.0.0.1', 0),
+            reuse_address=False)
+
+        with self.assertWarns(DeprecationWarning):
+            transport, protocol = self.loop.run_until_complete(coro)
+            transport.close()
+            self.loop.run_until_complete(protocol.done)
+            self.assertEqual('CLOSED', protocol.state)
+
     @patch_socket
     def test_create_datagram_endpoint_nosoreuseport(self, m_socket):
         del m_socket.SO_REUSEPORT
@@ -1876,11 +1889,13 @@ class BaseEventLoopWithSelectorTests(test_utils.TestCase):
             constants.ACCEPT_RETRY_DELAY,
             # self.loop._start_serving
             mock.ANY,
-            MyProto, sock, None, None, mock.ANY, mock.ANY, mock.ANY)
+            MyProto, sock, None, None, mock.ANY, mock.ANY)
 
     def test_call_coroutine(self):
-        async def simple_coroutine():
-            pass
+        with self.assertWarns(DeprecationWarning):
+            @asyncio.coroutine
+            def simple_coroutine():
+                pass
 
         self.loop.set_debug(True)
         coro_func = simple_coroutine

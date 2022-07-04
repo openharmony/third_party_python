@@ -1,6 +1,5 @@
 import gc
 import sys
-import doctest
 import unittest
 import collections
 import weakref
@@ -14,7 +13,6 @@ import random
 from test import support
 from test.support import script_helper, ALWAYS_EQ
 from test.support import gc_collect
-from test.support import threading_helper
 
 # Used in ReferencesTestCase.test_ref_created_during_del() .
 ref_from_del = None
@@ -1852,7 +1850,6 @@ class MappingTestCase(TestBase):
         dict = weakref.WeakKeyDictionary()
         self.assertRegex(repr(dict), '<WeakKeyDictionary at 0x.*>')
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_valued_setdefault(self):
         d = weakref.WeakValueDictionary()
         with collect_in_thread():
@@ -1861,7 +1858,6 @@ class MappingTestCase(TestBase):
                 self.assertIsNot(x, None)  # we never put None in there!
                 del x
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_valued_pop(self):
         d = weakref.WeakValueDictionary()
         with collect_in_thread():
@@ -1870,7 +1866,6 @@ class MappingTestCase(TestBase):
                 x = d.pop(10, 10)
                 self.assertIsNot(x, None)  # we never put None in there!
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_valued_consistency(self):
         # Issue #28427: old keys should not remove new values from
         # WeakValueDictionary when collecting from another thread.
@@ -1944,25 +1939,21 @@ class MappingTestCase(TestBase):
         if exc:
             raise exc[0]
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_key_dict_copy(self):
         # Issue #35615: Weakref keys or values getting GC'ed during dict
         # copying should not result in a crash.
         self.check_threaded_weak_dict_copy(weakref.WeakKeyDictionary, False)
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_key_dict_deepcopy(self):
         # Issue #35615: Weakref keys or values getting GC'ed during dict
         # copying should not result in a crash.
         self.check_threaded_weak_dict_copy(weakref.WeakKeyDictionary, True)
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_value_dict_copy(self):
         # Issue #35615: Weakref keys or values getting GC'ed during dict
         # copying should not result in a crash.
         self.check_threaded_weak_dict_copy(weakref.WeakValueDictionary, False)
 
-    @threading_helper.requires_working_threading()
     def test_threaded_weak_value_dict_deepcopy(self):
         # Issue #35615: Weakref keys or values getting GC'ed during dict
         # copying should not result in a crash.
@@ -2154,17 +2145,6 @@ class FinalizeTestCase(unittest.TestCase):
         self.assertTrue(b'ZeroDivisionError' in err)
 
 
-class ModuleTestCase(unittest.TestCase):
-    def test_names(self):
-        for name in ('ReferenceType', 'ProxyType', 'CallableProxyType',
-                     'WeakMethod', 'WeakSet', 'WeakKeyDictionary', 'WeakValueDictionary'):
-            obj = getattr(weakref, name)
-            if name != 'WeakSet':
-                self.assertEqual(obj.__module__, 'weakref')
-            self.assertEqual(obj.__name__, name)
-            self.assertEqual(obj.__qualname__, name)
-
-
 libreftest = """ Doctest for examples in the library reference: weakref.rst
 
 >>> from test.support import gc_collect
@@ -2253,10 +2233,18 @@ OK
 
 __test__ = {'libreftest' : libreftest}
 
-def load_tests(loader, tests, pattern):
-    tests.addTest(doctest.DocTestSuite())
-    return tests
+def test_main():
+    support.run_unittest(
+        ReferencesTestCase,
+        WeakMethodTestCase,
+        MappingTestCase,
+        WeakValueDictionaryTestCase,
+        WeakKeyDictionaryTestCase,
+        SubclassableWeakrefTestCase,
+        FinalizeTestCase,
+        )
+    support.run_doctest(sys.modules[__name__])
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()

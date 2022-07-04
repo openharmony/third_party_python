@@ -4,8 +4,6 @@
 #include <windows.h>
 #endif
 
-#include <stdlib.h>               // qsort()
-
 #define EXPORT(x) Py_EXPORTED_SYMBOL x
 
 /* some functions handy for testing */

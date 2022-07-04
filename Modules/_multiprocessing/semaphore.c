@@ -9,8 +9,6 @@
 
 #include "multiprocessing.h"
 
-#ifdef HAVE_MP_SEMAPHORE
-
 enum { RECURSIVE_MUTEX, SEMAPHORE };
 
 typedef struct {
@@ -796,5 +794,3 @@ _PyMp_sem_unlink(const char *name)
 
     Py_RETURN_NONE;
 }
-
-#endif // HAVE_MP_SEMAPHORE

@@ -2,7 +2,6 @@ import copy
 import gc
 import pickle
 import sys
-import doctest
 import unittest
 import weakref
 import inspect
@@ -897,7 +896,7 @@ From the Iterators list, about the types of these things.
 >>> type(i)
 <class 'generator'>
 >>> [s for s in dir(i) if not s.startswith('_')]
-['close', 'gi_code', 'gi_frame', 'gi_running', 'gi_suspended', 'gi_yieldfrom', 'send', 'throw']
+['close', 'gi_code', 'gi_frame', 'gi_running', 'gi_yieldfrom', 'send', 'throw']
 >>> from test.support import HAVE_DOCSTRINGS
 >>> print(i.__next__.__doc__ if HAVE_DOCSTRINGS else 'Implement next(self).')
 Implement next(self).
@@ -2380,10 +2379,15 @@ __test__ = {"tut":      tutorial_tests,
             "refleaks": refleaks_tests,
             }
 
-def load_tests(loader, tests, pattern):
-    tests.addTest(doctest.DocTestSuite())
-    return tests
+# Magic test name that regrtest.py invokes *after* importing this module.
+# This worms around a bootstrap problem.
+# Note that doctest and regrtest both look in sys.argv for a "-v" argument,
+# so this works as expected in both ways of running regrtest.
+def test_main(verbose=None):
+    from test import support, test_generators
+    support.run_unittest(__name__)
+    support.run_doctest(test_generators, verbose)
 
-
+# This part isn't needed for regrtest, but for running the test directly.
 if __name__ == "__main__":
-    unittest.main()
+    test_main(1)

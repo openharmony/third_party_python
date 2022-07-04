@@ -194,12 +194,7 @@ Future Object
       schedule the callbacks, and return ``True``.
 
       .. versionchanged:: 3.9
-         Added the *msg* parameter.
-
-      .. deprecated-removed:: 3.11 3.14
-         *msg* parameter is ambiguous when multiple :meth:`cancel`
-         are called with different cancellation messages.
-         The argument will be removed.
+         Added the ``msg`` parameter.
 
    .. method:: exception()
 
@@ -281,8 +276,3 @@ the Future has a result::
 
    - :meth:`asyncio.Future.cancel` accepts an optional ``msg`` argument,
      but :func:`concurrent.futures.cancel` does not.
-
-     .. deprecated-removed:: 3.11 3.14
-        *msg* parameter is ambiguous when multiple :meth:`cancel`
-        are called with different cancellation messages.
-        The argument will be removed.

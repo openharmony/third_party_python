@@ -1,4 +1,3 @@
-from test import support
 from test.test_json import PyTest, CTest
 
 
@@ -70,14 +69,11 @@ class TestRecursion:
         # test that loading highly-nested objects doesn't segfault when C
         # accelerations are used. See #12017
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                self.loads('{"a":' * 100000 + '1' + '}' * 100000)
+            self.loads('{"a":' * 100000 + '1' + '}' * 100000)
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                self.loads('{"a":' * 100000 + '[1]' + '}' * 100000)
+            self.loads('{"a":' * 100000 + '[1]' + '}' * 100000)
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                self.loads('[' * 100000 + '1' + ']' * 100000)
+            self.loads('[' * 100000 + '1' + ']' * 100000)
 
     def test_highly_nested_objects_encoding(self):
         # See #12051
@@ -85,11 +81,9 @@ class TestRecursion:
         for x in range(100000):
             l, d = [l], {'k':d}
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                self.dumps(l)
+            self.dumps(l)
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                self.dumps(d)
+            self.dumps(d)
 
     def test_endless_recursion(self):
         # See #12051
@@ -99,8 +93,7 @@ class TestRecursion:
                 return [o]
 
         with self.assertRaises(RecursionError):
-            with support.infinite_recursion():
-                EndlessJSONEncoder(check_circular=False).encode(5j)
+            EndlessJSONEncoder(check_circular=False).encode(5j)
 
 
 class TestPyRecursion(TestRecursion, PyTest): pass

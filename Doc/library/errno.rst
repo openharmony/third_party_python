@@ -8,7 +8,7 @@
 
 This module makes available standard ``errno`` system symbols. The value of each
 symbol is the corresponding integer value. The names and descriptions are
-borrowed from :file:`linux/include/errno.h`, which should be
+borrowed from :file:`linux/include/errno.h`, which should be pretty
 all-inclusive.
 
 
@@ -27,26 +27,25 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EPERM
 
-   Operation not permitted. This error is mapped to the exception
-   :exc:`PermissionError`.
+   Operation not permitted
 
 
 .. data:: ENOENT
 
-   No such file or directory. This error is mapped to the exception
-   :exc:`FileNotFoundError`.
+   No such file or directory
 
 
 .. data:: ESRCH
 
-   No such process. This error is mapped to the exception
-   :exc:`ProcessLookupError`.
+   No such process
 
 
 .. data:: EINTR
 
-   Interrupted system call. This error is mapped to the exception
-   :exc:`InterruptedError`.
+   Interrupted system call.
+
+   .. seealso::
+      This error is mapped to the exception :exc:`InterruptedError`.
 
 
 .. data:: EIO
@@ -76,13 +75,12 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: ECHILD
 
-   No child processes. This error is mapped to the exception
-   :exc:`ChildProcessError`.
+   No child processes
 
 
 .. data:: EAGAIN
 
-   Try again. This error is mapped to the exception :exc:`BlockingIOError`.
+   Try again
 
 
 .. data:: ENOMEM
@@ -92,8 +90,7 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EACCES
 
-   Permission denied.  This error is mapped to the exception
-   :exc:`PermissionError`.
+   Permission denied
 
 
 .. data:: EFAULT
@@ -113,8 +110,7 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EEXIST
 
-   File exists. This error is mapped to the exception
-   :exc:`FileExistsError`.
+   File exists
 
 
 .. data:: EXDEV
@@ -129,14 +125,12 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: ENOTDIR
 
-   Not a directory. This error is mapped to the exception
-   :exc:`NotADirectoryError`.
+   Not a directory
 
 
 .. data:: EISDIR
 
-   Is a directory. This error is mapped to the exception
-   :exc:`IsADirectoryError`.
+   Is a directory
 
 
 .. data:: EINVAL
@@ -191,8 +185,7 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EPIPE
 
-   Broken pipe. This error is mapped to the exception
-   :exc:`BrokenPipeError`.
+   Broken pipe
 
 
 .. data:: EDOM
@@ -237,8 +230,7 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EWOULDBLOCK
 
-   Operation would block. This error is mapped to the exception
-   :exc:`BlockingIOError`.
+   Operation would block
 
 
 .. data:: ENOMSG
@@ -548,14 +540,12 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: ECONNABORTED
 
-   Software caused connection abort. This error is mapped to the
-   exception :exc:`ConnectionAbortedError`.
+   Software caused connection abort
 
 
 .. data:: ECONNRESET
 
-   Connection reset by peer. This error is mapped to the exception
-   :exc:`ConnectionResetError`.
+   Connection reset by peer
 
 
 .. data:: ENOBUFS
@@ -575,8 +565,7 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: ESHUTDOWN
 
-   Cannot send after transport endpoint shutdown. This error is mapped
-   to the exception :exc:`BrokenPipeError`.
+   Cannot send after transport endpoint shutdown
 
 
 .. data:: ETOOMANYREFS
@@ -586,14 +575,12 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: ETIMEDOUT
 
-   Connection timed out. This error is mapped to the exception
-   :exc:`TimeoutError`.
+   Connection timed out
 
 
 .. data:: ECONNREFUSED
 
-   Connection refused. This error is mapped to the exception
-   :exc:`ConnectionRefusedError`.
+   Connection refused
 
 
 .. data:: EHOSTDOWN
@@ -608,14 +595,12 @@ defined by the module.  The specific list of defined symbols is available as
 
 .. data:: EALREADY
 
-   Operation already in progress. This error is mapped to the
-   exception :exc:`BlockingIOError`.
+   Operation already in progress
 
 
 .. data:: EINPROGRESS
 
-   Operation now in progress. This error is mapped to the exception
-   :exc:`BlockingIOError`.
+   Operation now in progress
 
 
 .. data:: ESTALE
@@ -652,8 +637,3 @@ defined by the module.  The specific list of defined symbols is available as
 
    Quota exceeded
 
-.. data:: EQFULL
-
-   Interface output queue is full
-
-   .. versionadded:: 3.11

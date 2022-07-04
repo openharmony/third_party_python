@@ -10,7 +10,6 @@
 */
 
 #include "Python.h"
-#include "pycore_fileutils.h"     // _Py_BEGIN_SUPPRESS_IPH
 #include "pycore_pystate.h"   // _PyThreadState_GET()
 #ifdef MS_WINDOWS
 #  define WIN32_LEAN_AND_MEAN
@@ -247,8 +246,7 @@ PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
     assert(tstate != NULL);
 
 #ifdef MS_WINDOWS
-    const PyConfig *config = _PyInterpreterState_GetConfig(tstate->interp);
-    if (!config->legacy_windows_stdio && sys_stdin == stdin) {
+    if (!Py_LegacyWindowsStdioFlag && sys_stdin == stdin) {
         HANDLE hStdIn, hStdErr;
 
         hStdIn = _Py_get_osfhandle_noraise(fileno(sys_stdin));

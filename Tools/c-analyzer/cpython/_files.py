@@ -6,17 +6,15 @@ from . import REPO_ROOT, INCLUDE_DIRS, SOURCE_DIRS
 
 GLOBS = [
     'Include/*.h',
-    # Technically, this is covered by "Include/*.h":
-    #'Include/cpython/*.h',
     'Include/internal/*.h',
     'Modules/**/*.h',
     'Modules/**/*.c',
     'Objects/**/*.h',
     'Objects/**/*.c',
-    'Parser/**/*.h',
+    'Python/**/*.h',
     'Parser/**/*.c',
     'Python/**/*.h',
-    'Python/**/*.c',
+    'Parser/**/*.c',
 ]
 LEVEL_GLOBS = {
     'stable': 'Include/*.h',

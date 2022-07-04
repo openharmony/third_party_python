@@ -1,12 +1,8 @@
 
 /* Testing module for multi-phase initialization of extension modules (PEP 489)
  */
-#ifndef Py_BUILD_CORE_BUILTIN
-#  define Py_BUILD_CORE_MODULE 1
-#endif
 
 #include "Python.h"
-#include "pycore_namespace.h"     // _PyNamespace_New()
 
 /* State for testing module state access from methods */
 
@@ -126,8 +122,6 @@ static PyType_Spec Example_Type_spec = {
 
 
 static PyModuleDef def_meth_state_access;
-static PyModuleDef def_nonmodule;
-static PyModuleDef def_nonmodule_with_methods;
 
 /*[clinic input]
 _testmultiphase.StateAccessType.get_defining_module
@@ -136,41 +130,23 @@ _testmultiphase.StateAccessType.get_defining_module
 
 Return the module of the defining class.
 
-Also tests that result of PyType_GetModuleByDef matches defining_class's
+Also tests that result of _PyType_GetModuleByDef matches defining_class's
 module.
 [clinic start generated code]*/
 
 static PyObject *
 _testmultiphase_StateAccessType_get_defining_module_impl(StateAccessTypeObject *self,
                                                          PyTypeObject *cls)
-/*[clinic end generated code: output=ba2a14284a5d0921 input=d2c7245c8a9d06f8]*/
+/*[clinic end generated code: output=ba2a14284a5d0921 input=356f999fc16e0933]*/
 {
     PyObject *retval;
     retval = PyType_GetModule(cls);
     if (retval == NULL) {
         return NULL;
     }
-    assert(PyType_GetModuleByDef(Py_TYPE(self), &def_meth_state_access) == retval);
+    assert(_PyType_GetModuleByDef(Py_TYPE(self), &def_meth_state_access) == retval);
     Py_INCREF(retval);
     return retval;
-}
-
-/*[clinic input]
-_testmultiphase.StateAccessType.getmodulebydef_bad_def
-
-    cls: defining_class
-
-Test that result of PyType_GetModuleByDef with a bad def is NULL.
-[clinic start generated code]*/
-
-static PyObject *
-_testmultiphase_StateAccessType_getmodulebydef_bad_def_impl(StateAccessTypeObject *self,
-                                                            PyTypeObject *cls)
-/*[clinic end generated code: output=64509074dfcdbd31 input=edaff09aa4788204]*/
-{
-    PyType_GetModuleByDef(Py_TYPE(self), &def_nonmodule);  // should raise
-    assert(PyErr_Occurred());
-    return NULL;
 }
 
 /*[clinic input]
@@ -269,12 +245,11 @@ _testmultiphase_StateAccessType_get_count_impl(StateAccessTypeObject *self,
 
 static PyMethodDef StateAccessType_methods[] = {
     _TESTMULTIPHASE_STATEACCESSTYPE_GET_DEFINING_MODULE_METHODDEF
-    _TESTMULTIPHASE_STATEACCESSTYPE_GETMODULEBYDEF_BAD_DEF_METHODDEF
     _TESTMULTIPHASE_STATEACCESSTYPE_GET_COUNT_METHODDEF
     _TESTMULTIPHASE_STATEACCESSTYPE_INCREMENT_COUNT_CLINIC_METHODDEF
     {
         "increment_count_noclinic",
-        _PyCFunction_CAST(_StateAccessType_increment_count_noclinic),
+        (PyCFunction)(void(*)(void))_StateAccessType_increment_count_noclinic,
         METH_METHOD|METH_FASTCALL|METH_KEYWORDS,
         _StateAccessType_decrement_count__doc__
     },
@@ -450,13 +425,16 @@ static PyModuleDef_Slot main_slots[] = {
 static PyModuleDef main_def = TEST_MODULE_DEF("main", main_slots, testexport_methods);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase(void)
+PyInit__testmultiphase(PyObject *spec)
 {
     return PyModuleDef_Init(&main_def);
 }
 
 
 /**** Importing a non-module object ****/
+
+static PyModuleDef def_nonmodule;
+static PyModuleDef def_nonmodule_with_methods;
 
 /* Create a SimpleNamespace(three=3) */
 static PyObject*
@@ -495,7 +473,7 @@ static PyModuleDef def_nonmodule = TEST_MODULE_DEF(
     "_testmultiphase_nonmodule", slots_create_nonmodule, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_nonmodule(void)
+PyInit__testmultiphase_nonmodule(PyObject *spec)
 {
     return PyModuleDef_Init(&def_nonmodule);
 }
@@ -525,7 +503,7 @@ static PyModuleDef def_nonmodule_with_methods = TEST_MODULE_DEF(
     "_testmultiphase_nonmodule_with_methods", slots_create_nonmodule, nonmodule_methods);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_nonmodule_with_methods(void)
+PyInit__testmultiphase_nonmodule_with_methods(PyObject *spec)
 {
     return PyModuleDef_Init(&def_nonmodule_with_methods);
 }
@@ -545,7 +523,7 @@ static PyModuleDef def_nonascii_latin = { \
 };
 
 PyMODINIT_FUNC
-PyInitU__testmultiphase_zkouka_naten_evc07gi8e(void)
+PyInitU__testmultiphase_zkouka_naten_evc07gi8e(PyObject *spec)
 {
     return PyModuleDef_Init(&def_nonascii_latin);
 }
@@ -563,7 +541,7 @@ static PyModuleDef def_nonascii_kana = { \
 };
 
 PyMODINIT_FUNC
-PyInitU_eckzbwbhc6jpgzcx415x(void)
+PyInitU_eckzbwbhc6jpgzcx415x(PyObject *spec)
 {
     return PyModuleDef_Init(&def_nonascii_kana);
 }
@@ -571,7 +549,7 @@ PyInitU_eckzbwbhc6jpgzcx415x(void)
 /*** Module with a single-character name ***/
 
 PyMODINIT_FUNC
-PyInit_x(void)
+PyInit_x(PyObject *spec)
 {
     return PyModuleDef_Init(&main_def);
 }
@@ -582,7 +560,7 @@ static PyModuleDef null_slots_def = TEST_MODULE_DEF(
     "_testmultiphase_null_slots", NULL, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_null_slots(void)
+PyInit__testmultiphase_null_slots(PyObject *spec)
 {
     return PyModuleDef_Init(&null_slots_def);
 }
@@ -598,7 +576,7 @@ static PyModuleDef def_bad_large = TEST_MODULE_DEF(
     "_testmultiphase_bad_slot_large", slots_bad_large, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_bad_slot_large(void)
+PyInit__testmultiphase_bad_slot_large(PyObject *spec)
 {
     return PyModuleDef_Init(&def_bad_large);
 }
@@ -612,7 +590,7 @@ static PyModuleDef def_bad_negative = TEST_MODULE_DEF(
     "_testmultiphase_bad_slot_negative", slots_bad_negative, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_bad_slot_negative(void)
+PyInit__testmultiphase_bad_slot_negative(PyObject *spec)
 {
     return PyModuleDef_Init(&def_bad_negative);
 }
@@ -630,7 +608,7 @@ static PyModuleDef def_create_int_with_state = { \
 };
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_create_int_with_state(void)
+PyInit__testmultiphase_create_int_with_state(PyObject *spec)
 {
     return PyModuleDef_Init(&def_create_int_with_state);
 }
@@ -649,7 +627,7 @@ static PyModuleDef def_negative_size = { \
 };
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_negative_size(void)
+PyInit__testmultiphase_negative_size(PyObject *spec)
 {
     return PyModuleDef_Init(&def_negative_size);
 }
@@ -658,26 +636,26 @@ PyInit__testmultiphase_negative_size(void)
 static PyModuleDef uninitialized_def = TEST_MODULE_DEF("main", main_slots, testexport_methods);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_export_uninitialized(void)
+PyInit__testmultiphase_export_uninitialized(PyObject *spec)
 {
     return (PyObject*) &uninitialized_def;
 }
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_export_null(void)
+PyInit__testmultiphase_export_null(PyObject *spec)
 {
     return NULL;
 }
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_export_raise(void)
+PyInit__testmultiphase_export_raise(PyObject *spec)
 {
     PyErr_SetString(PyExc_SystemError, "bad export function");
     return NULL;
 }
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_export_unreported_exception(void)
+PyInit__testmultiphase_export_unreported_exception(PyObject *spec)
 {
     PyErr_SetString(PyExc_SystemError, "bad export function");
     return PyModuleDef_Init(&main_def);
@@ -698,7 +676,7 @@ static PyModuleDef def_create_null = TEST_MODULE_DEF(
     "_testmultiphase_create_null", slots_create_null, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_create_null(void)
+PyInit__testmultiphase_create_null(PyObject *spec)
 {
     return PyModuleDef_Init(&def_create_null);
 }
@@ -719,7 +697,7 @@ static PyModuleDef def_create_raise = TEST_MODULE_DEF(
     "_testmultiphase_create_null", slots_create_raise, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_create_raise(void)
+PyInit__testmultiphase_create_raise(PyObject *spec)
 {
     return PyModuleDef_Init(&def_create_raise);
 }
@@ -740,7 +718,7 @@ static PyModuleDef def_create_unreported_exception = TEST_MODULE_DEF(
     "_testmultiphase_create_unreported_exception", slots_create_unreported_exception, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_create_unreported_exception(void)
+PyInit__testmultiphase_create_unreported_exception(PyObject *spec)
 {
     return PyModuleDef_Init(&def_create_unreported_exception);
 }
@@ -755,7 +733,7 @@ static PyModuleDef def_nonmodule_with_exec_slots = TEST_MODULE_DEF(
     "_testmultiphase_nonmodule_with_exec_slots", slots_nonmodule_with_exec_slots, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_nonmodule_with_exec_slots(void)
+PyInit__testmultiphase_nonmodule_with_exec_slots(PyObject *spec)
 {
     return PyModuleDef_Init(&def_nonmodule_with_exec_slots);
 }
@@ -775,7 +753,7 @@ static PyModuleDef def_exec_err = TEST_MODULE_DEF(
     "_testmultiphase_exec_err", slots_exec_err, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_exec_err(void)
+PyInit__testmultiphase_exec_err(PyObject *spec)
 {
     return PyModuleDef_Init(&def_exec_err);
 }
@@ -796,7 +774,7 @@ static PyModuleDef def_exec_raise = TEST_MODULE_DEF(
     "_testmultiphase_exec_raise", slots_exec_raise, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_exec_raise(void)
+PyInit__testmultiphase_exec_raise(PyObject *mod)
 {
     return PyModuleDef_Init(&def_exec_raise);
 }
@@ -817,7 +795,7 @@ static PyModuleDef def_exec_unreported_exception = TEST_MODULE_DEF(
     "_testmultiphase_exec_unreported_exception", slots_exec_unreported_exception, NULL);
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_exec_unreported_exception(void)
+PyInit__testmultiphase_exec_unreported_exception(PyObject *spec)
 {
     return PyModuleDef_Init(&def_exec_unreported_exception);
 }
@@ -861,7 +839,7 @@ static PyModuleDef def_meth_state_access = {
 };
 
 PyMODINIT_FUNC
-PyInit__testmultiphase_meth_state_access(void)
+PyInit__testmultiphase_meth_state_access(PyObject *spec)
 {
     return PyModuleDef_Init(&def_meth_state_access);
 }
@@ -874,7 +852,7 @@ static PyModuleDef def_module_state_shared = {
 };
 
 PyMODINIT_FUNC
-PyInit__test_module_state_shared(void)
+PyInit__test_module_state_shared(PyObject *spec)
 {
     PyObject *module = PyModule_Create(&def_module_state_shared);
     if (module == NULL) {
@@ -894,7 +872,7 @@ PyInit__test_module_state_shared(void)
 static PyModuleDef imp_dummy_def = TEST_MODULE_DEF("imp_dummy", main_slots, testexport_methods);
 
 PyMODINIT_FUNC
-PyInit_imp_dummy(void)
+PyInit_imp_dummy(PyObject *spec)
 {
     return PyModuleDef_Init(&imp_dummy_def);
 }

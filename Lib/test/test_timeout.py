@@ -5,6 +5,9 @@ import unittest
 from test import support
 from test.support import socket_helper
 
+# This requires the 'network' resource as given on the regrtest command line.
+skip_expected = not support.is_resource_enabled('network')
+
 import time
 import errno
 import socket
@@ -50,10 +53,10 @@ class CreationTestCase(unittest.TestCase):
     def testReturnType(self):
         # Test return type of gettimeout()
         self.sock.settimeout(1)
-        self.assertIs(type(self.sock.gettimeout()), float)
+        self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
         self.sock.settimeout(3.9)
-        self.assertIs(type(self.sock.gettimeout()), float)
+        self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
     def testTypeCheck(self):
         # Test type checking by settimeout()
@@ -289,7 +292,6 @@ class UDPTimeoutTestCase(TimeoutTestCase):
 
 def setUpModule():
     support.requires('network')
-    support.requires_working_socket(module=True)
 
 
 if __name__ == "__main__":

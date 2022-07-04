@@ -1,9 +1,8 @@
 from test.support import verbose, reap_children
 from test.support.import_helper import import_module
 
-# Skip these tests if termios or fcntl are not available
+# Skip these tests if termios is not available
 import_module('termios')
-import_module("fcntl")
 
 import errno
 import os
@@ -17,6 +16,7 @@ import io # readline
 import unittest
 
 import struct
+import tty
 import fcntl
 import warnings
 

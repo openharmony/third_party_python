@@ -7,7 +7,7 @@ import functools
 
 from time import monotonic as _time
 from _weakrefset import WeakSet
-from itertools import count as _count
+from itertools import islice as _islice, count as _count
 try:
     from _collections import deque as _deque
 except ImportError:
@@ -368,21 +368,14 @@ class Condition:
         """
         if not self._is_owned():
             raise RuntimeError("cannot notify on un-acquired lock")
-        waiters = self._waiters
-        while waiters and n > 0:
-            waiter = waiters[0]
+        all_waiters = self._waiters
+        waiters_to_notify = _deque(_islice(all_waiters, n))
+        if not waiters_to_notify:
+            return
+        for waiter in waiters_to_notify:
+            waiter.release()
             try:
-                waiter.release()
-            except RuntimeError:
-                # gh-92530: The previous call of notify() released the lock,
-                # but was interrupted before removing it from the queue.
-                # It can happen if a signal handler raises an exception,
-                # like CTRL+C which raises KeyboardInterrupt.
-                pass
-            else:
-                n -= 1
-            try:
-                waiters.remove(waiter)
+                all_waiters.remove(waiter)
             except ValueError:
                 pass
 
@@ -424,11 +417,6 @@ class Semaphore:
             raise ValueError("semaphore initial value must be >= 0")
         self._cond = Condition(Lock())
         self._value = value
-
-    def __repr__(self):
-        cls = self.__class__
-        return (f"<{cls.__module__}.{cls.__qualname__} at {id(self):#x}:"
-                f" value={self._value}>")
 
     def acquire(self, blocking=True, timeout=None):
         """Acquire a semaphore, decrementing the internal counter by one.
@@ -488,7 +476,8 @@ class Semaphore:
             raise ValueError('n must be one or more')
         with self._cond:
             self._value += n
-            self._cond.notify(n)
+            for i in range(n):
+                self._cond.notify()
 
     def __exit__(self, t, v, tb):
         self.release()
@@ -512,13 +501,8 @@ class BoundedSemaphore(Semaphore):
     """
 
     def __init__(self, value=1):
-        super().__init__(value)
+        Semaphore.__init__(self, value)
         self._initial_value = value
-
-    def __repr__(self):
-        cls = self.__class__
-        return (f"<{cls.__module__}.{cls.__qualname__} at {id(self):#x}:"
-                f" value={self._value}/{self._initial_value}>")
 
     def release(self, n=1):
         """Release a semaphore, incrementing the internal counter by one or more.
@@ -536,7 +520,8 @@ class BoundedSemaphore(Semaphore):
             if self._value + n > self._initial_value:
                 raise ValueError("Semaphore released too many times")
             self._value += n
-            self._cond.notify(n)
+            for i in range(n):
+                self._cond.notify()
 
 
 class Event:
@@ -553,11 +538,6 @@ class Event:
     def __init__(self):
         self._cond = Condition(Lock())
         self._flag = False
-
-    def __repr__(self):
-        cls = self.__class__
-        status = 'set' if self._flag else 'unset'
-        return f"<{cls.__module__}.{cls.__qualname__} at {id(self):#x}: {status}>"
 
     def _at_fork_reinit(self):
         # Private method called by Thread._reset_internal_locks()
@@ -656,13 +636,6 @@ class Barrier:
         self._parties = parties
         self._state = 0  # 0 filling, 1 draining, -1 resetting, -2 broken
         self._count = 0
-
-    def __repr__(self):
-        cls = self.__class__
-        if self.broken:
-            return f"<{cls.__module__}.{cls.__qualname__} at {id(self):#x}: broken>"
-        return (f"<{cls.__module__}.{cls.__qualname__} at {id(self):#x}:"
-                f" waiters={self.n_waiting}/{self.parties}>")
 
     def wait(self, timeout=None):
         """Wait for the barrier.
@@ -857,7 +830,7 @@ class Thread:
         *name* is the thread name. By default, a unique name is constructed of
         the form "Thread-N" where N is a small decimal number.
 
-        *args* is a list or tuple of arguments for the target invocation. Defaults to ().
+        *args* is the argument tuple for the target invocation. Defaults to ().
 
         *kwargs* is a dictionary of keyword arguments for the target
         invocation. Defaults to {}.
@@ -1037,7 +1010,13 @@ class Thread:
             except:
                 self._invoke_excepthook(self)
         finally:
-            self._delete()
+            with _active_limbo_lock:
+                try:
+                    # We don't call self._delete() because it also
+                    # grabs _active_limbo_lock.
+                    del _active[get_ident()]
+                except:
+                    pass
 
     def _stop(self):
         # After calling ._stop(), .is_alive() returns False and .join() returns

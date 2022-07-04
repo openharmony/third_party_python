@@ -315,15 +315,9 @@ line of a file like this::
 Sets can take their contents from an iterable and let you iterate over the set's
 elements::
 
-    >>> S = {2, 3, 5, 7, 11, 13}
-    >>> for i in S:
-    ...     print(i)
-    2
-    3
-    5
-    7
-    11
-    13
+    S = {2, 3, 5, 7, 11, 13}
+    for i in S:
+        print(i)
 
 
 
@@ -341,18 +335,18 @@ List comprehensions and generator expressions (short form: "listcomps" and
 functional programming language Haskell (https://www.haskell.org/).  You can strip
 all the whitespace from a stream of strings with the following code::
 
-    >>> line_list = ['  line 1\n', 'line 2  \n', ' \n', '']
+    line_list = ['  line 1\n', 'line 2  \n', ...]
 
-    >>> # Generator expression -- returns iterator
-    >>> stripped_iter = (line.strip() for line in line_list)
+    # Generator expression -- returns iterator
+    stripped_iter = (line.strip() for line in line_list)
 
-    >>> # List comprehension -- returns list
-    >>> stripped_list = [line.strip() for line in line_list]
+    # List comprehension -- returns list
+    stripped_list = [line.strip() for line in line_list]
 
 You can select only certain elements by adding an ``"if"`` condition::
 
-    >>> stripped_list = [line.strip() for line in line_list
-    ...                  if line != ""]
+    stripped_list = [line.strip() for line in line_list
+                     if line != ""]
 
 With a list comprehension, you get back a Python list; ``stripped_list`` is a
 list containing the resulting lines, not an iterator.  Generator expressions
@@ -369,8 +363,7 @@ have the form::
                  if condition1
                  for expr2 in sequence2
                  if condition2
-                 for expr3 in sequence3
-                 ...
+                 for expr3 in sequence3 ...
                  if condition3
                  for exprN in sequenceN
                  if conditionN )
@@ -596,7 +589,7 @@ generator function.
 In addition to :meth:`~generator.send`, there are two other methods on
 generators:
 
-* :meth:`throw(value) <generator.throw>` is used to
+* :meth:`throw(type, value=None, traceback=None) <generator.throw>` is used to
   raise an exception inside the generator; the exception is raised by the
   ``yield`` expression where the generator's execution is paused.
 

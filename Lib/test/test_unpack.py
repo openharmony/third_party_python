@@ -1,7 +1,3 @@
-import doctest
-import unittest
-
-
 doctests = """
 
 Unpack tuple
@@ -146,26 +142,10 @@ Unpacking to an empty iterable should raise ValueError
 
 __test__ = {'doctests' : doctests}
 
-def load_tests(loader, tests, pattern):
-    tests.addTest(doctest.DocTestSuite())
-    return tests
-
-
-class TestCornerCases(unittest.TestCase):
-    def test_extended_oparg_not_ignored(self):
-        # https://github.com/python/cpython/issues/91625
-        target = "(" + "y,"*400 + ")"
-        code = f"""def unpack_400(x):
-            {target} = x
-            return y
-        """
-        ns = {}
-        exec(code, ns)
-        unpack_400 = ns["unpack_400"]
-        # Warm up the the function for quickening (PEP 659)
-        for _ in range(30):
-            y = unpack_400(range(400))
-            self.assertEqual(y, 399)
+def test_main(verbose=False):
+    from test import support
+    from test import test_unpack
+    support.run_doctest(test_unpack, verbose)
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main(verbose=True)

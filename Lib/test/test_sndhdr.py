@@ -1,10 +1,7 @@
+import sndhdr
 import pickle
 import unittest
 from test.support import findfile
-from test.support import warnings_helper
-
-sndhdr = warnings_helper.import_deprecated("sndhdr")
-
 
 class TestFormats(unittest.TestCase):
     def test_data(self):

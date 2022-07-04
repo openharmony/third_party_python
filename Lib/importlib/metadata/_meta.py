@@ -37,7 +37,7 @@ class SimplePath(Protocol):
     def joinpath(self) -> 'SimplePath':
         ...  # pragma: no cover
 
-    def __truediv__(self) -> 'SimplePath':
+    def __div__(self) -> 'SimplePath':
         ...  # pragma: no cover
 
     def parent(self) -> 'SimplePath':

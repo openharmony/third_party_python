@@ -186,15 +186,15 @@ The :mod:`abc` module also provides the following decorator:
 
       class C(ABC):
           @abstractmethod
-          def my_abstract_method(self, arg1):
+          def my_abstract_method(self, ...):
               ...
           @classmethod
           @abstractmethod
-          def my_abstract_classmethod(cls, arg2):
+          def my_abstract_classmethod(cls, ...):
               ...
           @staticmethod
           @abstractmethod
-          def my_abstract_staticmethod(arg3):
+          def my_abstract_staticmethod(...):
               ...
 
           @property
@@ -255,7 +255,7 @@ The :mod:`abc` module also supports the following legacy decorators:
       class C(ABC):
           @classmethod
           @abstractmethod
-          def my_abstract_classmethod(cls, arg):
+          def my_abstract_classmethod(cls, ...):
               ...
 
 
@@ -276,7 +276,7 @@ The :mod:`abc` module also supports the following legacy decorators:
       class C(ABC):
           @staticmethod
           @abstractmethod
-          def my_abstract_staticmethod(arg):
+          def my_abstract_staticmethod(...):
               ...
 
 

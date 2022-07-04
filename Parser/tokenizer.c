@@ -3,7 +3,6 @@
 
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
-#include "pycore_call.h"          // _PyObject_CallNoArgs()
 
 #include <ctype.h>
 #include <assert.h>
@@ -40,7 +39,7 @@
 static struct tok_state *tok_new(void);
 static int tok_nextc(struct tok_state *tok);
 static void tok_backup(struct tok_state *tok, int c);
-static int syntaxerror(struct tok_state *tok, const char *format, ...);
+
 
 /* Spaces in this constant are treated as "zero or more spaces or tabs" when
    tokenizing. */
@@ -88,9 +87,6 @@ tok_new(void)
     tok->async_def_nl = 0;
     tok->interactive_underflow = IUNDERFLOW_NORMAL;
     tok->str = NULL;
-#ifdef Py_DEBUG
-    tok->debug = _Py_GetConfig()->parser_debug;
-#endif
     return tok;
 }
 
@@ -111,7 +107,7 @@ static char *
 error_ret(struct tok_state *tok) /* XXX */
 {
     tok->decoding_erred = 1;
-    if (tok->fp != NULL && tok->buf != NULL) /* see _PyTokenizer_Free */
+    if (tok->fp != NULL && tok->buf != NULL) /* see PyTokenizer_Free */
         PyMem_Free(tok->buf);
     tok->buf = tok->cur = tok->inp = NULL;
     tok->start = NULL;
@@ -285,6 +281,30 @@ check_bom(int get_char(struct tok_state *),
             unget_char(ch1, tok);
             return 1;
         }
+#if 0
+    /* Disable support for UTF-16 BOMs until a decision
+       is made whether this needs to be supported.  */
+    } else if (ch1 == 0xFE) {
+        ch2 = get_char(tok);
+        if (ch2 != 0xFF) {
+            unget_char(ch2, tok);
+            unget_char(ch1, tok);
+            return 1;
+        }
+        if (!set_readline(tok, "utf-16-be"))
+            return 0;
+        tok->decoding_state = STATE_NORMAL;
+    } else if (ch1 == 0xFF) {
+        ch2 = get_char(tok);
+        if (ch2 != 0xFE) {
+            unget_char(ch2, tok);
+            unget_char(ch1, tok);
+            return 1;
+        }
+        if (!set_readline(tok, "utf-16-le"))
+            return 0;
+        tok->decoding_state = STATE_NORMAL;
+#endif
     } else {
         unget_char(ch1, tok);
         return 1;
@@ -421,7 +441,9 @@ error:
 static int
 fp_setreadl(struct tok_state *tok, const char* enc)
 {
-    PyObject *readline, *open, *stream;
+    PyObject *readline, *io, *stream;
+    _Py_IDENTIFIER(open);
+    _Py_IDENTIFIER(readline);
     int fd;
     long pos;
 
@@ -438,29 +460,26 @@ fp_setreadl(struct tok_state *tok, const char* enc)
         return 0;
     }
 
-    open = _PyImport_GetModuleAttrString("io", "open");
-    if (open == NULL) {
+    io = PyImport_ImportModuleNoBlock("io");
+    if (io == NULL)
         return 0;
-    }
-    stream = PyObject_CallFunction(open, "isisOOO",
-                    fd, "r", -1, enc, Py_None, Py_None, Py_False);
-    Py_DECREF(open);
-    if (stream == NULL) {
-        return 0;
-    }
 
-    readline = PyObject_GetAttr(stream, &_Py_ID(readline));
-    Py_DECREF(stream);
-    if (readline == NULL) {
+    stream = _PyObject_CallMethodId(io, &PyId_open, "isisOOO",
+                    fd, "r", -1, enc, Py_None, Py_None, Py_False);
+    Py_DECREF(io);
+    if (stream == NULL)
         return 0;
-    }
+
+    readline = _PyObject_GetAttrId(stream, &PyId_readline);
+    Py_DECREF(stream);
+    if (readline == NULL)
+        return 0;
     Py_XSETREF(tok->decoding_readline, readline);
 
     if (pos > 0) {
-        PyObject *bufobj = _PyObject_CallNoArgs(readline);
-        if (bufobj == NULL) {
+        PyObject *bufobj = _PyObject_CallNoArg(readline);
+        if (bufobj == NULL)
             return 0;
-        }
         Py_DECREF(bufobj);
     }
 
@@ -526,7 +545,7 @@ ensure_utf8(char *line, struct tok_state *tok)
                      "Non-UTF-8 code starting with '\\x%.2x' "
                      "in file %U on line %i, "
                      "but no encoding declared; "
-                     "see https://peps.python.org/pep-0263/ for details",
+                     "see https://python.org/dev/peps/pep-0263/ for details",
                      badchar, tok->filename, tok->lineno + 1);
         return 0;
     }
@@ -682,7 +701,7 @@ decode_str(const char *input, int single, struct tok_state *tok)
 /* Set up tokenizer for string */
 
 struct tok_state *
-_PyTokenizer_FromString(const char *str, int exec_input)
+PyTokenizer_FromString(const char *str, int exec_input)
 {
     struct tok_state *tok = tok_new();
     char *decoded;
@@ -691,7 +710,7 @@ _PyTokenizer_FromString(const char *str, int exec_input)
         return NULL;
     decoded = decode_str(str, exec_input, tok);
     if (decoded == NULL) {
-        _PyTokenizer_Free(tok);
+        PyTokenizer_Free(tok);
         return NULL;
     }
 
@@ -703,7 +722,7 @@ _PyTokenizer_FromString(const char *str, int exec_input)
 /* Set up tokenizer for UTF-8 string */
 
 struct tok_state *
-_PyTokenizer_FromUTF8(const char *str, int exec_input)
+PyTokenizer_FromUTF8(const char *str, int exec_input)
 {
     struct tok_state *tok = tok_new();
     char *translated;
@@ -711,7 +730,7 @@ _PyTokenizer_FromUTF8(const char *str, int exec_input)
         return NULL;
     tok->input = translated = translate_newlines(str, exec_input, tok);
     if (translated == NULL) {
-        _PyTokenizer_Free(tok);
+        PyTokenizer_Free(tok);
         return NULL;
     }
     tok->decoding_state = STATE_NORMAL;
@@ -719,7 +738,7 @@ _PyTokenizer_FromUTF8(const char *str, int exec_input)
     tok->str = translated;
     tok->encoding = new_string("utf-8", 5, tok);
     if (!tok->encoding) {
-        _PyTokenizer_Free(tok);
+        PyTokenizer_Free(tok);
         return NULL;
     }
 
@@ -731,14 +750,14 @@ _PyTokenizer_FromUTF8(const char *str, int exec_input)
 /* Set up tokenizer for file */
 
 struct tok_state *
-_PyTokenizer_FromFile(FILE *fp, const char* enc,
-                      const char *ps1, const char *ps2)
+PyTokenizer_FromFile(FILE *fp, const char* enc,
+                     const char *ps1, const char *ps2)
 {
     struct tok_state *tok = tok_new();
     if (tok == NULL)
         return NULL;
     if ((tok->buf = (char *)PyMem_Malloc(BUFSIZ)) == NULL) {
-        _PyTokenizer_Free(tok);
+        PyTokenizer_Free(tok);
         return NULL;
     }
     tok->cur = tok->inp = tok->buf;
@@ -751,7 +770,7 @@ _PyTokenizer_FromFile(FILE *fp, const char* enc,
            gets copied into the parse tree. */
         tok->encoding = new_string(enc, strlen(enc), tok);
         if (!tok->encoding) {
-            _PyTokenizer_Free(tok);
+            PyTokenizer_Free(tok);
             return NULL;
         }
         tok->decoding_state = STATE_NORMAL;
@@ -762,7 +781,7 @@ _PyTokenizer_FromFile(FILE *fp, const char* enc,
 /* Free a tok_state structure */
 
 void
-_PyTokenizer_Free(struct tok_state *tok)
+PyTokenizer_Free(struct tok_state *tok)
 {
     if (tok->encoding != NULL) {
         PyMem_Free(tok->encoding);
@@ -835,7 +854,7 @@ tok_underflow_interactive(struct tok_state *tok) {
         tok->done = E_INTERACT_STOP;
         return 1;
     }
-    char *newtok = PyOS_Readline(tok->fp ? tok->fp : stdin, stdout, tok->prompt);
+    char *newtok = PyOS_Readline(stdin, stdout, tok->prompt);
     if (newtok != NULL) {
         char *translated = translate_newlines(newtok, 0, tok);
         PyMem_Free(newtok);
@@ -1011,9 +1030,8 @@ tok_nextc(struct tok_state *tok)
         if (tok->cur != tok->inp) {
             return Py_CHARMASK(*tok->cur++); /* Fast path */
         }
-        if (tok->done != E_OK) {
-           return EOF;
-        }
+        if (tok->done != E_OK)
+            return EOF;
         if (tok->fp == NULL) {
             rc = tok_underflow_string(tok);
         }
@@ -1024,7 +1042,7 @@ tok_nextc(struct tok_state *tok)
             rc = tok_underflow_file(tok);
         }
 #if defined(Py_DEBUG)
-        if (tok->debug) {
+        if (Py_DebugFlag) {
             fprintf(stderr, "line[%d] = ", tok->lineno);
             print_escape(stderr, tok->cur, tok->inp - tok->cur);
             fprintf(stderr, "  tok->done = %d\n", tok->done);
@@ -1105,7 +1123,11 @@ static int
 syntaxerror(struct tok_state *tok, const char *format, ...)
 {
     va_list vargs;
+#ifdef HAVE_STDARG_PROTOTYPES
     va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
     int ret = _syntaxerror_range(tok, format, -1, -1, vargs);
     va_end(vargs);
     return ret;
@@ -1117,7 +1139,11 @@ syntaxerror_known_range(struct tok_state *tok,
                         const char *format, ...)
 {
     va_list vargs;
+#ifdef HAVE_STDARG_PROTOTYPES
     va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
     int ret = _syntaxerror_range(tok, format, col_offset, end_col_offset, vargs);
     va_end(vargs);
     return ret;
@@ -1134,20 +1160,24 @@ indenterror(struct tok_state *tok)
 }
 
 static int
-parser_warn(struct tok_state *tok, PyObject *category, const char *format, ...)
+parser_warn(struct tok_state *tok, const char *format, ...)
 {
     PyObject *errmsg;
     va_list vargs;
+#ifdef HAVE_STDARG_PROTOTYPES
     va_start(vargs, format);
+#else
+    va_start(vargs);
+#endif
     errmsg = PyUnicode_FromFormatV(format, vargs);
     va_end(vargs);
     if (!errmsg) {
         goto error;
     }
 
-    if (PyErr_WarnExplicitObject(category, errmsg, tok->filename,
+    if (PyErr_WarnExplicitObject(PyExc_DeprecationWarning, errmsg, tok->filename,
                                  tok->lineno, NULL, NULL) < 0) {
-        if (PyErr_ExceptionMatches(category)) {
+        if (PyErr_ExceptionMatches(PyExc_DeprecationWarning)) {
             /* Replace the DeprecationWarning exception with a SyntaxError
                to get a more accurate error report */
             PyErr_Clear();
@@ -1191,12 +1221,12 @@ static int
 verify_end_of_number(struct tok_state *tok, int c, const char *kind)
 {
     /* Emit a deprecation warning only if the numeric literal is immediately
-     * followed by one of keywords which can occur after a numeric literal
+     * followed by one of keywords which can occurr after a numeric literal
      * in valid code: "and", "else", "for", "if", "in", "is" and "or".
      * It allows to gradually deprecate existing valid code without adding
      * warning before error in most cases of invalid numeric literal (which
-     * would be confusing and break existing tests).
-     * Raise a syntax error with slightly better message than plain
+     * would be confusiong and break existing tests).
+     * Raise a syntax error with slighly better message than plain
      * "invalid syntax" if the numeric literal is immediately followed by
      * other keyword or identifier.
      */
@@ -1220,14 +1250,9 @@ verify_end_of_number(struct tok_state *tok, int c, const char *kind)
     else if (c == 'o') {
         r = lookahead(tok, "r");
     }
-    else if (c == 'n') {
-        r = lookahead(tok, "ot");
-    }
     if (r) {
         tok_backup(tok, c);
-        if (parser_warn(tok, PyExc_SyntaxWarning,
-                "invalid %s literal", kind))
-        {
+        if (parser_warn(tok, "invalid %s literal", kind)) {
             return 0;
         }
         tok_nextc(tok);
@@ -1321,24 +1346,6 @@ tok_decimal_tail(struct tok_state *tok)
 
 /* Get next token, after space stripping etc. */
 
-static inline int
-tok_continuation_line(struct tok_state *tok) {
-    int c = tok_nextc(tok);
-    if (c != '\n') {
-        tok->done = E_LINECONT;
-        return -1;
-    }
-    c = tok_nextc(tok);
-    if (c == EOF) {
-        tok->done = E_EOF;
-        tok->cur = tok->inp;
-        return -1;
-    } else {
-        tok_backup(tok, c);
-    }
-    return c;
-}
-
 static int
 tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
 {
@@ -1355,7 +1362,6 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
         int col = 0;
         int altcol = 0;
         tok->atbol = 0;
-        int cont_line_col = 0;
         for (;;) {
             c = tok_nextc(tok);
             if (c == ' ') {
@@ -1368,23 +1374,14 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
             else if (c == '\014')  {/* Control-L (formfeed) */
                 col = altcol = 0; /* For Emacs users */
             }
-            else if (c == '\\') {
-                // Indentation cannot be split over multiple physical lines
-                // using backslashes. This means that if we found a backslash
-                // preceded by whitespace, **the first one we find** determines
-                // the level of indentation of whatever comes next.
-                cont_line_col = cont_line_col ? cont_line_col : col;
-                if ((c = tok_continuation_line(tok)) == -1) {
-                    return ERRORTOKEN;
-                }
-            }
             else {
                 break;
             }
         }
         tok_backup(tok, c);
-        if (c == '#' || c == '\n') {
+        if (c == '#' || c == '\n' || c == '\\') {
             /* Lines with only whitespace and/or comments
+               and/or a line continuation character
                shouldn't affect the indentation and are
                not passed to the parser as NEWLINE tokens,
                except *totally* empty lines in interactive
@@ -1405,8 +1402,6 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
                may need to skip to the end of a comment */
         }
         if (!blankline && tok->level == 0) {
-            col = cont_line_col ? cont_line_col : col;
-            altcol = cont_line_col ? cont_line_col : altcol;
             if (col == tok->indstack[tok->indent]) {
                 /* No change */
                 if (altcol != tok->altindstack[tok->indent]) {
@@ -1938,21 +1933,16 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
                 tok->line_start = tok->multi_line_start;
                 int start = tok->lineno;
                 tok->lineno = tok->first_lineno;
+
                 if (quote_size == 3) {
-                    syntaxerror(tok, "unterminated triple-quoted string literal"
-                                     " (detected at line %d)", start);
-                    if (c != '\n') {
-                        tok->done = E_EOFS;
-                    }
-                    return ERRORTOKEN;
+                    return syntaxerror(tok,
+                                       "unterminated triple-quoted string literal"
+                                       " (detected at line %d)", start);
                 }
                 else {
-                    syntaxerror(tok, "unterminated string literal (detected at"
-                                     " line %d)", start);
-                    if (c != '\n') {
-                        tok->done = E_EOLS;
-                    }
-                    return ERRORTOKEN;
+                    return syntaxerror(tok,
+                                       "unterminated string literal (detected at"
+                                       " line %d)", start);
                 }
             }
             if (c == quote) {
@@ -1973,8 +1963,18 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
 
     /* Line continuation */
     if (c == '\\') {
-        if ((c = tok_continuation_line(tok)) == -1) {
+        c = tok_nextc(tok);
+        if (c != '\n') {
+            tok->done = E_LINECONT;
             return ERRORTOKEN;
+        }
+        c = tok_nextc(tok);
+        if (c == EOF) {
+            tok->done = E_EOF;
+            tok->cur = tok->inp;
+            return ERRORTOKEN;
+        } else {
+            tok_backup(tok, c);
         }
         tok->cont_line = 1;
         goto again; /* Read next line */
@@ -1983,10 +1983,10 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
     /* Check for two-character token */
     {
         int c2 = tok_nextc(tok);
-        int token = _PyToken_TwoChars(c, c2);
+        int token = PyToken_TwoChars(c, c2);
         if (token != OP) {
             int c3 = tok_nextc(tok);
-            int token3 = _PyToken_ThreeChars(c, c2, c3);
+            int token3 = PyToken_ThreeChars(c, c2, c3);
             if (token3 != OP) {
                 token = token3;
             }
@@ -2041,21 +2041,14 @@ tok_get(struct tok_state *tok, const char **p_start, const char **p_end)
         break;
     }
 
-    if (!Py_UNICODE_ISPRINTABLE(c)) {
-        char hex[9];
-        (void)PyOS_snprintf(hex, sizeof(hex), "%04X", c);
-        return syntaxerror(tok, "invalid non-printable character U+%s", hex);
-    }
-
     /* Punctuation character */
     *p_start = tok->start;
     *p_end = tok->cur;
-    return _PyToken_OneChar(c);
+    return PyToken_OneChar(c);
 }
 
 int
-_PyTokenizer_Get(struct tok_state *tok,
-                 const char **p_start, const char **p_end)
+PyTokenizer_Get(struct tok_state *tok, const char **p_start, const char **p_end)
 {
     int result = tok_get(tok, p_start, p_end);
     if (tok->decoding_erred) {
@@ -2065,43 +2058,10 @@ _PyTokenizer_Get(struct tok_state *tok,
     return result;
 }
 
-#if defined(__wasi__) || (defined(__EMSCRIPTEN__) && (__EMSCRIPTEN_major__ >= 3))
-// fdopen() with borrowed fd. WASI does not provide dup() and Emscripten's
-// dup() emulation with open() is slow.
-typedef union {
-    void *cookie;
-    int fd;
-} borrowed;
-
-static ssize_t
-borrow_read(void *cookie, char *buf, size_t size)
-{
-    borrowed b = {.cookie = cookie};
-    return read(b.fd, (void *)buf, size);
-}
-
-static FILE *
-fdopen_borrow(int fd) {
-    // supports only reading. seek fails. close and write are no-ops.
-    cookie_io_functions_t io_cb = {borrow_read, NULL, NULL, NULL};
-    borrowed b = {.fd = fd};
-    return fopencookie(b.cookie, "r", io_cb);
-}
-#else
-static FILE *
-fdopen_borrow(int fd) {
-    fd = _Py_dup(fd);
-    if (fd < 0) {
-        return NULL;
-    }
-    return fdopen(fd, "r");
-}
-#endif
-
 /* Get the encoding of a Python file. Check for the coding cookie and check if
    the file starts with a BOM.
 
-   _PyTokenizer_FindEncodingFilename() returns NULL when it can't find the
+   PyTokenizer_FindEncodingFilename() returns NULL when it can't find the
    encoding in the first or second line of the file (in which case the encoding
    should be assumed to be UTF-8).
 
@@ -2109,7 +2069,7 @@ fdopen_borrow(int fd) {
    by the caller. */
 
 char *
-_PyTokenizer_FindEncodingFilename(int fd, PyObject *filename)
+PyTokenizer_FindEncodingFilename(int fd, PyObject *filename)
 {
     struct tok_state *tok;
     FILE *fp;
@@ -2117,11 +2077,16 @@ _PyTokenizer_FindEncodingFilename(int fd, PyObject *filename)
     const char *p_end = NULL;
     char *encoding = NULL;
 
-    fp = fdopen_borrow(fd);
+    fd = _Py_dup(fd);
+    if (fd < 0) {
+        return NULL;
+    }
+
+    fp = fdopen(fd, "r");
     if (fp == NULL) {
         return NULL;
     }
-    tok = _PyTokenizer_FromFile(fp, NULL, NULL, NULL);
+    tok = PyTokenizer_FromFile(fp, NULL, NULL, NULL);
     if (tok == NULL) {
         fclose(fp);
         return NULL;
@@ -2134,12 +2099,12 @@ _PyTokenizer_FindEncodingFilename(int fd, PyObject *filename)
         tok->filename = PyUnicode_FromString("<string>");
         if (tok->filename == NULL) {
             fclose(fp);
-            _PyTokenizer_Free(tok);
+            PyTokenizer_Free(tok);
             return encoding;
         }
     }
     while (tok->lineno < 2 && tok->done == E_OK) {
-        _PyTokenizer_Get(tok, &p_start, &p_end);
+        PyTokenizer_Get(tok, &p_start, &p_end);
     }
     fclose(fp);
     if (tok->encoding) {
@@ -2148,11 +2113,18 @@ _PyTokenizer_FindEncodingFilename(int fd, PyObject *filename)
             strcpy(encoding, tok->encoding);
         }
     }
-    _PyTokenizer_Free(tok);
+    PyTokenizer_Free(tok);
     return encoding;
 }
 
+char *
+PyTokenizer_FindEncoding(int fd)
+{
+    return PyTokenizer_FindEncodingFilename(fd, NULL);
+}
+
 #ifdef Py_DEBUG
+
 void
 tok_dump(int type, char *start, char *end)
 {
@@ -2160,4 +2132,5 @@ tok_dump(int type, char *start, char *end)
     if (type == NAME || type == NUMBER || type == STRING || type == OP)
         fprintf(stderr, "(%.*s)", (int)(end - start), start);
 }
-#endif  // Py_DEBUG
+
+#endif

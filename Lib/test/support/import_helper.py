@@ -1,9 +1,7 @@
 import contextlib
-import _imp
 import importlib
 import importlib.util
 import os
-import shutil
 import sys
 import unittest
 import warnings
@@ -60,7 +58,7 @@ def make_legacy_pyc(source):
     pyc_file = importlib.util.cache_from_source(source)
     up_one = os.path.dirname(os.path.abspath(source))
     legacy_pyc = os.path.join(up_one, source + 'c')
-    shutil.move(pyc_file, legacy_pyc)
+    os.rename(pyc_file, legacy_pyc)
     return legacy_pyc
 
 
@@ -91,24 +89,7 @@ def _save_and_remove_modules(names):
     return orig_modules
 
 
-@contextlib.contextmanager
-def frozen_modules(enabled=True):
-    """Force frozen modules to be used (or not).
-
-    This only applies to modules that haven't been imported yet.
-    Also, some essential modules will always be imported frozen.
-    """
-    _imp._override_frozen_modules_for_tests(1 if enabled else -1)
-    try:
-        yield
-    finally:
-        _imp._override_frozen_modules_for_tests(0)
-
-
-def import_fresh_module(name, fresh=(), blocked=(), *,
-                        deprecated=False,
-                        usefrozen=False,
-                        ):
+def import_fresh_module(name, fresh=(), blocked=(), deprecated=False):
     """Import and return a module, deliberately bypassing sys.modules.
 
     This function imports and returns a fresh copy of the named Python module
@@ -133,9 +114,6 @@ def import_fresh_module(name, fresh=(), blocked=(), *,
 
     This function will raise ImportError if the named module cannot be
     imported.
-
-    If "usefrozen" is False (the default) then the frozen importer is
-    disabled (except for essential modules like importlib._bootstrap).
     """
     # NOTE: test_heapq, test_json and test_warnings include extra sanity checks
     # to make sure that this utility function is working as expected
@@ -150,14 +128,13 @@ def import_fresh_module(name, fresh=(), blocked=(), *,
             sys.modules[modname] = None
 
         try:
-            with frozen_modules(usefrozen):
-                # Return None when one of the "fresh" modules can not be imported.
-                try:
-                    for modname in fresh:
-                        __import__(modname)
-                except ImportError:
-                    return None
-                return importlib.import_module(name)
+            # Return None when one of the "fresh" modules can not be imported.
+            try:
+                for modname in fresh:
+                    __import__(modname)
+            except ImportError:
+                return None
+            return importlib.import_module(name)
         finally:
             _save_and_remove_modules(names)
             sys.modules.update(orig_modules)
@@ -173,12 +150,9 @@ class CleanImport(object):
 
         with CleanImport("foo"):
             importlib.import_module("foo") # new reference
-
-    If "usefrozen" is False (the default) then the frozen importer is
-    disabled (except for essential modules like importlib._bootstrap).
     """
 
-    def __init__(self, *module_names, usefrozen=False):
+    def __init__(self, *module_names):
         self.original_modules = sys.modules.copy()
         for module_name in module_names:
             if module_name in sys.modules:
@@ -190,15 +164,12 @@ class CleanImport(object):
                 if module.__name__ != module_name:
                     del sys.modules[module.__name__]
                 del sys.modules[module_name]
-        self._frozen_modules = frozen_modules(usefrozen)
 
     def __enter__(self):
-        self._frozen_modules.__enter__()
         return self
 
     def __exit__(self, *ignore_exc):
         sys.modules.update(self.original_modules)
-        self._frozen_modules.__exit__(*ignore_exc)
 
 
 class DirsOnSysPath(object):

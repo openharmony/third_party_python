@@ -314,35 +314,6 @@ always available.
    yourself to control bytecode file generation.
 
 
-.. data:: _emscripten_info
-
-   A :term:`named tuple` holding information about the environment on the
-   *wasm32-emscripten* platform. The named tuple is provisional and may change
-   in the future.
-
-   .. tabularcolumns:: |l|L|
-
-   +-----------------------------+----------------------------------------------+
-   | Attribute                   | Explanation                                  |
-   +=============================+==============================================+
-   | :const:`emscripten_version` | Emscripten version as tuple of ints          |
-   |                             | (major, minor, micro), e.g. ``(3, 1, 8)``.   |
-   +-----------------------------+----------------------------------------------+
-   | :const:`runtime`            | Runtime string, e.g. browser user agent,     |
-   |                             | ``'Node.js v14.18.2'``, or ``'UNKNOWN'``.    |
-   +-----------------------------+----------------------------------------------+
-   | :const:`pthreads`           | ``True`` if Python is compiled with          |
-   |                             | Emscripten pthreads support.                 |
-   +-----------------------------+----------------------------------------------+
-   | :const:`shared_memory`      | ``True`` if Python is compiled with shared   |
-   |                             | memory support.                              |
-   +-----------------------------+----------------------------------------------+
-
-   .. availability:: WebAssembly Emscripten platform (*wasm32-emscripten*).
-
-   .. versionadded:: 3.11
-
-
 .. data:: pycache_prefix
 
    If this is set (not ``None``), Python will write bytecode-cache ``.pyc``
@@ -407,40 +378,27 @@ always available.
    .. versionadded:: 3.8
       __unraisablehook__
 
-
-.. function:: exception()
-
-   This function, when called while an exception handler is executing (such as
-   an ``except`` or ``except*`` clause), returns the exception instance that
-   was caught by this handler. When exception handlers are nested within one
-   another, only the exception handled by the innermost handler is accessible.
-
-   If no exception handler is executing, this function returns ``None``.
-
-   .. versionadded:: 3.11
-
-
 .. function:: exc_info()
 
-   This function returns the old-style representation of the handled
-   exception. If an exception ``e`` is currently handled (so
-   :func:`exception` would return ``e``), :func:`exc_info` returns the
-   tuple ``(type(e), e, e.__traceback__)``.
-   That is, a tuple containing the type of the exception (a subclass of
-   :exc:`BaseException`), the exception itself, and a :ref:`traceback
-   object <traceback-objects>` which typically encapsulates the call
-   stack at the point where the exception last occurred.
+   This function returns a tuple of three values that give information about the
+   exception that is currently being handled.  The information returned is specific
+   both to the current thread and to the current stack frame.  If the current stack
+   frame is not handling an exception, the information is taken from the calling
+   stack frame, or its caller, and so on until a stack frame is found that is
+   handling an exception.  Here, "handling an exception" is defined as "executing
+   an except clause."  For any stack frame, only information about the exception
+   being currently handled is accessible.
 
    .. index:: object: traceback
 
-   If no exception is being handled anywhere on the stack, this function
-   return a tuple containing three ``None`` values.
+   If no exception is being handled anywhere on the stack, a tuple containing
+   three ``None`` values is returned.  Otherwise, the values returned are
+   ``(type, value, traceback)``.  Their meaning is: *type* gets the type of the
+   exception being handled (a subclass of :exc:`BaseException`); *value* gets
+   the exception instance (an instance of the exception type); *traceback* gets
+   a :ref:`traceback object <traceback-objects>` which encapsulates the call
+   stack at the point where the exception originally occurred.
 
-   .. versionchanged:: 3.11
-      The ``type`` and ``traceback`` fields are now derived from the ``value``
-      (the exception instance), so when an exception is modified while it is
-      being handled, the changes are reflected in the results of subsequent
-      calls to :func:`exc_info`.
 
 .. data:: exec_prefix
 
@@ -471,7 +429,10 @@ always available.
 
 .. function:: exit([arg])
 
-   Raise a :exc:`SystemExit` exception, signaling an intention to exit the interpreter.
+   Exit from Python.  This is implemented by raising the :exc:`SystemExit`
+   exception, so cleanup actions specified by finally clauses of :keyword:`try`
+   statements are honored, and it is possible to intercept the exit attempt at
+   an outer level.
 
    The optional argument *arg* can be an integer giving the exit status
    (defaulting to zero), or another type of object.  If it is an integer, zero
@@ -488,8 +449,7 @@ always available.
 
    Since :func:`exit` ultimately "only" raises an exception, it will only exit
    the process when called from the main thread, and the exception is not
-   intercepted. Cleanup actions specified by finally clauses of :keyword:`try` statements
-   are honored, and it is possible to intercept the exit attempt at an outer level.
+   intercepted.
 
    .. versionchanged:: 3.6
       If an error occurs in the cleanup after the Python interpreter
@@ -520,7 +480,6 @@ always available.
    :const:`hash_randomization`   :option:`-R`
    :const:`dev_mode`             :option:`-X dev <-X>` (:ref:`Python Development Mode <devmode>`)
    :const:`utf8_mode`            :option:`-X utf8 <-X>`
-   :const:`safe_path`            :option:`-P`
    ============================= ================================================================
 
    .. versionchanged:: 3.2
@@ -539,9 +498,6 @@ always available.
       Added the ``dev_mode`` attribute for the new :ref:`Python Development
       Mode <devmode>` and the ``utf8_mode`` attribute for the new  :option:`-X`
       ``utf8`` flag.
-
-   .. versionchanged:: 3.11
-      Added the ``safe_path`` attribute for :option:`-P` option.
 
 
 .. data:: float_info
@@ -1087,8 +1043,7 @@ always available.
 
     A list of :term:`meta path finder` objects that have their
     :meth:`~importlib.abc.MetaPathFinder.find_spec` methods called to see if one
-    of the objects can find the module to be imported. By default, it holds entries
-    that implement Python's default import semantics. The
+    of the objects can find the module to be imported. The
     :meth:`~importlib.abc.MetaPathFinder.find_spec` method is called with at
     least the absolute name of the module being imported. If the module to be
     imported is contained in a package, then the parent package's :attr:`__path__`
@@ -1143,19 +1098,13 @@ always available.
    the environment variable :envvar:`PYTHONPATH`, plus an installation-dependent
    default.
 
-   By default, as initialized upon program startup, a potentially unsafe path
-   is prepended to :data:`sys.path` (*before* the entries inserted as a result
-   of :envvar:`PYTHONPATH`):
-
-   * ``python -m module`` command line: prepend the current working
-     directory.
-   * ``python script.py`` command line: prepend the script's directory.
-     If it's a symbolic link, resolve symbolic links.
-   * ``python -c code`` and ``python`` (REPL) command lines: prepend an empty
-     string, which means the current working directory.
-
-   To not prepend this potentially unsafe path, use the :option:`-P` command
-   line option or the :envvar:`PYTHONSAFEPATH` environment variable?
+   As initialized upon program startup, the first item of this list, ``path[0]``,
+   is the directory containing the script that was used to invoke the Python
+   interpreter.  If the script directory is not available (e.g.  if the interpreter
+   is invoked interactively or if the script is read from standard input),
+   ``path[0]`` is the empty string, which directs Python to search modules in the
+   current directory first.  Notice that the script directory is inserted *before*
+   the entries inserted as a result of :envvar:`PYTHONPATH`.
 
    A program is free to modify this list for its own purposes.  Only strings
    and bytes should be added to :data:`sys.path`; all other data types are
@@ -1163,8 +1112,9 @@ always available.
 
 
    .. seealso::
-      * Module :mod:`site` This describes how to use .pth files to
-        extend :data:`sys.path`.
+      Module :mod:`site` This describes how to use .pth files to extend
+      :data:`sys.path`.
+
 
 .. data:: path_hooks
 
@@ -1214,9 +1164,7 @@ always available.
    System           ``platform`` value
    ================ ===========================
    AIX              ``'aix'``
-   Emscripten       ``'emscripten'``
    Linux            ``'linux'``
-   WASI             ``'wasi'``
    Windows          ``'win32'``
    Windows/Cygwin   ``'cygwin'``
    macOS            ``'darwin'``
@@ -1778,13 +1726,13 @@ always available.
 
    .. code-block:: shell-session
 
-      $ ./python -Xpycache_prefix=some_path -Xdev
+      $ ./python -Xa=b -Xc
       Python 3.2a3+ (py3k, Oct 16 2010, 20:14:50)
       [GCC 4.4.3] on linux2
       Type "help", "copyright", "credits" or "license" for more information.
       >>> import sys
       >>> sys._xoptions
-      {'pycache_prefix': 'some_path', 'dev': True}
+      {'a': 'b', 'c': True}
 
    .. impl-detail::
 

@@ -1,9 +1,8 @@
 """Tests for http/cookiejar.py."""
 
 import os
-import stat
-import sys
 import re
+import test.support
 from test.support import os_helper
 from test.support import warnings_helper
 import time
@@ -18,7 +17,6 @@ from http.cookiejar import (time2isoz, http2time, iso2time, time2netscape,
      reach, is_HDN, domain_match, user_domain_match, request_path,
      request_port, request_host)
 
-mswindows = (sys.platform == "win32")
 
 class DateTimeTests(unittest.TestCase):
 
@@ -366,36 +364,9 @@ class FileCookieJarTests(unittest.TestCase):
             c = LWPCookieJar()
             c.load(filename, ignore_discard=True)
         finally:
-            os_helper.unlink(filename)
+            try: os.unlink(filename)
+            except OSError: pass
         self.assertEqual(c._cookies["www.acme.com"]["/"]["boo"].value, None)
-
-    @unittest.skipIf(mswindows, "windows file permissions are incompatible with file modes")
-    @os_helper.skip_unless_working_chmod
-    def test_lwp_filepermissions(self):
-        # Cookie file should only be readable by the creator
-        filename = os_helper.TESTFN
-        c = LWPCookieJar()
-        interact_netscape(c, "http://www.acme.com/", 'boo')
-        try:
-            c.save(filename, ignore_discard=True)
-            st = os.stat(filename)
-            self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
-        finally:
-            os_helper.unlink(filename)
-
-    @unittest.skipIf(mswindows, "windows file permissions are incompatible with file modes")
-    @os_helper.skip_unless_working_chmod
-    def test_mozilla_filepermissions(self):
-        # Cookie file should only be readable by the creator
-        filename = os_helper.TESTFN
-        c = MozillaCookieJar()
-        interact_netscape(c, "http://www.acme.com/", 'boo')
-        try:
-            c.save(filename, ignore_discard=True)
-            st = os.stat(filename)
-            self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
-        finally:
-            os_helper.unlink(filename)
 
     def test_bad_magic(self):
         # OSErrors (eg. file doesn't exist) are allowed to propagate
@@ -420,7 +391,8 @@ class FileCookieJarTests(unittest.TestCase):
                     c = cookiejar_class()
                     self.assertRaises(LoadError, c.load, filename)
         finally:
-            os_helper.unlink(filename)
+            try: os.unlink(filename)
+            except OSError: pass
 
 class CookieTests(unittest.TestCase):
     # XXX
@@ -524,7 +496,7 @@ class CookieTests(unittest.TestCase):
             c = MozillaCookieJar(filename)
             c.revert(ignore_expires=True, ignore_discard=True)
         finally:
-            os_helper.unlink(c.filename)
+            os.unlink(c.filename)
         # cookies unchanged apart from lost info re. whether path was specified
         self.assertEqual(
             repr(c),
@@ -948,48 +920,6 @@ class CookieTests(unittest.TestCase):
 ##         self.assertEqual(len(c), 2)
         self.assertEqual(len(c), 4)
 
-    def test_localhost_domain(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://localhost", "foo=bar; domain=localhost;")
-
-        self.assertEqual(len(c), 1)
-
-    def test_localhost_domain_contents(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://localhost", "foo=bar; domain=localhost;")
-
-        self.assertEqual(c._cookies[".localhost"]["/"]["foo"].value, "bar")
-
-    def test_localhost_domain_contents_2(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://localhost", "foo=bar;")
-
-        self.assertEqual(c._cookies["localhost.local"]["/"]["foo"].value, "bar")
-
-    def test_evil_nonlocal_domain(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://evil.com", "foo=bar; domain=.localhost")
-
-        self.assertEqual(len(c), 0)
-
-    def test_evil_local_domain(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://localhost", "foo=bar; domain=.evil.com")
-
-        self.assertEqual(len(c), 0)
-
-    def test_evil_local_domain_2(self):
-        c = CookieJar()
-
-        interact_netscape(c, "http://localhost", "foo=bar; domain=.someother.local")
-
-        self.assertEqual(len(c), 0)
-
     def test_two_component_domain_rfc2965(self):
         pol = DefaultCookiePolicy(rfc2965=True)
         c = CookieJar(pol)
@@ -1321,11 +1251,11 @@ class CookieTests(unittest.TestCase):
                       r'port="90,100, 80,8080"; '
                       r'max-age=100; Comment = "Just kidding! (\"|\\\\) "')
 
-        versions = [1, 0, 1, 1, 1]
-        names = ["foo", "spam", "foo", "foo", "bang"]
-        domains = ["blah.spam.org", "www.acme.com", "www.acme.com",
-                   "www.acme.com", ".sol.no"]
-        paths = ["/", "/blah", "/blah/", "/", "/"]
+        versions = [1, 1, 1, 0, 1]
+        names = ["bang", "foo", "foo", "spam", "foo"]
+        domains = [".sol.no", "blah.spam.org", "www.acme.com",
+                   "www.acme.com", "www.acme.com"]
+        paths = ["/", "/", "/", "/blah", "/blah/"]
 
         for i in range(4):
             i = 0
@@ -1794,7 +1724,8 @@ class LWPCookieTests(unittest.TestCase):
             c = LWPCookieJar(policy=pol)
             c.load(filename, ignore_discard=True)
         finally:
-            os_helper.unlink(filename)
+            try: os.unlink(filename)
+            except OSError: pass
 
         self.assertEqual(old, repr(c))
 
@@ -1853,7 +1784,8 @@ class LWPCookieTests(unittest.TestCase):
                                          DefaultCookiePolicy(rfc2965=True))
                 new_c.load(ignore_discard=ignore_discard)
             finally:
-                os_helper.unlink(filename)
+                try: os.unlink(filename)
+                except OSError: pass
             return new_c
 
         new_c = save_and_restore(c, True)

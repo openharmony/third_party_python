@@ -4,11 +4,6 @@ import socket
 import tempfile
 import urllib.response
 import unittest
-from test import support
-
-if support.is_wasi:
-    raise unittest.SkipTest("Cannot create socket on WASI")
-
 
 class TestResponse(unittest.TestCase):
 

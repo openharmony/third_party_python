@@ -1,6 +1,7 @@
 import re
 import json
 import pickle
+import textwrap
 import unittest
 import warnings
 import importlib.metadata
@@ -15,11 +16,9 @@ from importlib.metadata import (
     Distribution,
     EntryPoint,
     PackageNotFoundError,
-    _unique,
     distributions,
     entry_points,
     metadata,
-    packages_distributions,
     version,
 )
 
@@ -37,12 +36,10 @@ class BasicTests(fixtures.DistInfoPkg, unittest.TestCase):
             Distribution.from_name('does-not-exist')
 
     def test_package_not_found_mentions_metadata(self):
-        """
-        When a package is not found, that could indicate that the
-        packgae is not installed or that it is installed without
-        metadata. Ensure the exception mentions metadata to help
-        guide users toward the cause. See #124.
-        """
+        # When a package is not found, that could indicate that the
+        # packgae is not installed or that it is installed without
+        # metadata. Ensure the exception mentions metadata to help
+        # guide users toward the cause. See #124.
         with self.assertRaises(PackageNotFoundError) as ctx:
             Distribution.from_name('does-not-exist')
 
@@ -50,14 +47,6 @@ class BasicTests(fixtures.DistInfoPkg, unittest.TestCase):
 
     def test_new_style_classes(self):
         self.assertIsInstance(Distribution, type)
-
-    @fixtures.parameterize(
-        dict(name=None),
-        dict(name=''),
-    )
-    def test_invalid_inputs_to_from_name(self, name):
-        with self.assertRaises(Exception):
-            Distribution.from_name(name)
 
 
 class ImportTests(fixtures.DistInfoPkg, unittest.TestCase):
@@ -86,49 +75,43 @@ class ImportTests(fixtures.DistInfoPkg, unittest.TestCase):
 
 class NameNormalizationTests(fixtures.OnSysPath, fixtures.SiteDir, unittest.TestCase):
     @staticmethod
-    def make_pkg(name):
+    def pkg_with_dashes(site_dir):
         """
-        Create minimal metadata for a dist-info package with
-        the indicated name on the file system.
+        Create minimal metadata for a package with dashes
+        in the name (and thus underscores in the filename).
         """
-        return {
-            f'{name}.dist-info': {
-                'METADATA': 'VERSION: 1.0\n',
-            },
-        }
+        metadata_dir = site_dir / 'my_pkg.dist-info'
+        metadata_dir.mkdir()
+        metadata = metadata_dir / 'METADATA'
+        with metadata.open('w', encoding='utf-8') as strm:
+            strm.write('Version: 1.0\n')
+        return 'my-pkg'
 
     def test_dashes_in_dist_name_found_as_underscores(self):
+        # For a package with a dash in the name, the dist-info metadata
+        # uses underscores in the name. Ensure the metadata loads.
+        pkg_name = self.pkg_with_dashes(self.site_dir)
+        assert version(pkg_name) == '1.0'
+
+    @staticmethod
+    def pkg_with_mixed_case(site_dir):
         """
-        For a package with a dash in the name, the dist-info metadata
-        uses underscores in the name. Ensure the metadata loads.
+        Create minimal metadata for a package with mixed case
+        in the name.
         """
-        fixtures.build_files(self.make_pkg('my_pkg'), self.site_dir)
-        assert version('my-pkg') == '1.0'
+        metadata_dir = site_dir / 'CherryPy.dist-info'
+        metadata_dir.mkdir()
+        metadata = metadata_dir / 'METADATA'
+        with metadata.open('w', encoding='utf-8') as strm:
+            strm.write('Version: 1.0\n')
+        return 'CherryPy'
 
     def test_dist_name_found_as_any_case(self):
-        """
-        Ensure the metadata loads when queried with any case.
-        """
-        pkg_name = 'CherryPy'
-        fixtures.build_files(self.make_pkg(pkg_name), self.site_dir)
+        # Ensure the metadata loads when queried with any case.
+        pkg_name = self.pkg_with_mixed_case(self.site_dir)
         assert version(pkg_name) == '1.0'
         assert version(pkg_name.lower()) == '1.0'
         assert version(pkg_name.upper()) == '1.0'
-
-    def test_unique_distributions(self):
-        """
-        Two distributions varying only by non-normalized name on
-        the file system should resolve as the same.
-        """
-        fixtures.build_files(self.make_pkg('abc'), self.site_dir)
-        before = list(_unique(distributions()))
-
-        alt_site_dir = self.fixtures.enter_context(fixtures.tempdir())
-        self.fixtures.enter_context(self.add_sys_path(alt_site_dir))
-        fixtures.build_files(self.make_pkg('ABC'), alt_site_dir)
-        after = list(_unique(distributions()))
-
-        assert len(after) == len(before)
 
 
 class NonASCIITests(fixtures.OnSysPath, fixtures.SiteDir, unittest.TestCase):
@@ -138,12 +121,11 @@ class NonASCIITests(fixtures.OnSysPath, fixtures.SiteDir, unittest.TestCase):
         Create minimal metadata for a package with non-ASCII in
         the description.
         """
-        contents = {
-            'portend.dist-info': {
-                'METADATA': 'Description: pôrˈtend',
-            },
-        }
-        fixtures.build_files(contents, site_dir)
+        metadata_dir = site_dir / 'portend.dist-info'
+        metadata_dir.mkdir()
+        metadata = metadata_dir / 'METADATA'
+        with metadata.open('w', encoding='utf-8') as fp:
+            fp.write('Description: pôrˈtend')
         return 'portend'
 
     @staticmethod
@@ -152,15 +134,19 @@ class NonASCIITests(fixtures.OnSysPath, fixtures.SiteDir, unittest.TestCase):
         Create minimal metadata for an egg-info package with
         non-ASCII in the description.
         """
-        contents = {
-            'portend.dist-info': {
-                'METADATA': """
+        metadata_dir = site_dir / 'portend.dist-info'
+        metadata_dir.mkdir()
+        metadata = metadata_dir / 'METADATA'
+        with metadata.open('w', encoding='utf-8') as fp:
+            fp.write(
+                textwrap.dedent(
+                    """
                 Name: portend
 
-                pôrˈtend""",
-            },
-        }
-        fixtures.build_files(contents, site_dir)
+                pôrˈtend
+                """
+                ).strip()
+            )
         return 'portend'
 
     def test_metadata_loads(self):
@@ -217,7 +203,7 @@ class InaccessibleSysPath(fixtures.OnSysPath, ffs.TestCase):
     site_dir = '/access-denied'
 
     def setUp(self):
-        super().setUp()
+        super(InaccessibleSysPath, self).setUp()
         self.setUpPyfakefs()
         self.fs.create_dir(self.site_dir, perm_bits=000)
 
@@ -231,20 +217,12 @@ class InaccessibleSysPath(fixtures.OnSysPath, ffs.TestCase):
 
 class TestEntryPoints(unittest.TestCase):
     def __init__(self, *args):
-        super().__init__(*args)
-        self.ep = importlib.metadata.EntryPoint(
-            name='name', value='value', group='group'
-        )
+        super(TestEntryPoints, self).__init__(*args)
+        self.ep = importlib.metadata.EntryPoint('name', 'value', 'group')
 
     def test_entry_point_pickleable(self):
         revived = pickle.loads(pickle.dumps(self.ep))
         assert revived == self.ep
-
-    def test_positional_args(self):
-        """
-        Capture legacy (namedtuple) construction, discouraged.
-        """
-        EntryPoint('name', 'value', 'group')
 
     def test_immutable(self):
         """EntryPoints should be immutable"""
@@ -257,13 +235,11 @@ class TestEntryPoints(unittest.TestCase):
         assert "'name'" in repr(self.ep)
 
     def test_hashable(self):
-        """EntryPoints should be hashable"""
+        # EntryPoints should be hashable.
         hash(self.ep)
 
     def test_json_dump(self):
-        """
-        json should not expect to be able to dump an EntryPoint
-        """
+        # json should not expect to be able to dump an EntryPoint.
         with self.assertRaises(Exception):
             with warnings.catch_warnings(record=True):
                 json.dumps(self.ep)
@@ -275,13 +251,11 @@ class TestEntryPoints(unittest.TestCase):
         assert self.ep.attr is None
 
     def test_sortable(self):
-        """
-        EntryPoint objects are sortable, but result is undefined.
-        """
+        # EntryPoint objects are sortable, but result is undefined.
         sorted(
             [
-                EntryPoint(name='b', value='val', group='group'),
-                EntryPoint(name='a', value='val', group='group'),
+                EntryPoint('b', 'val', 'group'),
+                EntryPoint('a', 'val', 'group'),
             ]
         )
 
@@ -290,47 +264,10 @@ class FileSystem(
     fixtures.OnSysPath, fixtures.SiteDir, fixtures.FileBuilder, unittest.TestCase
 ):
     def test_unicode_dir_on_sys_path(self):
-        """
-        Ensure a Unicode subdirectory of a directory on sys.path
-        does not crash.
-        """
+        # Ensure a Unicode subdirectory of a directory on sys.path
+        # does not crash.
         fixtures.build_files(
             {self.unicode_filename(): {}},
             prefix=self.site_dir,
         )
         list(distributions())
-
-
-class PackagesDistributionsPrebuiltTest(fixtures.ZipFixtures, unittest.TestCase):
-    def test_packages_distributions_example(self):
-        self._fixture_on_path('example-21.12-py3-none-any.whl')
-        assert packages_distributions()['example'] == ['example']
-
-    def test_packages_distributions_example2(self):
-        """
-        Test packages_distributions on a wheel built
-        by trampolim.
-        """
-        self._fixture_on_path('example2-1.0.0-py3-none-any.whl')
-        assert packages_distributions()['example2'] == ['example2']
-
-
-class PackagesDistributionsTest(
-    fixtures.OnSysPath, fixtures.SiteDir, unittest.TestCase
-):
-    def test_packages_distributions_neither_toplevel_nor_files(self):
-        """
-        Test a package built without 'top-level.txt' or a file list.
-        """
-        fixtures.build_files(
-            {
-                'trim_example-1.0.0.dist-info': {
-                    'METADATA': """
-                Name: trim_example
-                Version: 1.0.0
-                """,
-                }
-            },
-            prefix=self.site_dir,
-        )
-        packages_distributions()

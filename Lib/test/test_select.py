@@ -1,12 +1,11 @@
 import errno
+import os
 import select
 import subprocess
 import sys
 import textwrap
 import unittest
 from test import support
-
-support.requires_working_socket(module=True)
 
 @unittest.skipIf((sys.platform[:3]=='win'),
                  "can't easily test on this system")
@@ -47,7 +46,7 @@ class SelectTestCase(unittest.TestCase):
         self.assertIsNot(r, x)
         self.assertIsNot(w, x)
 
-    @support.requires_fork()
+    @unittest.skipUnless(hasattr(os, 'popen'), "need os.popen()")
     def test_select(self):
         code = textwrap.dedent('''
             import time
@@ -79,9 +78,6 @@ class SelectTestCase(unittest.TestCase):
                           rfd, wfd, xfd)
 
     # Issue 16230: Crash on select resized list
-    @unittest.skipIf(
-        support.is_emscripten, "Emscripten cannot select a fd multiple times."
-    )
     def test_select_mutated(self):
         a = []
         class F:

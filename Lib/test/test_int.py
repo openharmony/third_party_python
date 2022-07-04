@@ -369,14 +369,12 @@ class IntTestCases(unittest.TestCase):
             class JustTrunc(base):
                 def __trunc__(self):
                     return 42
-            with self.assertWarns(DeprecationWarning):
-                self.assertEqual(int(JustTrunc()), 42)
+            self.assertEqual(int(JustTrunc()), 42)
 
             class ExceptionalTrunc(base):
                 def __trunc__(self):
                     1 / 0
-            with self.assertRaises(ZeroDivisionError), \
-                 self.assertWarns(DeprecationWarning):
+            with self.assertRaises(ZeroDivisionError):
                 int(ExceptionalTrunc())
 
             for trunc_result_base in (object, Classic):
@@ -387,8 +385,7 @@ class IntTestCases(unittest.TestCase):
                 class TruncReturnsNonInt(base):
                     def __trunc__(self):
                         return Index()
-                with self.assertWarns(DeprecationWarning):
-                    self.assertEqual(int(TruncReturnsNonInt()), 42)
+                self.assertEqual(int(TruncReturnsNonInt()), 42)
 
                 class Intable(trunc_result_base):
                     def __int__(self):
@@ -397,8 +394,7 @@ class IntTestCases(unittest.TestCase):
                 class TruncReturnsNonIndex(base):
                     def __trunc__(self):
                         return Intable()
-                with self.assertWarns(DeprecationWarning):
-                    self.assertEqual(int(TruncReturnsNonInt()), 42)
+                self.assertEqual(int(TruncReturnsNonInt()), 42)
 
                 class NonIntegral(trunc_result_base):
                     def __trunc__(self):
@@ -409,8 +405,7 @@ class IntTestCases(unittest.TestCase):
                     def __trunc__(self):
                         return NonIntegral()
                 try:
-                    with self.assertWarns(DeprecationWarning):
-                        int(TruncReturnsNonIntegral())
+                    int(TruncReturnsNonIntegral())
                 except TypeError as e:
                     self.assertEqual(str(e),
                                       "__trunc__ returned non-Integral"
@@ -428,8 +423,7 @@ class IntTestCases(unittest.TestCase):
                     def __trunc__(self):
                         return BadInt()
 
-                with self.assertRaises(TypeError), \
-                     self.assertWarns(DeprecationWarning):
+                with self.assertRaises(TypeError):
                     int(TruncReturnsBadInt())
 
     def test_int_subclass_with_index(self):
@@ -523,16 +517,13 @@ class IntTestCases(unittest.TestCase):
         self.assertIs(type(n), int)
 
         bad_int = TruncReturnsBadInt()
-        with self.assertWarns(DeprecationWarning):
-            self.assertRaises(TypeError, int, bad_int)
+        self.assertRaises(TypeError, int, bad_int)
 
         good_int = TruncReturnsIntSubclass()
-        with self.assertWarns(DeprecationWarning):
-            n = int(good_int)
+        n = int(good_int)
         self.assertEqual(n, 1)
         self.assertIs(type(n), int)
-        with self.assertWarns(DeprecationWarning):
-            n = IntSubclass(good_int)
+        n = IntSubclass(good_int)
         self.assertEqual(n, 1)
         self.assertIs(type(n), IntSubclass)
 

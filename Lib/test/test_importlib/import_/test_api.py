@@ -1,4 +1,4 @@
-from test.test_importlib import util
+from .. import util
 
 from importlib import machinery
 import sys

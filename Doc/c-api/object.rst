@@ -81,9 +81,8 @@ Object Protocol
    return ``0`` on success.  This is the equivalent of the Python statement
    ``o.attr_name = v``.
 
-   If *v* is ``NULL``, the attribute is deleted. This behaviour is deprecated
-   in favour of using :c:func:`PyObject_DelAttr`, but there are currently no
-   plans to remove it.
+   If *v* is ``NULL``, the attribute is deleted, however this feature is
+   deprecated in favour of using :c:func:`PyObject_DelAttr`.
 
 
 .. c:function:: int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
@@ -93,7 +92,7 @@ Object Protocol
    return ``0`` on success.  This is the equivalent of the Python statement
    ``o.attr_name = v``.
 
-   If *v* is ``NULL``, the attribute is deleted, but this feature is
+   If *v* is ``NULL``, the attribute is deleted, however this feature is
    deprecated in favour of using :c:func:`PyObject_DelAttrString`.
 
 
@@ -258,7 +257,7 @@ Object Protocol
 
    .. versionchanged:: 3.2
       The return type is now Py_hash_t.  This is a signed integer the same size
-      as :c:type:`Py_ssize_t`.
+      as Py_ssize_t.
 
 
 .. c:function:: Py_hash_t PyObject_HashNotImplemented(PyObject *o)
@@ -291,7 +290,7 @@ Object Protocol
    of object *o*. On failure, raises :exc:`SystemError` and returns ``NULL``.  This
    is equivalent to the Python expression ``type(o)``. This function increments the
    reference count of the return value. There's really no reason to use this
-   function instead of the :c:func:`Py_TYPE()` function, which returns a
+   function instead of the common expression ``o->ob_type``, which returns a
    pointer of type :c:type:`PyTypeObject*`, except when the incremented reference
    count is needed.
 

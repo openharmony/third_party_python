@@ -1161,9 +1161,7 @@ class Member(namedtuple('Member', 'name vartype size')):
             vartype = dict(raw.data)
             del vartype['storage']
             if 'size' in vartype:
-                size = vartype.pop('size')
-                if isinstance(size, str) and size.isdigit():
-                    size = int(size)
+                size = int(vartype.pop('size'))
             vartype = VarType(**vartype)
         return cls(name, vartype, size)
 
@@ -1515,7 +1513,7 @@ class Declarations:
 
     def get(self, key, default=None):
         try:
-            return self[key]
+           return self[key]
         except KeyError:
             return default
 

@@ -61,7 +61,8 @@ class bdist(Command):
                       'nt': 'zip'}
 
     # Establish the preferred order (for the --help-formats option).
-    format_commands = ['rpm', 'gztar', 'bztar', 'xztar', 'ztar', 'tar', 'zip']
+    format_commands = ['rpm', 'gztar', 'bztar', 'xztar', 'ztar', 'tar',
+                       'zip', 'msi']
 
     # And the real information.
     format_command = {'rpm':   ('bdist_rpm',  "RPM distribution"),
@@ -71,7 +72,9 @@ class bdist(Command):
                       'ztar':  ('bdist_dumb', "compressed tar file"),
                       'tar':   ('bdist_dumb', "tar file"),
                       'zip':   ('bdist_dumb', "ZIP file"),
+                      'msi':   ('bdist_msi',  "Microsoft Installer")
                       }
+
 
     def initialize_options(self):
         self.bdist_base = None

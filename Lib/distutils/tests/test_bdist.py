@@ -1,4 +1,5 @@
 """Tests for distutils.command.bdist."""
+import os
 import unittest
 from test.support import run_unittest
 
@@ -17,12 +18,13 @@ class BuildTestCase(support.TempdirManager,
         # we can set the format
         dist = self.create_dist()[1]
         cmd = bdist(dist)
-        cmd.formats = ['tar']
+        cmd.formats = ['msi']
         cmd.ensure_finalized()
-        self.assertEqual(cmd.formats, ['tar'])
+        self.assertEqual(cmd.formats, ['msi'])
 
         # what formats does bdist offer?
-        formats = ['bztar', 'gztar', 'rpm', 'tar', 'xztar', 'zip', 'ztar']
+        formats = ['bztar', 'gztar', 'msi', 'rpm', 'tar',
+                   'xztar', 'zip', 'ztar']
         found = sorted(cmd.format_command)
         self.assertEqual(found, formats)
 
@@ -34,7 +36,11 @@ class BuildTestCase(support.TempdirManager,
         cmd.ensure_finalized()
         dist.command_obj['bdist'] = cmd
 
-        for name in ['bdist_dumb']:  # bdist_rpm does not support --skip-build
+        names = ['bdist_dumb']  # bdist_rpm does not support --skip-build
+        if os.name == 'nt':
+            names.append('bdist_msi')
+
+        for name in names:
             subcmd = cmd.get_finalized_command(name)
             if getattr(subcmd, '_unsupported', False):
                 # command is not supported on this build
@@ -44,8 +50,7 @@ class BuildTestCase(support.TempdirManager,
 
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(BuildTestCase)
-
+    return unittest.makeSuite(BuildTestCase)
 
 if __name__ == '__main__':
     run_unittest(test_suite())

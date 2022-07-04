@@ -8,8 +8,7 @@
 
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
-#include "pycore_fileutils.h"     // _Py_BEGIN_SUPPRESS_IPH
-#include "pycore_object.h"        // _PyObject_GC_UNTRACK()
+#include "pycore_object.h"
 
 #ifdef MS_WINDOWS
 
@@ -156,6 +155,8 @@ typedef struct {
 
 PyTypeObject PyWindowsConsoleIO_Type;
 
+_Py_IDENTIFIER(name);
+
 int
 _PyWindowsConsoleIO_closed(PyObject *self)
 {
@@ -194,8 +195,9 @@ _io__WindowsConsoleIO_close_impl(winconsoleio *self)
     PyObject *res;
     PyObject *exc, *val, *tb;
     int rc;
-    res = PyObject_CallMethodOneArg((PyObject*)&PyRawIOBase_Type,
-                                    &_Py_ID(close), (PyObject*)self);
+    _Py_IDENTIFIER(close);
+    res = _PyObject_CallMethodIdOneArg((PyObject*)&PyRawIOBase_Type,
+                                       &PyId_close, (PyObject*)self);
     if (!self->closefd) {
         self->fd = -1;
         return res;
@@ -391,7 +393,7 @@ _io__WindowsConsoleIO___init___impl(winconsoleio *self, PyObject *nameobj,
     self->blksize = DEFAULT_BUFFER_SIZE;
     memset(self->buf, 0, 4);
 
-    if (PyObject_SetAttr((PyObject *)self, &_Py_ID(name), nameobj) < 0)
+    if (_PyObject_SetAttrId((PyObject *)self, &PyId_name, nameobj) < 0)
         goto error;
 
     goto done;

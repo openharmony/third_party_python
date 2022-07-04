@@ -8,7 +8,7 @@ from distutils.command.install_lib import install_lib
 from distutils.extension import Extension
 from distutils.tests import support
 from distutils.errors import DistutilsOptionError
-from test.support import run_unittest, requires_subprocess
+from test.support import run_unittest
 
 
 class InstallLibTestCase(support.TempdirManager,
@@ -35,7 +35,6 @@ class InstallLibTestCase(support.TempdirManager,
         self.assertEqual(cmd.optimize, 2)
 
     @unittest.skipIf(sys.dont_write_bytecode, 'byte-compile disabled')
-    @requires_subprocess()
     def test_byte_compile(self):
         project_dir, dist = self.create_dist()
         os.chdir(project_dir)
@@ -91,7 +90,6 @@ class InstallLibTestCase(support.TempdirManager,
         inputs = cmd.get_inputs()
         self.assertEqual(len(inputs), 2, inputs)
 
-    @requires_subprocess()
     def test_dont_write_bytecode(self):
         # makes sure byte_compile is not used
         dist = self.create_dist()[1]
@@ -111,7 +109,7 @@ class InstallLibTestCase(support.TempdirManager,
 
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(InstallLibTestCase)
+    return unittest.makeSuite(InstallLibTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

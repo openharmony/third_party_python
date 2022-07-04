@@ -88,7 +88,7 @@ Add new audit event ``glob.glob/2`` to incorporate the new *root_dir* and
 :mod:`ipaddress` module no longer accepts any leading zeros in IPv4 address
 strings. Leading zeros are ambiguous and interpreted as octal notation by
 some libraries. For example the legacy function :func:`socket.inet_aton`
-treats leading zeros as octal notation. glibc implementation of modern
+treats leading zeros as octal notatation. glibc implementation of modern
 :func:`~socket.inet_pton` does not accept any leading zeros. For a while the
 :mod:`ipaddress` module used to accept ambiguous leading zeros.
 
@@ -941,7 +941,7 @@ result from ``entry_points()`` as deprecated.
 
 ..
 
-.. gh: 47383
+.. bpo: 47383
 .. date: 2021-04-08-19-32-26
 .. nonce: YI1hdL
 .. section: Library
@@ -1001,7 +1001,7 @@ some :mod:`dataclasses`.
 
 Fix :mod:`sqlite3` regression for zero-sized blobs with converters, where
 ``b""`` was returned instead of ``None``. The regression was introduced by
-PR 24723. Patch by Erlend E. Aasland.
+GH-24723. Patch by Erlend E. Aasland.
 
 ..
 
@@ -1673,8 +1673,7 @@ zips together prompts from the sidebar with lines from the selected text.
 .. nonce: 3EFl1H
 .. section: IDLE
 
-Fix reference leak in test_sidebar and test_squeezer.
-Patches by Terry Jan Reedy and Pablo Galindo
+Fix reference leak in test_squeezer. Patch by Pablo Galindo
 
 ..
 

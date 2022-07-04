@@ -118,12 +118,11 @@
 /* Linking of Python's #defines to Gay's #defines starts here. */
 
 #include "Python.h"
-#include "pycore_dtoa.h"          // _PY_SHORT_FLOAT_REPR
-#include <stdlib.h>               // exit()
+#include "pycore_dtoa.h"
 
-/* if _PY_SHORT_FLOAT_REPR == 0, then don't even try to compile
+/* if PY_NO_SHORT_FLOAT_REPR is defined, then don't even try to compile
    the following code */
-#if _PY_SHORT_FLOAT_REPR == 1
+#ifndef PY_NO_SHORT_FLOAT_REPR
 
 #include "float.h"
 
@@ -2857,4 +2856,4 @@ _Py_dg_dtoa(double dd, int mode, int ndigits,
 }
 #endif
 
-#endif  // _PY_SHORT_FLOAT_REPR == 1
+#endif  /* PY_NO_SHORT_FLOAT_REPR */

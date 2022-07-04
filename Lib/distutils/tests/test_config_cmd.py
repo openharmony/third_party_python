@@ -3,9 +3,7 @@ import unittest
 import os
 import sys
 import sysconfig
-from test.support import (
-    run_unittest, missing_compiler_executable, requires_subprocess
-)
+from test.support import run_unittest, missing_compiler_executable
 
 from distutils.command.config import dump_file, config
 from distutils.tests import support
@@ -44,7 +42,6 @@ class ConfigTestCase(support.LoggingSilencer,
         self.assertEqual(len(self._logs), numlines+1)
 
     @unittest.skipIf(sys.platform == 'win32', "can't test on Windows")
-    @requires_subprocess()
     def test_search_cpp(self):
         cmd = missing_compiler_executable(['preprocessor'])
         if cmd is not None:
@@ -97,7 +94,7 @@ class ConfigTestCase(support.LoggingSilencer,
             self.assertFalse(os.path.exists(f))
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(ConfigTestCase)
+    return unittest.makeSuite(ConfigTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

@@ -4,9 +4,7 @@ import os
 import sys
 import sysconfig
 
-from test.support import (
-    run_unittest, missing_compiler_executable, requires_subprocess
-)
+from test.support import run_unittest, missing_compiler_executable
 
 from distutils.command.build_clib import build_clib
 from distutils.errors import DistutilsSetupError
@@ -114,7 +112,6 @@ class BuildCLibTestCase(support.TempdirManager,
         self.assertRaises(DistutilsSetupError, cmd.finalize_options)
 
     @unittest.skipIf(sys.platform == 'win32', "can't test on Windows")
-    @requires_subprocess()
     def test_run(self):
         pkg_dir, dist = self.create_dist()
         cmd = build_clib(dist)
@@ -141,7 +138,7 @@ class BuildCLibTestCase(support.TempdirManager,
         self.assertIn('libfoo.a', os.listdir(build_temp))
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(BuildCLibTestCase)
+    return unittest.makeSuite(BuildCLibTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

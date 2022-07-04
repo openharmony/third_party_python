@@ -63,7 +63,10 @@ class TextWrapper:
         Append to the last line of truncated text.
     """
 
-    unicode_whitespace_trans = dict.fromkeys(map(ord, _whitespace), ord(' '))
+    unicode_whitespace_trans = {}
+    uspace = ord(' ')
+    for x in _whitespace:
+        unicode_whitespace_trans[ord(x)] = uspace
 
     # This funky little regex is just the trick for splitting
     # text up into word-wrappable chunks.  E.g.

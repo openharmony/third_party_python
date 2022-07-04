@@ -1,6 +1,5 @@
 #include "Python.h"
 #include "opcode.h"
-#include "internal/pycore_code.h"
 
 /*[clinic input]
 module _opcode
@@ -60,12 +59,7 @@ _opcode_stack_effect_impl(PyObject *module, int opcode, PyObject *oparg,
                 "stack_effect: jump must be False, True or None");
         return -1;
     }
-    if (IS_ARTIFICIAL(opcode)) {
-        effect = PY_INVALID_STACK_EFFECT;
-    }
-    else {
-        effect = PyCompile_OpcodeStackEffectWithJump(opcode, oparg_int, jump_int);
-    }
+    effect = PyCompile_OpcodeStackEffectWithJump(opcode, oparg_int, jump_int);
     if (effect == PY_INVALID_STACK_EFFECT) {
             PyErr_SetString(PyExc_ValueError,
                     "invalid opcode or oparg");
@@ -74,28 +68,9 @@ _opcode_stack_effect_impl(PyObject *module, int opcode, PyObject *oparg,
     return effect;
 }
 
-/*[clinic input]
-
-_opcode.get_specialization_stats
-
-Return the specialization stats
-[clinic start generated code]*/
-
-static PyObject *
-_opcode_get_specialization_stats_impl(PyObject *module)
-/*[clinic end generated code: output=fcbc32fdfbec5c17 input=e1f60db68d8ce5f6]*/
-{
-#ifdef Py_STATS
-    return _Py_GetSpecializationStats();
-#else
-    Py_RETURN_NONE;
-#endif
-}
-
 static PyMethodDef
 opcode_functions[] =  {
     _OPCODE_STACK_EFFECT_METHODDEF
-    _OPCODE_GET_SPECIALIZATION_STATS_METHODDEF
     {NULL, NULL, 0, NULL}
 };
 

@@ -56,21 +56,22 @@ PyCell_Get(PyObject *op)
         PyErr_BadInternalCall();
         return NULL;
     }
-    PyObject *value = PyCell_GET(op);
-    return Py_XNewRef(value);
+    Py_XINCREF(((PyCellObject*)op)->ob_ref);
+    return PyCell_GET(op);
 }
 
 int
-PyCell_Set(PyObject *op, PyObject *value)
+PyCell_Set(PyObject *op, PyObject *obj)
 {
+    PyObject* oldobj;
     if (!PyCell_Check(op)) {
         PyErr_BadInternalCall();
         return -1;
     }
-    PyObject *old_value = PyCell_GET(op);
-    Py_XINCREF(value);
-    PyCell_SET(op, value);
-    Py_XDECREF(old_value);
+    oldobj = PyCell_GET(op);
+    Py_XINCREF(obj);
+    PyCell_SET(op, obj);
+    Py_XDECREF(oldobj);
     return 0;
 }
 

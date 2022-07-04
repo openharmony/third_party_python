@@ -9,6 +9,7 @@ Written by:   Fred L. Drake, Jr.
 Email:        <fdrake@acm.org>
 """
 
+import _imp
 import os
 import re
 import sys

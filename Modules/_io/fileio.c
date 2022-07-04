@@ -2,8 +2,7 @@
 
 #define PY_SSIZE_T_CLEAN
 #include "Python.h"
-#include "pycore_fileutils.h"     // _Py_BEGIN_SUPPRESS_IPH
-#include "pycore_object.h"        // _PyObject_GC_UNTRACK()
+#include "pycore_object.h"
 #include "structmember.h"         // PyMemberDef
 #include <stdbool.h>
 #ifdef HAVE_SYS_TYPES_H
@@ -71,6 +70,8 @@ typedef struct {
 } fileio;
 
 PyTypeObject PyFileIO_Type;
+
+_Py_IDENTIFIER(name);
 
 #define PyFileIO_Check(op) (PyObject_TypeCheck((op), &PyFileIO_Type))
 
@@ -144,8 +145,9 @@ _io_FileIO_close_impl(fileio *self)
     PyObject *res;
     PyObject *exc, *val, *tb;
     int rc;
-    res = PyObject_CallMethodOneArg((PyObject*)&PyRawIOBase_Type,
-                                     &_Py_ID(close), (PyObject *)self);
+    _Py_IDENTIFIER(close);
+    res = _PyObject_CallMethodIdOneArg((PyObject*)&PyRawIOBase_Type,
+                                       &PyId_close, (PyObject *)self);
     if (!self->closefd) {
         self->fd = -1;
         return res;
@@ -268,7 +270,14 @@ _io_FileIO___init___impl(fileio *self, PyObject *nameobj, const char *mode,
         if (!PyUnicode_FSDecoder(nameobj, &stringobj)) {
             return -1;
         }
+#if USE_UNICODE_WCHAR_CACHE
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
+        widename = PyUnicode_AsUnicode(stringobj);
+_Py_COMP_DIAG_POP
+#else /* USE_UNICODE_WCHAR_CACHE */
         widename = PyUnicode_AsWideCharString(stringobj, NULL);
+#endif /* USE_UNICODE_WCHAR_CACHE */
         if (widename == NULL)
             return -1;
 #else
@@ -466,7 +475,7 @@ _io_FileIO___init___impl(fileio *self, PyObject *nameobj, const char *mode,
     _setmode(self->fd, O_BINARY);
 #endif
 
-    if (PyObject_SetAttr((PyObject *)self, &_Py_ID(name), nameobj) < 0)
+    if (_PyObject_SetAttrId((PyObject *)self, &PyId_name, nameobj) < 0)
         goto error;
 
     if (self->appending) {
@@ -490,7 +499,9 @@ _io_FileIO___init___impl(fileio *self, PyObject *nameobj, const char *mode,
 
  done:
 #ifdef MS_WINDOWS
+#if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free(widename);
+#endif /* USE_UNICODE_WCHAR_CACHE */
 #endif
     Py_CLEAR(stringobj);
     return ret;
@@ -1073,7 +1084,7 @@ fileio_repr(fileio *self)
     if (self->fd < 0)
         return PyUnicode_FromFormat("<_io.FileIO [closed]>");
 
-    if (_PyObject_LookupAttr((PyObject *) self, &_Py_ID(name), &nameobj) < 0) {
+    if (_PyObject_LookupAttrId((PyObject *) self, &PyId_name, &nameobj) < 0) {
         return NULL;
     }
     if (nameobj == NULL) {

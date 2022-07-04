@@ -7,7 +7,6 @@ import os
 import sys
 import unittest
 import warnings
-from test.support import is_emscripten
 from test.support import os_helper
 from test.support import warnings_helper
 from test.support.script_helper import assert_python_ok
@@ -155,7 +154,6 @@ class GenericTest:
             self.assertIs(self.pathmodule.lexists(bfilename + b'\x00'), False)
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
-    @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
     def test_exists_fd(self):
         r, w = os.pipe()
         try:
@@ -248,7 +246,6 @@ class GenericTest:
     def test_samefile_on_symlink(self):
         self._test_samefile_on_link_func(os.symlink)
 
-    @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
     def test_samefile_on_link(self):
         try:
             self._test_samefile_on_link_func(os.link)
@@ -291,7 +288,6 @@ class GenericTest:
     def test_samestat_on_symlink(self):
         self._test_samestat_on_link_func(os.symlink)
 
-    @unittest.skipUnless(hasattr(os, 'link'), 'requires os.link')
     def test_samestat_on_link(self):
         try:
             self._test_samestat_on_link_func(os.link)
@@ -480,11 +476,11 @@ class CommonTest(GenericTest):
 
     def test_nonascii_abspath(self):
         if (os_helper.TESTFN_UNDECODABLE
-        # macOS and Emscripten deny the creation of a directory with an
-        # invalid UTF-8 name. Windows allows creating a directory with an
+        # Mac OS X denies the creation of a directory with an invalid
+        # UTF-8 name. Windows allows creating a directory with an
         # arbitrary bytes name, but fails to enter this directory
         # (when the bytes name is used).
-        and sys.platform not in ('win32', 'darwin', 'emscripten', 'wasi')):
+        and sys.platform not in ('win32', 'darwin')):
             name = os_helper.TESTFN_UNDECODABLE
         elif os_helper.TESTFN_NONASCII:
             name = os_helper.TESTFN_NONASCII

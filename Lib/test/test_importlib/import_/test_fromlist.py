@@ -1,5 +1,5 @@
 """Test that the semantics relating to the 'fromlist' argument are correct."""
-from test.test_importlib import util
+from .. import util
 import warnings
 import unittest
 

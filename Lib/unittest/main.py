@@ -3,7 +3,6 @@
 import sys
 import argparse
 import os
-import warnings
 
 from . import loader, runner
 from .signals import installHandler
@@ -40,7 +39,7 @@ def _convert_name(name):
             name = rel_path
         # on Windows both '\' and '/' are used as path
         # separators. Better to replace both than rely on os.path.sep
-        return os.path.normpath(name)[:-3].replace('\\', '.').replace('/', '.')
+        return name[:-3].replace('\\', '.').replace('/', '.')
     return name
 
 def _convert_names(names):
@@ -102,8 +101,6 @@ class TestProgram(object):
         self.runTests()
 
     def usageExit(self, msg=None):
-        warnings.warn("TestProgram.usageExit() is deprecated and will be"
-                      " removed in Python 3.13", DeprecationWarning)
         if msg:
             print(msg)
         if self._discovery_parser is None:

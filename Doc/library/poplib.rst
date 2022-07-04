@@ -118,10 +118,10 @@ One exception is defined as an attribute of the :mod:`poplib` module:
 POP3 Objects
 ------------
 
-All POP3 commands are represented by methods of the same name, in lowercase;
+All POP3 commands are represented by methods of the same name, in lower-case;
 most return the response text sent by the server.
 
-A :class:`POP3` instance has the following methods:
+An :class:`POP3` instance has the following methods:
 
 
 .. method:: POP3.set_debuglevel(level)

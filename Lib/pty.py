@@ -162,7 +162,7 @@ def _copy(master_fd, master_read=_read, stdin_read=_read):
 
 def spawn(argv, master_read=_read, stdin_read=_read):
     """Create a spawned process."""
-    if isinstance(argv, str):
+    if type(argv) == type(''):
         argv = (argv,)
     sys.audit('pty.spawn', argv)
 

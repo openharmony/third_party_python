@@ -34,7 +34,8 @@ typedef struct {
 } iobase;
 
 PyDoc_STRVAR(iobase_doc,
-    "The abstract base class for all I/O classes.\n"
+    "The abstract base class for all I/O classes, acting on streams of\n"
+    "bytes. There is no public constructor.\n"
     "\n"
     "This class provides dummy implementations for many methods that\n"
     "derived classes can override selectively; the default implementations\n"
@@ -67,6 +68,9 @@ PyDoc_STRVAR(iobase_doc,
 /* Use this macro whenever you want to check the internal `closed` status
    of the IOBase object rather than the virtual `closed` attribute as returned
    by whatever subclass. */
+
+_Py_IDENTIFIER(__IOBase_closed);
+_Py_IDENTIFIER(read);
 
 
 /* Internal methods */
@@ -110,7 +114,9 @@ static PyObject *
 _io__IOBase_tell_impl(PyObject *self)
 /*[clinic end generated code: output=89a1c0807935abe2 input=04e615fec128801f]*/
 {
-    return _PyObject_CallMethod(self, &_Py_ID(seek), "ii", 0, 1);
+    _Py_IDENTIFIER(seek);
+
+    return _PyObject_CallMethodId(self, &PyId_seek, "ii", 0, 1);
 }
 
 PyDoc_STRVAR(iobase_truncate_doc,
@@ -132,7 +138,7 @@ iobase_is_closed(PyObject *self)
     int ret;
     /* This gets the derived attribute, which is *not* __IOBase_closed
        in most cases! */
-    ret = _PyObject_LookupAttr(self, &_Py_ID(__IOBase_closed), &res);
+    ret = _PyObject_LookupAttrId(self, &PyId___IOBase_closed, &res);
     Py_XDECREF(res);
     return ret;
 }
@@ -180,7 +186,7 @@ iobase_check_closed(PyObject *self)
     int closed;
     /* This gets the derived attribute, which is *not* __IOBase_closed
        in most cases! */
-    closed = _PyObject_LookupAttr(self, &_Py_ID(closed), &res);
+    closed = _PyObject_LookupAttr(self, _PyIO_str_closed, &res);
     if (closed > 0) {
         closed = PyObject_IsTrue(res);
         Py_DECREF(res);
@@ -230,10 +236,10 @@ _io__IOBase_close_impl(PyObject *self)
         Py_RETURN_NONE;
     }
 
-    res = PyObject_CallMethodNoArgs(self, &_Py_ID(flush));
+    res = PyObject_CallMethodNoArgs(self, _PyIO_str_flush);
 
     PyErr_Fetch(&exc, &val, &tb);
-    rc = PyObject_SetAttr(self, &_Py_ID(__IOBase_closed), Py_True);
+    rc = _PyObject_SetAttrId(self, &PyId___IOBase_closed, Py_True);
     _PyErr_ChainExceptions(exc, val, tb);
     if (rc < 0) {
         Py_CLEAR(res);
@@ -254,13 +260,14 @@ iobase_finalize(PyObject *self)
     PyObject *res;
     PyObject *error_type, *error_value, *error_traceback;
     int closed;
+    _Py_IDENTIFIER(_finalizing);
 
     /* Save the current exception, if any. */
     PyErr_Fetch(&error_type, &error_value, &error_traceback);
 
     /* If `closed` doesn't exist or can't be evaluated as bool, then the
        object is probably in an unusable state, so ignore. */
-    if (_PyObject_LookupAttr(self, &_Py_ID(closed), &res) <= 0) {
+    if (_PyObject_LookupAttr(self, _PyIO_str_closed, &res) <= 0) {
         PyErr_Clear();
         closed = -1;
     }
@@ -273,9 +280,9 @@ iobase_finalize(PyObject *self)
     if (closed == 0) {
         /* Signal close() that it was called as part of the object
            finalization process. */
-        if (PyObject_SetAttr(self, &_Py_ID(_finalizing), Py_True))
+        if (_PyObject_SetAttrId(self, &PyId__finalizing, Py_True))
             PyErr_Clear();
-        res = PyObject_CallMethodNoArgs((PyObject *)self, &_Py_ID(close));
+        res = PyObject_CallMethodNoArgs((PyObject *)self, _PyIO_str_close);
         /* Silencing I/O errors is bad, but printing spurious tracebacks is
            equally as bad, and potentially more frequent (because of
            shutdown issues). */
@@ -376,7 +383,7 @@ _io__IOBase_seekable_impl(PyObject *self)
 PyObject *
 _PyIOBase_check_seekable(PyObject *self, PyObject *args)
 {
-    PyObject *res  = PyObject_CallMethodNoArgs(self, &_Py_ID(seekable));
+    PyObject *res  = PyObject_CallMethodNoArgs(self, _PyIO_str_seekable);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -409,7 +416,7 @@ _io__IOBase_readable_impl(PyObject *self)
 PyObject *
 _PyIOBase_check_readable(PyObject *self, PyObject *args)
 {
-    PyObject *res = PyObject_CallMethodNoArgs(self, &_Py_ID(readable));
+    PyObject *res = PyObject_CallMethodNoArgs(self, _PyIO_str_readable);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -442,7 +449,7 @@ _io__IOBase_writable_impl(PyObject *self)
 PyObject *
 _PyIOBase_check_writable(PyObject *self, PyObject *args)
 {
-    PyObject *res = PyObject_CallMethodNoArgs(self, &_Py_ID(writable));
+    PyObject *res = PyObject_CallMethodNoArgs(self, _PyIO_str_writable);
     if (res == NULL)
         return NULL;
     if (res != Py_True) {
@@ -471,7 +478,7 @@ iobase_enter(PyObject *self, PyObject *args)
 static PyObject *
 iobase_exit(PyObject *self, PyObject *args)
 {
-    return PyObject_CallMethodNoArgs(self, &_Py_ID(close));
+    return PyObject_CallMethodNoArgs(self, _PyIO_str_close);
 }
 
 /* Lower-level APIs */
@@ -535,7 +542,7 @@ _io__IOBase_readline_impl(PyObject *self, Py_ssize_t limit)
     PyObject *peek, *buffer, *result;
     Py_ssize_t old_size = -1;
 
-    if (_PyObject_LookupAttr(self, &_Py_ID(peek), &peek) < 0) {
+    if (_PyObject_LookupAttr(self, _PyIO_str_peek, &peek) < 0) {
         return NULL;
     }
 
@@ -590,7 +597,7 @@ _io__IOBase_readline_impl(PyObject *self, Py_ssize_t limit)
             Py_DECREF(readahead);
         }
 
-        b = _PyObject_CallMethod(self, &_Py_ID(read), "n", nreadahead);
+        b = _PyObject_CallMethodId(self, &PyId_read, "n", nreadahead);
         if (b == NULL) {
             /* NOTE: PyErr_SetFromErrno() calls PyErr_CheckSignals()
                when EINTR occurs so we needn't do it ourselves. */
@@ -649,7 +656,7 @@ iobase_iter(PyObject *self)
 static PyObject *
 iobase_iternext(PyObject *self)
 {
-    PyObject *line = PyObject_CallMethodNoArgs(self, &_Py_ID(readline));
+    PyObject *line = PyObject_CallMethodNoArgs(self, _PyIO_str_readline);
 
     if (line == NULL)
         return NULL;
@@ -690,8 +697,10 @@ _io__IOBase_readlines_impl(PyObject *self, Py_ssize_t hint)
         /* XXX special-casing this made sense in the Python version in order
            to remove the bytecode interpretation overhead, but it could
            probably be removed here. */
-        PyObject *ret = PyObject_CallMethodObjArgs(result, &_Py_ID(extend),
-                                                   self, NULL);
+        _Py_IDENTIFIER(extend);
+        PyObject *ret = _PyObject_CallMethodIdObjArgs(result, &PyId_extend,
+                                                      self, NULL);
+
         if (ret == NULL) {
             goto error;
         }
@@ -775,7 +784,7 @@ _io__IOBase_writelines(PyObject *self, PyObject *lines)
 
         res = NULL;
         do {
-            res = PyObject_CallMethodObjArgs(self, &_Py_ID(write), line, NULL);
+            res = PyObject_CallMethodObjArgs(self, _PyIO_str_write, line, NULL);
         } while (res == NULL && _PyIO_trap_eintr());
         Py_DECREF(line);
         if (res == NULL) {
@@ -910,7 +919,9 @@ _io__RawIOBase_read_impl(PyObject *self, Py_ssize_t n)
     PyObject *b, *res;
 
     if (n < 0) {
-        return PyObject_CallMethodNoArgs(self, &_Py_ID(readall));
+        _Py_IDENTIFIER(readall);
+
+        return _PyObject_CallMethodIdNoArgs(self, &PyId_readall);
     }
 
     /* TODO: allocate a bytes object directly instead and manually construct
@@ -919,7 +930,7 @@ _io__RawIOBase_read_impl(PyObject *self, Py_ssize_t n)
     if (b == NULL)
         return NULL;
 
-    res = PyObject_CallMethodObjArgs(self, &_Py_ID(readinto), b, NULL);
+    res = PyObject_CallMethodObjArgs(self, _PyIO_str_readinto, b, NULL);
     if (res == NULL || res == Py_None) {
         Py_DECREF(b);
         return res;
@@ -956,8 +967,8 @@ _io__RawIOBase_readall_impl(PyObject *self)
         return NULL;
 
     while (1) {
-        PyObject *data = _PyObject_CallMethod(self, &_Py_ID(read),
-                                              "i", DEFAULT_BUFFER_SIZE);
+        PyObject *data = _PyObject_CallMethodId(self, &PyId_read,
+                                                "i", DEFAULT_BUFFER_SIZE);
         if (!data) {
             /* NOTE: PyErr_SetFromErrno() calls PyErr_CheckSignals()
                when EINTR occurs so we needn't do it ourselves. */
@@ -993,7 +1004,7 @@ _io__RawIOBase_readall_impl(PyObject *self)
             return NULL;
         }
     }
-    result = _PyBytes_Join((PyObject *)&_Py_SINGLETON(bytes_empty), chunks);
+    result = _PyBytes_Join(_PyIO_empty_bytes, chunks);
     Py_DECREF(chunks);
     return result;
 }

@@ -15,9 +15,7 @@ __all__ = ["IllegalMonthError", "IllegalWeekdayError", "setfirstweekday",
            "monthcalendar", "prmonth", "month", "prcal", "calendar",
            "timegm", "month_name", "month_abbr", "day_name", "day_abbr",
            "Calendar", "TextCalendar", "HTMLCalendar", "LocaleTextCalendar",
-           "LocaleHTMLCalendar", "weekheader",
-           "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY",
-           "SATURDAY", "SUNDAY"]
+           "LocaleHTMLCalendar", "weekheader"]
 
 # Exception raised for bad input (with string parameter for details)
 error = ValueError
@@ -548,38 +546,27 @@ class HTMLCalendar(Calendar):
 class different_locale:
     def __init__(self, locale):
         self.locale = locale
-        self.oldlocale = None
 
     def __enter__(self):
-        self.oldlocale = _locale.setlocale(_locale.LC_TIME, None)
+        self.oldlocale = _locale.getlocale(_locale.LC_TIME)
         _locale.setlocale(_locale.LC_TIME, self.locale)
 
     def __exit__(self, *args):
-        if self.oldlocale is None:
-            return
         _locale.setlocale(_locale.LC_TIME, self.oldlocale)
-
-
-def _get_default_locale():
-    locale = _locale.setlocale(_locale.LC_TIME, None)
-    if locale == "C":
-        with different_locale(""):
-            # The LC_TIME locale does not seem to be configured:
-            # get the user preferred locale.
-            locale = _locale.setlocale(_locale.LC_TIME, None)
-    return locale
 
 
 class LocaleTextCalendar(TextCalendar):
     """
     This class can be passed a locale name in the constructor and will return
-    month and weekday names in the specified locale.
+    month and weekday names in the specified locale. If this locale includes
+    an encoding all strings containing month and weekday names will be returned
+    as unicode.
     """
 
     def __init__(self, firstweekday=0, locale=None):
         TextCalendar.__init__(self, firstweekday)
         if locale is None:
-            locale = _get_default_locale()
+            locale = _locale.getdefaultlocale()
         self.locale = locale
 
     def formatweekday(self, day, width):
@@ -594,12 +581,14 @@ class LocaleTextCalendar(TextCalendar):
 class LocaleHTMLCalendar(HTMLCalendar):
     """
     This class can be passed a locale name in the constructor and will return
-    month and weekday names in the specified locale.
+    month and weekday names in the specified locale. If this locale includes
+    an encoding all strings containing month and weekday names will be returned
+    as unicode.
     """
     def __init__(self, firstweekday=0, locale=None):
         HTMLCalendar.__init__(self, firstweekday)
         if locale is None:
-            locale = _get_default_locale()
+            locale = _locale.getdefaultlocale()
         self.locale = locale
 
     def formatweekday(self, day):

@@ -1,4 +1,5 @@
-from test.test_importlib import abc, util
+from .. import abc
+from .. import util
 
 importlib = util.import_importlib('importlib')
 importlib_abc = util.import_importlib('importlib.abc')

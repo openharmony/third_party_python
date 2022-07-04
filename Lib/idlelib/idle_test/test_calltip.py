@@ -77,9 +77,7 @@ class Get_argspecTest(unittest.TestCase):
         tiptest(List.append, '(self, object, /)' + append_doc)
         tiptest([].append, '(object, /)' + append_doc)
 
-        tiptest(types.MethodType,
-              '(function, instance, /)\n'
-              'Create a bound instance method object.')
+        tiptest(types.MethodType, "method(function, instance)")
         tiptest(SB(), default_tip)
 
         p = re.compile('')
@@ -108,7 +106,7 @@ subclasses to override in order to tweak the default behaviour.
 If you want to completely replace the main wrapping algorithm,
 you\'ll probably have to override _wrap_chunks().''')
 
-    def test_properly_formatted(self):
+    def test_properly_formated(self):
 
         def foo(s='a'*100):
             pass

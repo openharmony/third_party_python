@@ -77,7 +77,7 @@ PyDoc_STRVAR(winreg_HKEYType___exit____doc__,
 "\n");
 
 #define WINREG_HKEYTYPE___EXIT___METHODDEF    \
-    {"__exit__", _PyCFunction_CAST(winreg_HKEYType___exit__), METH_FASTCALL|METH_KEYWORDS, winreg_HKEYType___exit____doc__},
+    {"__exit__", (PyCFunction)(void(*)(void))winreg_HKEYType___exit__, METH_FASTCALL|METH_KEYWORDS, winreg_HKEYType___exit____doc__},
 
 static PyObject *
 winreg_HKEYType___exit___impl(PyHKEYObject *self, PyObject *exc_type,
@@ -138,7 +138,7 @@ PyDoc_STRVAR(winreg_ConnectRegistry__doc__,
 "If the function fails, an OSError exception is raised.");
 
 #define WINREG_CONNECTREGISTRY_METHODDEF    \
-    {"ConnectRegistry", _PyCFunction_CAST(winreg_ConnectRegistry), METH_FASTCALL, winreg_ConnectRegistry__doc__},
+    {"ConnectRegistry", (PyCFunction)(void(*)(void))winreg_ConnectRegistry, METH_FASTCALL, winreg_ConnectRegistry__doc__},
 
 static HKEY
 winreg_ConnectRegistry_impl(PyObject *module,
@@ -159,7 +159,11 @@ winreg_ConnectRegistry(PyObject *module, PyObject *const *args, Py_ssize_t nargs
         computer_name = NULL;
     }
     else if (PyUnicode_Check(args[0])) {
+        #if USE_UNICODE_WCHAR_CACHE
+        computer_name = _PyUnicode_AsUnicode(args[0]);
+        #else /* USE_UNICODE_WCHAR_CACHE */
         computer_name = PyUnicode_AsWideCharString(args[0], NULL);
+        #endif /* USE_UNICODE_WCHAR_CACHE */
         if (computer_name == NULL) {
             goto exit;
         }
@@ -179,7 +183,9 @@ winreg_ConnectRegistry(PyObject *module, PyObject *const *args, Py_ssize_t nargs
 
 exit:
     /* Cleanup for computer_name */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)computer_name);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -204,7 +210,7 @@ PyDoc_STRVAR(winreg_CreateKey__doc__,
 "If the function fails, an OSError exception is raised.");
 
 #define WINREG_CREATEKEY_METHODDEF    \
-    {"CreateKey", _PyCFunction_CAST(winreg_CreateKey), METH_FASTCALL, winreg_CreateKey__doc__},
+    {"CreateKey", (PyCFunction)(void(*)(void))winreg_CreateKey, METH_FASTCALL, winreg_CreateKey__doc__},
 
 static HKEY
 winreg_CreateKey_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key);
@@ -227,7 +233,11 @@ winreg_CreateKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         sub_key = NULL;
     }
     else if (PyUnicode_Check(args[1])) {
+        #if USE_UNICODE_WCHAR_CACHE
+        sub_key = _PyUnicode_AsUnicode(args[1]);
+        #else /* USE_UNICODE_WCHAR_CACHE */
         sub_key = PyUnicode_AsWideCharString(args[1], NULL);
+        #endif /* USE_UNICODE_WCHAR_CACHE */
         if (sub_key == NULL) {
             goto exit;
         }
@@ -244,7 +254,9 @@ winreg_CreateKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -275,7 +287,7 @@ PyDoc_STRVAR(winreg_CreateKeyEx__doc__,
 "If the function fails, an OSError exception is raised.");
 
 #define WINREG_CREATEKEYEX_METHODDEF    \
-    {"CreateKeyEx", _PyCFunction_CAST(winreg_CreateKeyEx), METH_FASTCALL|METH_KEYWORDS, winreg_CreateKeyEx__doc__},
+    {"CreateKeyEx", (PyCFunction)(void(*)(void))winreg_CreateKeyEx, METH_FASTCALL|METH_KEYWORDS, winreg_CreateKeyEx__doc__},
 
 static HKEY
 winreg_CreateKeyEx_impl(PyObject *module, HKEY key,
@@ -306,7 +318,9 @@ winreg_CreateKeyEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs, Py
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -330,7 +344,7 @@ PyDoc_STRVAR(winreg_DeleteKey__doc__,
 "is removed.  If the function fails, an OSError exception is raised.");
 
 #define WINREG_DELETEKEY_METHODDEF    \
-    {"DeleteKey", _PyCFunction_CAST(winreg_DeleteKey), METH_FASTCALL, winreg_DeleteKey__doc__},
+    {"DeleteKey", (PyCFunction)(void(*)(void))winreg_DeleteKey, METH_FASTCALL, winreg_DeleteKey__doc__},
 
 static PyObject *
 winreg_DeleteKey_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key);
@@ -352,7 +366,11 @@ winreg_DeleteKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         _PyArg_BadArgument("DeleteKey", "argument 2", "str", args[1]);
         goto exit;
     }
+    #if USE_UNICODE_WCHAR_CACHE
+    sub_key = _PyUnicode_AsUnicode(args[1]);
+    #else /* USE_UNICODE_WCHAR_CACHE */
     sub_key = PyUnicode_AsWideCharString(args[1], NULL);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     if (sub_key == NULL) {
         goto exit;
     }
@@ -360,7 +378,9 @@ winreg_DeleteKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -391,7 +411,7 @@ PyDoc_STRVAR(winreg_DeleteKeyEx__doc__,
 "On unsupported Windows versions, NotImplementedError is raised.");
 
 #define WINREG_DELETEKEYEX_METHODDEF    \
-    {"DeleteKeyEx", _PyCFunction_CAST(winreg_DeleteKeyEx), METH_FASTCALL|METH_KEYWORDS, winreg_DeleteKeyEx__doc__},
+    {"DeleteKeyEx", (PyCFunction)(void(*)(void))winreg_DeleteKeyEx, METH_FASTCALL|METH_KEYWORDS, winreg_DeleteKeyEx__doc__},
 
 static PyObject *
 winreg_DeleteKeyEx_impl(PyObject *module, HKEY key,
@@ -417,7 +437,9 @@ winreg_DeleteKeyEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs, Py
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -434,7 +456,7 @@ PyDoc_STRVAR(winreg_DeleteValue__doc__,
 "    A string that identifies the value to remove.");
 
 #define WINREG_DELETEVALUE_METHODDEF    \
-    {"DeleteValue", _PyCFunction_CAST(winreg_DeleteValue), METH_FASTCALL, winreg_DeleteValue__doc__},
+    {"DeleteValue", (PyCFunction)(void(*)(void))winreg_DeleteValue, METH_FASTCALL, winreg_DeleteValue__doc__},
 
 static PyObject *
 winreg_DeleteValue_impl(PyObject *module, HKEY key, const Py_UNICODE *value);
@@ -456,7 +478,11 @@ winreg_DeleteValue(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         value = NULL;
     }
     else if (PyUnicode_Check(args[1])) {
+        #if USE_UNICODE_WCHAR_CACHE
+        value = _PyUnicode_AsUnicode(args[1]);
+        #else /* USE_UNICODE_WCHAR_CACHE */
         value = PyUnicode_AsWideCharString(args[1], NULL);
+        #endif /* USE_UNICODE_WCHAR_CACHE */
         if (value == NULL) {
             goto exit;
         }
@@ -469,7 +495,9 @@ winreg_DeleteValue(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for value */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)value);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -490,7 +518,7 @@ PyDoc_STRVAR(winreg_EnumKey__doc__,
 "raised, indicating no more values are available.");
 
 #define WINREG_ENUMKEY_METHODDEF    \
-    {"EnumKey", _PyCFunction_CAST(winreg_EnumKey), METH_FASTCALL, winreg_EnumKey__doc__},
+    {"EnumKey", (PyCFunction)(void(*)(void))winreg_EnumKey, METH_FASTCALL, winreg_EnumKey__doc__},
 
 static PyObject *
 winreg_EnumKey_impl(PyObject *module, HKEY key, int index);
@@ -543,7 +571,7 @@ PyDoc_STRVAR(winreg_EnumValue__doc__,
 "    An integer that identifies the type of the value data.");
 
 #define WINREG_ENUMVALUE_METHODDEF    \
-    {"EnumValue", _PyCFunction_CAST(winreg_EnumValue), METH_FASTCALL, winreg_EnumValue__doc__},
+    {"EnumValue", (PyCFunction)(void(*)(void))winreg_EnumValue, METH_FASTCALL, winreg_EnumValue__doc__},
 
 static PyObject *
 winreg_EnumValue_impl(PyObject *module, HKEY key, int index);
@@ -594,7 +622,11 @@ winreg_ExpandEnvironmentStrings(PyObject *module, PyObject *arg)
         _PyArg_BadArgument("ExpandEnvironmentStrings", "argument", "str", arg);
         goto exit;
     }
+    #if USE_UNICODE_WCHAR_CACHE
+    string = _PyUnicode_AsUnicode(arg);
+    #else /* USE_UNICODE_WCHAR_CACHE */
     string = PyUnicode_AsWideCharString(arg, NULL);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     if (string == NULL) {
         goto exit;
     }
@@ -602,7 +634,9 @@ winreg_ExpandEnvironmentStrings(PyObject *module, PyObject *arg)
 
 exit:
     /* Cleanup for string */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)string);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -676,7 +710,7 @@ PyDoc_STRVAR(winreg_LoadKey__doc__,
 "tree.");
 
 #define WINREG_LOADKEY_METHODDEF    \
-    {"LoadKey", _PyCFunction_CAST(winreg_LoadKey), METH_FASTCALL, winreg_LoadKey__doc__},
+    {"LoadKey", (PyCFunction)(void(*)(void))winreg_LoadKey, METH_FASTCALL, winreg_LoadKey__doc__},
 
 static PyObject *
 winreg_LoadKey_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key,
@@ -700,7 +734,11 @@ winreg_LoadKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         _PyArg_BadArgument("LoadKey", "argument 2", "str", args[1]);
         goto exit;
     }
+    #if USE_UNICODE_WCHAR_CACHE
+    sub_key = _PyUnicode_AsUnicode(args[1]);
+    #else /* USE_UNICODE_WCHAR_CACHE */
     sub_key = PyUnicode_AsWideCharString(args[1], NULL);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     if (sub_key == NULL) {
         goto exit;
     }
@@ -708,7 +746,11 @@ winreg_LoadKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         _PyArg_BadArgument("LoadKey", "argument 3", "str", args[2]);
         goto exit;
     }
+    #if USE_UNICODE_WCHAR_CACHE
+    file_name = _PyUnicode_AsUnicode(args[2]);
+    #else /* USE_UNICODE_WCHAR_CACHE */
     file_name = PyUnicode_AsWideCharString(args[2], NULL);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     if (file_name == NULL) {
         goto exit;
     }
@@ -716,9 +758,13 @@ winreg_LoadKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     /* Cleanup for file_name */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)file_name);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -743,7 +789,7 @@ PyDoc_STRVAR(winreg_OpenKey__doc__,
 "If the function fails, an OSError exception is raised.");
 
 #define WINREG_OPENKEY_METHODDEF    \
-    {"OpenKey", _PyCFunction_CAST(winreg_OpenKey), METH_FASTCALL|METH_KEYWORDS, winreg_OpenKey__doc__},
+    {"OpenKey", (PyCFunction)(void(*)(void))winreg_OpenKey, METH_FASTCALL|METH_KEYWORDS, winreg_OpenKey__doc__},
 
 static HKEY
 winreg_OpenKey_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key,
@@ -773,7 +819,9 @@ winreg_OpenKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObje
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -798,7 +846,7 @@ PyDoc_STRVAR(winreg_OpenKeyEx__doc__,
 "If the function fails, an OSError exception is raised.");
 
 #define WINREG_OPENKEYEX_METHODDEF    \
-    {"OpenKeyEx", _PyCFunction_CAST(winreg_OpenKeyEx), METH_FASTCALL|METH_KEYWORDS, winreg_OpenKeyEx__doc__},
+    {"OpenKeyEx", (PyCFunction)(void(*)(void))winreg_OpenKeyEx, METH_FASTCALL|METH_KEYWORDS, winreg_OpenKeyEx__doc__},
 
 static HKEY
 winreg_OpenKeyEx_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key,
@@ -828,7 +876,9 @@ winreg_OpenKeyEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyOb
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -890,7 +940,7 @@ PyDoc_STRVAR(winreg_QueryValue__doc__,
 "completeness.");
 
 #define WINREG_QUERYVALUE_METHODDEF    \
-    {"QueryValue", _PyCFunction_CAST(winreg_QueryValue), METH_FASTCALL, winreg_QueryValue__doc__},
+    {"QueryValue", (PyCFunction)(void(*)(void))winreg_QueryValue, METH_FASTCALL, winreg_QueryValue__doc__},
 
 static PyObject *
 winreg_QueryValue_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key);
@@ -912,7 +962,11 @@ winreg_QueryValue(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         sub_key = NULL;
     }
     else if (PyUnicode_Check(args[1])) {
+        #if USE_UNICODE_WCHAR_CACHE
+        sub_key = _PyUnicode_AsUnicode(args[1]);
+        #else /* USE_UNICODE_WCHAR_CACHE */
         sub_key = PyUnicode_AsWideCharString(args[1], NULL);
+        #endif /* USE_UNICODE_WCHAR_CACHE */
         if (sub_key == NULL) {
             goto exit;
         }
@@ -925,7 +979,9 @@ winreg_QueryValue(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -947,7 +1003,7 @@ PyDoc_STRVAR(winreg_QueryValueEx__doc__,
 "The return value is a tuple of the value and the type_id.");
 
 #define WINREG_QUERYVALUEEX_METHODDEF    \
-    {"QueryValueEx", _PyCFunction_CAST(winreg_QueryValueEx), METH_FASTCALL, winreg_QueryValueEx__doc__},
+    {"QueryValueEx", (PyCFunction)(void(*)(void))winreg_QueryValueEx, METH_FASTCALL, winreg_QueryValueEx__doc__},
 
 static PyObject *
 winreg_QueryValueEx_impl(PyObject *module, HKEY key, const Py_UNICODE *name);
@@ -969,7 +1025,11 @@ winreg_QueryValueEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         name = NULL;
     }
     else if (PyUnicode_Check(args[1])) {
+        #if USE_UNICODE_WCHAR_CACHE
+        name = _PyUnicode_AsUnicode(args[1]);
+        #else /* USE_UNICODE_WCHAR_CACHE */
         name = PyUnicode_AsWideCharString(args[1], NULL);
+        #endif /* USE_UNICODE_WCHAR_CACHE */
         if (name == NULL) {
             goto exit;
         }
@@ -982,7 +1042,9 @@ winreg_QueryValueEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for name */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)name);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -1009,7 +1071,7 @@ PyDoc_STRVAR(winreg_SaveKey__doc__,
 "to the API.");
 
 #define WINREG_SAVEKEY_METHODDEF    \
-    {"SaveKey", _PyCFunction_CAST(winreg_SaveKey), METH_FASTCALL, winreg_SaveKey__doc__},
+    {"SaveKey", (PyCFunction)(void(*)(void))winreg_SaveKey, METH_FASTCALL, winreg_SaveKey__doc__},
 
 static PyObject *
 winreg_SaveKey_impl(PyObject *module, HKEY key, const Py_UNICODE *file_name);
@@ -1031,7 +1093,11 @@ winreg_SaveKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
         _PyArg_BadArgument("SaveKey", "argument 2", "str", args[1]);
         goto exit;
     }
+    #if USE_UNICODE_WCHAR_CACHE
+    file_name = _PyUnicode_AsUnicode(args[1]);
+    #else /* USE_UNICODE_WCHAR_CACHE */
     file_name = PyUnicode_AsWideCharString(args[1], NULL);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
     if (file_name == NULL) {
         goto exit;
     }
@@ -1039,7 +1105,9 @@ winreg_SaveKey(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for file_name */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)file_name);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -1071,7 +1139,7 @@ PyDoc_STRVAR(winreg_SetValue__doc__,
 "KEY_SET_VALUE access.");
 
 #define WINREG_SETVALUE_METHODDEF    \
-    {"SetValue", _PyCFunction_CAST(winreg_SetValue), METH_FASTCALL, winreg_SetValue__doc__},
+    {"SetValue", (PyCFunction)(void(*)(void))winreg_SetValue, METH_FASTCALL, winreg_SetValue__doc__},
 
 static PyObject *
 winreg_SetValue_impl(PyObject *module, HKEY key, const Py_UNICODE *sub_key,
@@ -1094,7 +1162,9 @@ winreg_SetValue(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for sub_key */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)sub_key);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -1143,7 +1213,7 @@ PyDoc_STRVAR(winreg_SetValueEx__doc__,
 "the configuration registry to help the registry perform efficiently.");
 
 #define WINREG_SETVALUEEX_METHODDEF    \
-    {"SetValueEx", _PyCFunction_CAST(winreg_SetValueEx), METH_FASTCALL, winreg_SetValueEx__doc__},
+    {"SetValueEx", (PyCFunction)(void(*)(void))winreg_SetValueEx, METH_FASTCALL, winreg_SetValueEx__doc__},
 
 static PyObject *
 winreg_SetValueEx_impl(PyObject *module, HKEY key,
@@ -1168,7 +1238,9 @@ winreg_SetValueEx(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 
 exit:
     /* Cleanup for value_name */
+    #if !USE_UNICODE_WCHAR_CACHE
     PyMem_Free((void *)value_name);
+    #endif /* USE_UNICODE_WCHAR_CACHE */
 
     return return_value;
 }
@@ -1274,4 +1346,4 @@ winreg_QueryReflectionKey(PyObject *module, PyObject *arg)
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=9782b1630b59e201 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=497a2e804821d5c9 input=a9049054013a1b77]*/

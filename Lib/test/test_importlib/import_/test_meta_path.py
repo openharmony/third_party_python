@@ -1,4 +1,4 @@
-from test.test_importlib import util
+from .. import util
 import importlib._bootstrap
 import sys
 from types import MethodType

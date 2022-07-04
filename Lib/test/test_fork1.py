@@ -14,9 +14,7 @@ from test import support
 
 
 # Skip test if fork does not exist.
-if not support.has_fork_support:
-    raise unittest.SkipTest("test module requires working os.fork")
-
+support.get_attribute(os, 'fork')
 
 class ForkTest(ForkWait):
     def test_threaded_import_lock_fork(self):

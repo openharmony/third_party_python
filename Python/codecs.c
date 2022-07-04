@@ -9,7 +9,6 @@ Copyright (c) Corporation for National Research Initiatives.
    ------------------------------------------------------------------------ */
 
 #include "Python.h"
-#include "pycore_call.h"          // _PyObject_CallNoArgs()
 #include "pycore_interp.h"        // PyInterpreterState.codec_search_path
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "pycore_ucnhash.h"       // _PyUnicode_Name_CAPI
@@ -281,7 +280,7 @@ PyObject *codec_makeincrementalcodec(PyObject *codec_info,
     if (errors)
         ret = PyObject_CallFunction(inccodec, "s", errors);
     else
-        ret = _PyObject_CallNoArgs(inccodec);
+        ret = _PyObject_CallNoArg(inccodec);
     Py_DECREF(inccodec);
     return ret;
 }
@@ -522,6 +521,7 @@ PyObject *PyCodec_Decode(PyObject *object,
 PyObject * _PyCodec_LookupTextEncoding(const char *encoding,
                                        const char *alternate_command)
 {
+    _Py_IDENTIFIER(_is_text_encoding);
     PyObject *codec;
     PyObject *attr;
     int is_text_codec;
@@ -535,7 +535,7 @@ PyObject * _PyCodec_LookupTextEncoding(const char *encoding,
      * attribute.
      */
     if (!PyTuple_CheckExact(codec)) {
-        if (_PyObject_LookupAttr(codec, &_Py_ID(_is_text_encoding), &attr) < 0) {
+        if (_PyObject_LookupAttrId(codec, &PyId__is_text_encoding, &attr) < 0) {
             Py_DECREF(codec);
             return NULL;
         }
@@ -1526,7 +1526,7 @@ static int _PyCodecRegistry_Init(void)
         }
     }
 
-    mod = PyImport_ImportModule("encodings");
+    mod = PyImport_ImportModuleNoBlock("encodings");
     if (mod == NULL) {
         return -1;
     }

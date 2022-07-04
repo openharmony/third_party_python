@@ -96,13 +96,11 @@ Save Copy As...
 Print Window
    Print the current window to the default printer.
 
-Close Window
-   Close the current window (if an unsaved editor, ask to save; if an unsaved
-   Shell, ask to quit execution).  Calling ``exit()`` or ``close()`` in the Shell
-   window also closes Shell.  If this is the only window, also exit IDLE.
+Close
+   Close the current window (ask to save if unsaved).
 
-Exit IDLE
-   Close all windows and quit IDLE (ask to save unsaved edit windows).
+Exit
+   Close all windows and quit IDLE (ask to save unsaved windows).
 
 Edit menu (Shell and Editor)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -357,7 +355,7 @@ for more on Help menu choices.
    single: Clear Breakpoint
    single: breakpoints
 
-Context menus
+Context Menus
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Open a context menu by right-clicking in a window (Control-click on macOS).
@@ -398,7 +396,7 @@ Squeeze
 
 .. _editing-and-navigation:
 
-Editing and Navigation
+Editing and navigation
 ----------------------
 
 Editor windows
@@ -576,28 +574,16 @@ line to the top of the editor.
 The text and background colors for the context pane can be configured under
 the Highlights tab in the Configure IDLE dialog.
 
-Shell window
-^^^^^^^^^^^^
+Python Shell window
+^^^^^^^^^^^^^^^^^^^
 
-In IDLE's Shell, enter, edit, and recall complete statements. (Most
-consoles and terminals only work with a single physical line at a time).
-
-Submit a single-line statement for execution by hitting :kbd:`Return`
-with the cursor anywhere on the line.  If a line is extended with
-Backslash (:kbd:`\\`), the cursor must be on the last physical line.
-Submit a multi-line compound statement by entering a blank line after
-the statement.
+With IDLE's Shell, one enters, edits, and recalls complete statements.
+Most consoles and terminals only work with a single physical line at a time.
 
 When one pastes code into Shell, it is not compiled and possibly executed
-until one hits :kbd:`Return`, as specified above.
-One may edit pasted code first.
-If one pastes more than one statement into Shell, the result will be a
+until one hits :kbd:`Return`.  One may edit pasted code first.
+If one pastes more that one statement into Shell, the result will be a
 :exc:`SyntaxError` when multiple statements are compiled as if they were one.
-
-Lines containing ``'RESTART'`` mean that the user execution process has been
-re-started.  This occurs when the user execution process has crashed,
-when one requests a restart on the Shell menu, or when one runs code
-in an editor window.
 
 The editing features described in previous subsections work when entering
 code interactively.  IDLE's Shell window also responds to the following keys.
@@ -615,8 +601,7 @@ code interactively.  IDLE's Shell window also responds to the following keys.
 
   * :kbd:`Alt-n` retrieves next. On macOS use :kbd:`C-n`.
 
-  * :kbd:`Return` while the cursor is on any previous command
-    retrieves that command
+  * :kbd:`Return` while on any previous command retrieves that command
 
 Text colors
 ^^^^^^^^^^^
@@ -640,7 +625,7 @@ Highlighting tab.  The marking of debugger breakpoint lines in the editor and
 text in popups and dialogs is not user-configurable.
 
 
-Startup and Code Execution
+Startup and code execution
 --------------------------
 
 Upon startup with the ``-s`` option, IDLE will execute the file referenced by
@@ -907,7 +892,7 @@ with the default subprocess if at all possible.
 .. deprecated:: 3.4
 
 
-Help and Preferences
+Help and preferences
 --------------------
 
 .. _help-sources:

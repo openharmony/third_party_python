@@ -217,7 +217,7 @@ class uploadTestCase(BasePyPIRCCommandTestCase):
 
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(uploadTestCase)
+    return unittest.makeSuite(uploadTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

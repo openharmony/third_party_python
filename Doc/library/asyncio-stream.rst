@@ -51,8 +51,7 @@ and work with streams:
 .. coroutinefunction:: open_connection(host=None, port=None, *, \
                           limit=None, ssl=None, family=0, proto=0, \
                           flags=0, sock=None, local_addr=None, \
-                          server_hostname=None, ssl_handshake_timeout=None, \
-                          happy_eyeballs_delay=None, interleave=None)
+                          server_hostname=None, ssl_handshake_timeout=None)
 
    Establish a network connection and return a pair of
    ``(reader, writer)`` objects.
@@ -67,14 +66,16 @@ and work with streams:
    The rest of the arguments are passed directly to
    :meth:`loop.create_connection`.
 
-   .. versionchanged:: 3.7
-      Added the *ssl_handshake_timeout* parameter.
+   .. versionadded:: 3.7
 
-   .. versionadded:: 3.8
-      Added *happy_eyeballs_delay* and *interleave* parameters.
+      The *ssl_handshake_timeout* parameter.
 
-   .. versionchanged:: 3.10
-      Removed the *loop* parameter.
+   .. deprecated-removed:: 3.8 3.10
+
+      The ``loop`` parameter.  This function has been implicitly getting the
+      current running loop since 3.7.  See
+      :ref:`What's New in 3.10's Removed section <whatsnew310-removed>`
+      for more information.
 
 
 .. coroutinefunction:: start_server(client_connected_cb, host=None, \
@@ -103,11 +104,16 @@ and work with streams:
    The rest of the arguments are passed directly to
    :meth:`loop.create_server`.
 
-   .. versionchanged:: 3.7
-      Added the *ssl_handshake_timeout* and *start_serving* parameters.
+   .. versionadded:: 3.7
 
-   .. versionchanged:: 3.10
-      Removed the *loop* parameter.
+      The *ssl_handshake_timeout* and *start_serving* parameters.
+
+   .. deprecated-removed:: 3.8 3.10
+
+      The ``loop`` parameter.  This function has been implicitly getting the
+      current running loop since 3.7.  See
+      :ref:`What's New in 3.10's Removed section <whatsnew310-removed>`
+      for more information.
 
 
 .. rubric:: Unix Sockets
@@ -125,12 +131,20 @@ and work with streams:
 
    .. availability:: Unix.
 
+   .. versionadded:: 3.7
+
+      The *ssl_handshake_timeout* parameter.
+
    .. versionchanged:: 3.7
-      Added the *ssl_handshake_timeout* parameter.
+
       The *path* parameter can now be a :term:`path-like object`
 
-   .. versionchanged:: 3.10
-      Removed the *loop* parameter.
+   .. deprecated-removed:: 3.8 3.10
+
+      The ``loop`` parameter.  This function has been implicitly getting the
+      current running loop since 3.7.  See
+      :ref:`What's New in 3.10's Removed section <whatsnew310-removed>`
+      for more information.
 
 
 .. coroutinefunction:: start_unix_server(client_connected_cb, path=None, \
@@ -145,12 +159,20 @@ and work with streams:
 
    .. availability:: Unix.
 
+   .. versionadded:: 3.7
+
+      The *ssl_handshake_timeout* and *start_serving* parameters.
+
    .. versionchanged:: 3.7
-      Added the *ssl_handshake_timeout* and *start_serving* parameters.
+
       The *path* parameter can now be a :term:`path-like object`.
 
-   .. versionchanged:: 3.10
-      Removed the *loop* parameter.
+   .. deprecated-removed:: 3.8 3.10
+
+      The ``loop`` parameter.  This function has been implicitly getting the
+      current running loop since 3.7.  See
+      :ref:`What's New in 3.10's Removed section <whatsnew310-removed>`
+      for more information.
 
 
 StreamReader
@@ -192,7 +214,7 @@ StreamReader
       can be read.  Use the :attr:`IncompleteReadError.partial`
       attribute to get the partially read data.
 
-   .. coroutinemethod:: readuntil(separator=b'\n')
+   .. coroutinemethod:: readuntil(separator=b'\\n')
 
       Read data from the stream until *separator* is found.
 
@@ -295,24 +317,6 @@ StreamWriter
       be resumed.  When there is nothing to wait for, the :meth:`drain`
       returns immediately.
 
-   .. coroutinemethod:: start_tls(sslcontext, \*, server_hostname=None, \
-                          ssl_handshake_timeout=None)
-
-      Upgrade an existing stream-based connection to TLS.
-
-      Parameters:
-
-      * *sslcontext*: a configured instance of :class:`~ssl.SSLContext`.
-
-      * *server_hostname*: sets or overrides the host name that the target
-        server's certificate will be matched against.
-
-      * *ssl_handshake_timeout* is the time in seconds to wait for the TLS
-        handshake to complete before aborting the connection.  ``60.0`` seconds
-        if ``None`` (default).
-
-      .. versionadded:: 3.11
-
    .. method:: is_closing()
 
       Return ``True`` if the stream is closed or in the process of
@@ -348,7 +352,6 @@ TCP echo client using the :func:`asyncio.open_connection` function::
 
         print(f'Send: {message!r}')
         writer.write(message.encode())
-        await writer.drain()
 
         data = await reader.read(100)
         print(f'Received: {data.decode()!r}')

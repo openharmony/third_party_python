@@ -4,14 +4,12 @@ from doctest import DocTestSuite
 from test import support
 from test.support import threading_helper
 import weakref
+import gc
 
 # Modules under test
 import _thread
 import threading
 import _threading_local
-
-
-threading_helper.requires_working_threading(module=True)
 
 
 class Weak(object):
@@ -203,19 +201,22 @@ class PyThreadingLocalTest(unittest.TestCase, BaseLocalTest):
     _local = _threading_local.local
 
 
-def load_tests(loader, tests, pattern):
-    tests.addTest(DocTestSuite('_threading_local'))
+def test_main():
+    suite = unittest.TestSuite()
+    suite.addTest(DocTestSuite('_threading_local'))
+    suite.addTest(unittest.makeSuite(ThreadLocalTest))
+    suite.addTest(unittest.makeSuite(PyThreadingLocalTest))
 
     local_orig = _threading_local.local
     def setUp(test):
         _threading_local.local = _thread._local
     def tearDown(test):
         _threading_local.local = local_orig
-    tests.addTests(DocTestSuite('_threading_local',
-                                setUp=setUp, tearDown=tearDown)
-                   )
-    return tests
+    suite.addTest(DocTestSuite('_threading_local',
+                               setUp=setUp, tearDown=tearDown)
+                  )
 
+    support.run_unittest(suite)
 
 if __name__ == '__main__':
-    unittest.main()
+    test_main()

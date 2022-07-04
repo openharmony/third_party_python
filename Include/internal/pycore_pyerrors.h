@@ -8,15 +8,6 @@ extern "C" {
 #  error "this header requires Py_BUILD_CORE define"
 #endif
 
-
-/* runtime lifecycle */
-
-extern PyStatus _PyErr_InitTypes(PyInterpreterState *);
-extern void _PyErr_FiniTypes(PyInterpreterState *);
-
-
-/* other API */
-
 static inline PyObject* _PyErr_Occurred(PyThreadState *tstate)
 {
     assert(tstate != NULL);
@@ -25,11 +16,18 @@ static inline PyObject* _PyErr_Occurred(PyThreadState *tstate)
 
 static inline void _PyErr_ClearExcState(_PyErr_StackItem *exc_state)
 {
-    Py_CLEAR(exc_state->exc_value);
+    PyObject *t, *v, *tb;
+    t = exc_state->exc_type;
+    v = exc_state->exc_value;
+    tb = exc_state->exc_traceback;
+    exc_state->exc_type = NULL;
+    exc_state->exc_value = NULL;
+    exc_state->exc_traceback = NULL;
+    Py_XDECREF(t);
+    Py_XDECREF(v);
+    Py_XDECREF(tb);
 }
 
-PyAPI_FUNC(PyObject*) _PyErr_StackItemToExcInfoTuple(
-    _PyErr_StackItem *err_info);
 
 PyAPI_FUNC(void) _PyErr_Fetch(
     PyThreadState *tstate,
@@ -83,14 +81,6 @@ PyAPI_FUNC(PyObject *) _PyErr_FormatFromCauseTstate(
     PyObject *exception,
     const char *format,
     ...);
-
-PyAPI_FUNC(PyObject *) _PyExc_CreateExceptionGroup(
-    const char *msg,
-    PyObject *excs);
-
-PyAPI_FUNC(PyObject *) _PyExc_PrepReraiseStar(
-    PyObject *orig,
-    PyObject *excs);
 
 PyAPI_FUNC(int) _PyErr_CheckSignalsTstate(PyThreadState *tstate);
 

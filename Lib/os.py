@@ -331,8 +331,8 @@ def walk(top, topdown=True, onerror=None, followlinks=False):
     import os
     from os.path import join, getsize
     for root, dirs, files in os.walk('python/Lib/email'):
-        print(root, "consumes ")
-        print(sum(getsize(join(root, name)) for name in files), end=" ")
+        print(root, "consumes", end="")
+        print(sum(getsize(join(root, name)) for name in files), end="")
         print("bytes in", len(files), "non-directory files")
         if 'CVS' in dirs:
             dirs.remove('CVS')  # don't visit CVS directories
@@ -461,7 +461,8 @@ if {open, stat} <= supports_dir_fd and {scandir, stat} <= supports_fd:
                 dirs.remove('CVS')  # don't visit CVS directories
         """
         sys.audit("os.fwalk", top, topdown, onerror, follow_symlinks, dir_fd)
-        top = fspath(top)
+        if not isinstance(top, int) or not hasattr(top, '__index__'):
+            top = fspath(top)
         # Note: To guard against symlink races, we use the standard
         # lstat()/open()/fstat() trick.
         if not follow_symlinks:
@@ -703,11 +704,9 @@ class _Environ(MutableMapping):
         return len(self._data)
 
     def __repr__(self):
-        formatted_items = ", ".join(
-            f"{self.decodekey(key)!r}: {self.decodevalue(value)!r}"
-            for key, value in self._data.items()
-        )
-        return f"environ({{{formatted_items}}})"
+        return 'environ({{{}}})'.format(', '.join(
+            ('{!r}: {!r}'.format(self.decodekey(key), self.decodevalue(value))
+            for key, value in self._data.items())))
 
     def copy(self):
         return dict(self)
@@ -981,7 +980,7 @@ if sys.platform != 'vxworks':
             raise ValueError("invalid mode %r" % mode)
         if buffering == 0 or buffering is None:
             raise ValueError("popen() does not support unbuffered streams")
-        import subprocess
+        import subprocess, io
         if mode == "r":
             proc = subprocess.Popen(cmd,
                                     shell=True, text=True,

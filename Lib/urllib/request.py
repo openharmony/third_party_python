@@ -11,8 +11,8 @@ option.  The OpenerDirector is a composite object that invokes the
 Handlers needed to open the requested URL.  For example, the
 HTTPHandler performs HTTP GET and POST requests and deals with
 non-error returns.  The HTTPRedirectHandler automatically deals with
-HTTP 301, 302, 303, 307, and 308 redirect errors, and the
-HTTPDigestAuthHandler deals with digest authentication.
+HTTP 301, 302, 303 and 307 redirect errors, and the HTTPDigestAuthHandler
+deals with digest authentication.
 
 urlopen(url, data=None) -- Basic usage is the same as original
 urllib.  pass the url and optionally data to post to an HTTP URL, and
@@ -88,6 +88,7 @@ import hashlib
 import http.client
 import io
 import os
+import posixpath
 import re
 import socket
 import string
@@ -660,7 +661,7 @@ class HTTPRedirectHandler(BaseHandler):
         but another Handler might.
         """
         m = req.get_method()
-        if (not (code in (301, 302, 303, 307, 308) and m in ("GET", "HEAD")
+        if (not (code in (301, 302, 303, 307) and m in ("GET", "HEAD")
             or code in (301, 302, 303) and m == "POST")):
             raise HTTPError(req.full_url, code, msg, headers, fp)
 
@@ -747,7 +748,7 @@ class HTTPRedirectHandler(BaseHandler):
 
         return self.parent.open(new, timeout=req.timeout)
 
-    http_error_301 = http_error_303 = http_error_307 = http_error_308 = http_error_302
+    http_error_301 = http_error_303 = http_error_307 = http_error_302
 
     inf_msg = "The HTTP server returned a redirect error that would " \
               "lead to an infinite loop.\n" \
@@ -888,10 +889,10 @@ class HTTPPasswordMgr:
             return True
         if base[0] != test[0]:
             return False
-        prefix = base[1]
-        if prefix[-1:] != '/':
-            prefix += '/'
-        return test[1].startswith(prefix)
+        common = posixpath.commonprefix((base[1], test[1]))
+        if len(common) == len(base[1]):
+            return True
+        return False
 
 
 class HTTPPasswordMgrWithDefaultRealm(HTTPPasswordMgr):
@@ -1383,16 +1384,12 @@ if hasattr(http.client, 'HTTPSConnection'):
 
         def __init__(self, debuglevel=0, context=None, check_hostname=None):
             AbstractHTTPHandler.__init__(self, debuglevel)
-            if context is None:
-                http_version = http.client.HTTPSConnection._http_vsn
-                context = http.client._create_https_context(http_version)
-            if check_hostname is not None:
-                context.check_hostname = check_hostname
             self._context = context
+            self._check_hostname = check_hostname
 
         def https_open(self, req):
             return self.do_open(http.client.HTTPSConnection, req,
-                                context=self._context)
+                context=self._context, check_hostname=self._check_hostname)
 
         https_request = AbstractHTTPHandler.do_request_
 
@@ -1582,7 +1579,8 @@ class FTPHandler(BaseHandler):
             headers = email.message_from_string(headers)
             return addinfourl(fp, headers, req.full_url)
         except ftplib.all_errors as exp:
-            raise URLError(f'ftp error: {exp}') from exp
+            exc = URLError('ftp error: %r' % exp)
+            raise exc.with_traceback(sys.exc_info()[2])
 
     def connect_ftp(self, user, passwd, host, port, dirs, timeout):
         return ftpwrapper(user, passwd, host, port, dirs, timeout,
@@ -1793,7 +1791,7 @@ class URLopener:
         except (HTTPError, URLError):
             raise
         except OSError as msg:
-            raise OSError('socket error', msg) from msg
+            raise OSError('socket error', msg).with_traceback(sys.exc_info()[2])
 
     def open_unknown(self, fullurl, data=None):
         """Overridable interface to open unknown URL type."""
@@ -1990,17 +1988,9 @@ class URLopener:
 
     if _have_ssl:
         def _https_connection(self, host):
-            if self.key_file or self.cert_file:
-                http_version = http.client.HTTPSConnection._http_vsn
-                context = http.client._create_https_context(http_version)
-                context.load_cert_chain(self.cert_file, self.key_file)
-                # cert and key file means the user wants to authenticate.
-                # enable TLS 1.3 PHA implicitly even for custom contexts.
-                if context.post_handshake_auth is not None:
-                    context.post_handshake_auth = True
-            else:
-                context = None
-            return http.client.HTTPSConnection(host, context=context)
+            return http.client.HTTPSConnection(host,
+                                           key_file=self.key_file,
+                                           cert_file=self.cert_file)
 
         def open_https(self, url, data=None):
             """Use HTTPS protocol."""
@@ -2103,7 +2093,7 @@ class URLopener:
             headers = email.message_from_string(headers)
             return addinfourl(fp, headers, "ftp:" + url)
         except ftperrors() as exp:
-            raise URLError(f'ftp error: {exp}') from exp
+            raise URLError('ftp error %r' % exp).with_traceback(sys.exc_info()[2])
 
     def open_data(self, url, data=None):
         """Use "data" URL."""
@@ -2218,13 +2208,6 @@ class FancyURLopener(URLopener):
         """Error 307 -- relocated, but turn POST into error."""
         if data is None:
             return self.http_error_302(url, fp, errcode, errmsg, headers, data)
-        else:
-            return self.http_error_default(url, fp, errcode, errmsg, headers)
-
-    def http_error_308(self, url, fp, errcode, errmsg, headers, data=None):
-        """Error 308 -- relocated, but turn POST into error."""
-        if data is None:
-            return self.http_error_301(url, fp, errcode, errmsg, headers, data)
         else:
             return self.http_error_default(url, fp, errcode, errmsg, headers)
 
@@ -2453,7 +2436,8 @@ class ftpwrapper:
                 conn, retrlen = self.ftp.ntransfercmd(cmd)
             except ftplib.error_perm as reason:
                 if str(reason)[:3] != '550':
-                    raise URLError(f'ftp error: {reason}') from reason
+                    raise URLError('ftp error: %r' % reason).with_traceback(
+                        sys.exc_info()[2])
         if not conn:
             # Set transfer mode to ASCII!
             self.ftp.voidcmd('TYPE A')
@@ -2690,26 +2674,22 @@ elif os.name == 'nt':
                 # Returned as Unicode but problems if not converted to ASCII
                 proxyServer = str(winreg.QueryValueEx(internetSettings,
                                                        'ProxyServer')[0])
-                if '=' not in proxyServer and ';' not in proxyServer:
-                    # Use one setting for all protocols.
-                    proxyServer = 'http={0};https={0};ftp={0}'.format(proxyServer)
-                for p in proxyServer.split(';'):
-                    protocol, address = p.split('=', 1)
-                    # See if address has a type:// prefix
-                    if not re.match('(?:[^/:]+)://', address):
-                        # Add type:// prefix to address without specifying type
-                        if protocol in ('http', 'https', 'ftp'):
-                            # The default proxy type of Windows is HTTP
-                            address = 'http://' + address
-                        elif protocol == 'socks':
-                            address = 'socks://' + address
-                    proxies[protocol] = address
-                # Use SOCKS proxy for HTTP(S) protocols
-                if proxies.get('socks'):
-                    # The default SOCKS proxy type of Windows is SOCKS4
-                    address = re.sub(r'^socks://', 'socks4://', proxies['socks'])
-                    proxies['http'] = proxies.get('http') or address
-                    proxies['https'] = proxies.get('https') or address
+                if '=' in proxyServer:
+                    # Per-protocol settings
+                    for p in proxyServer.split(';'):
+                        protocol, address = p.split('=', 1)
+                        # See if address has a type:// prefix
+                        if not re.match('(?:[^/:]+)://', address):
+                            address = '%s://%s' % (protocol, address)
+                        proxies[protocol] = address
+                else:
+                    # Use one setting for all protocols
+                    if proxyServer[:5] == 'http:':
+                        proxies['http'] = proxyServer
+                    else:
+                        proxies['http'] = 'http://%s' % proxyServer
+                        proxies['https'] = 'https://%s' % proxyServer
+                        proxies['ftp'] = 'ftp://%s' % proxyServer
             internetSettings.Close()
         except (OSError, ValueError, TypeError):
             # Either registry key not found etc, or the value in an

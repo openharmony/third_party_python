@@ -390,7 +390,7 @@ class ArchiveUtilTestCase(support.TempdirManager,
             archive.close()
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(ArchiveUtilTestCase)
+    return unittest.makeSuite(ArchiveUtilTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

@@ -27,7 +27,6 @@ from idlelib import query
 from idlelib import replace
 from idlelib import search
 from idlelib.tree import wheel_event
-from idlelib.util import py_extensions
 from idlelib import window
 
 # The default tab setting for a Text widget, in average-width characters.
@@ -758,7 +757,7 @@ class EditorWindow:
         if not filename or os.path.isdir(filename):
             return True
         base, ext = os.path.splitext(os.path.basename(filename))
-        if os.path.normcase(ext) in py_extensions:
+        if os.path.normcase(ext) in (".py", ".pyw"):
             return True
         line = self.text.get('1.0', '1.0 lineend')
         return line.startswith('#!') and 'python' in line

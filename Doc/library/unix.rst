@@ -13,10 +13,14 @@ of it.  Here's an overview:
 
    posix.rst
    pwd.rst
+   spwd.rst
    grp.rst
+   crypt.rst
    termios.rst
    tty.rst
    pty.rst
    fcntl.rst
+   pipes.rst
    resource.rst
+   nis.rst
    syslog.rst

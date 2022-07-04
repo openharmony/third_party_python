@@ -1,3 +1,4 @@
+from itertools import chain
 import graphlib
 import os
 import unittest
@@ -33,7 +34,7 @@ class TestTopologicalSort(unittest.TestCase):
         try:
             ts.prepare()
         except graphlib.CycleError as e:
-            _, seq = e.args
+            msg, seq = e.args
             self.assertIn(" ".join(map(str, cycle)), " ".join(map(str, seq * 2)))
         else:
             raise

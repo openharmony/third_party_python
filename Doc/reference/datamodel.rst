@@ -970,10 +970,8 @@ Internal types
          single: co_varnames (code object attribute)
          single: co_cellvars (code object attribute)
          single: co_freevars (code object attribute)
-         single: co_qualname (code object attribute)
 
       Special read-only attributes: :attr:`co_name` gives the function name;
-      :attr:`co_qualname` gives the fully qualified function name;
       :attr:`co_argcount` is the total number of positional arguments
       (including positional-only arguments and arguments with default values);
       :attr:`co_posonlyargcount` is the number of positional-only arguments
@@ -1015,39 +1013,6 @@ Internal types
 
       If a code object represents a function, the first item in :attr:`co_consts` is
       the documentation string of the function, or ``None`` if undefined.
-
-      .. method:: codeobject.co_positions()
-
-         Returns an iterable over the source code positions of each bytecode
-         instruction in the code object.
-
-         The iterator returns tuples containing the ``(start_line, end_line,
-         start_column, end_column)``. The *i-th* tuple corresponds to the
-         position of the source code that compiled to the *i-th* instruction.
-         Column information is 0-indexed utf-8 byte offsets on the given source
-         line.
-
-         This positional information can be missing. A non-exhaustive lists of
-         cases where this may happen:
-
-         - Running the interpreter with :option:`-X` ``no_debug_ranges``.
-         - Loading a pyc file compiled while using :option:`-X` ``no_debug_ranges``.
-         - Position tuples corresponding to artificial instructions.
-         - Line and column numbers that can't be represented due to
-           implementation specific limitations.
-
-         When this occurs, some or all of the tuple elements can be
-         :const:`None`.
-
-         .. versionadded:: 3.11
-
-         .. note::
-            This feature requires storing column positions in code objects which may
-            result in a small increase of disk usage of compiled Python files or
-            interpreter memory usage. To avoid storing the extra information and/or
-            deactivate printing the extra traceback information, the
-            :option:`-X` ``no_debug_ranges`` command line flag or the :envvar:`PYTHONNODEBUGRANGES`
-            environment variable can be used.
 
    .. _frame-objects:
 
@@ -1501,7 +1466,7 @@ Basic customization
 
    Called by built-in function :func:`hash` and for operations on members of
    hashed collections including :class:`set`, :class:`frozenset`, and
-   :class:`dict`.  The ``__hash__()`` method should return an integer. The only required
+   :class:`dict`.  :meth:`__hash__` should return an integer. The only required
    property is that objects which compare equal have the same hash value; it is
    advised to mix together the hash values of the components of the object that
    also play a part in comparison of objects by packing them into a tuple and
@@ -1822,42 +1787,10 @@ Class Binding
    ``A.__dict__['x'].__get__(None, A)``.
 
 Super Binding
-   A dotted lookup such as ``super(A, a).x`` searches
-   ``a.__class__.__mro__`` for a base class ``B`` following ``A`` and then
-   returns ``B.__dict__['x'].__get__(a, A)``.  If not a descriptor, ``x`` is
-   returned unchanged.
-
-.. testcode::
-    :hide:
-
-    class Desc:
-        def __get__(*args):
-            return args
-
-    class B:
-
-        x = Desc()
-
-    class A(B):
-
-        x = 999
-
-        def m(self):
-            'Demonstrate these two descriptor invocations are equivalent'
-            result1 = super(A, self).x
-            result2 = B.__dict__['x'].__get__(self, A)
-            return result1 == result2
-
-.. doctest::
-    :hide:
-
-    >>> a = A()
-    >>> a.__class__.__mro__.index(B) > a.__class__.__mro__.index(A)
-    True
-    >>> super(A, a).x == B.__dict__['x'].__get__(a, A)
-    True
-    >>> a.m()
-    True
+   If ``a`` is an instance of :class:`super`, then the binding ``super(B, obj).m()``
+   searches ``obj.__class__.__mro__`` for the base class ``A``
+   immediately following ``B`` and then invokes the descriptor with the call:
+   ``A.__dict__['m'].__get__(obj, obj.__class__)``.
 
 For instance bindings, the precedence of descriptor invocation depends on
 which descriptor methods are defined.  A descriptor can define any combination
@@ -1971,7 +1904,7 @@ Customizing class creation
 --------------------------
 
 Whenever a class inherits from another class, :meth:`~object.__init_subclass__` is
-called on the parent class. This way, it is possible to write classes which
+called on that class. This way, it is possible to write classes which
 change the behavior of subclasses. This is closely related to class
 decorators, but where class decorators only affect the specific class they're
 applied to, ``__init_subclass__`` solely applies to future subclasses of the
@@ -2334,7 +2267,7 @@ called::
    from inspect import isclass
 
    def subscribe(obj, x):
-       """Return the result of the expression 'obj[x]'"""
+       """Return the result of the expression `obj[x]`"""
 
        class_of_obj = type(obj)
 
@@ -2624,7 +2557,7 @@ left undefined.
    (``+``, ``-``, ``*``, ``@``, ``/``, ``//``, ``%``, :func:`divmod`,
    :func:`pow`, ``**``, ``<<``, ``>>``, ``&``, ``^``, ``|``).  For instance, to
    evaluate the expression ``x + y``, where *x* is an instance of a class that
-   has an :meth:`__add__` method, ``type(x).__add__(x, y)`` is called.  The
+   has an :meth:`__add__` method, ``x.__add__(y)`` is called.  The
    :meth:`__divmod__` method should be the equivalent to using
    :meth:`__floordiv__` and :meth:`__mod__`; it should not be related to
    :meth:`__truediv__`.  Note that :meth:`__pow__` should be defined to accept
@@ -2660,9 +2593,8 @@ left undefined.
    (swapped) operands.  These functions are only called if the left operand does
    not support the corresponding operation [#]_ and the operands are of different
    types. [#]_ For instance, to evaluate the expression ``x - y``, where *y* is
-   an instance of a class that has an :meth:`__rsub__` method,
-   ``type(y).__rsub__(y, x)`` is called if ``type(x).__sub__(x, y)`` returns
-   *NotImplemented*.
+   an instance of a class that has an :meth:`__rsub__` method, ``y.__rsub__(x)``
+   is called if ``x.__sub__(y)`` returns *NotImplemented*.
 
    .. index:: builtin: pow
 
@@ -2759,9 +2691,6 @@ left undefined.
 
    The built-in function :func:`int` falls back to :meth:`__trunc__` if neither
    :meth:`__int__` nor :meth:`__index__` is defined.
-
-   .. versionchanged:: 3.11
-      The delegation of :func:`int` to :meth:`__trunc__` is deprecated.
 
 
 .. _context-managers:
@@ -2939,7 +2868,7 @@ are awaitable.
 .. note::
 
    The :term:`generator iterator` objects returned from generators
-   decorated with :func:`types.coroutine`
+   decorated with :func:`types.coroutine` or :func:`asyncio.coroutine`
    are also awaitable, but they do not implement :meth:`~object.__await__`.
 
 .. method:: object.__await__(self)
@@ -2984,8 +2913,7 @@ generators, coroutines do not directly support iteration.
    :exc:`StopIteration`, or other exception) is the same as when
    iterating over the :meth:`__await__` return value, described above.
 
-.. method:: coroutine.throw(value)
-            coroutine.throw(type[, value[, traceback]])
+.. method:: coroutine.throw(type[, value[, traceback]])
 
    Raises the specified exception in the coroutine.  This method delegates
    to the :meth:`~generator.throw` method of the iterator that caused

@@ -186,7 +186,8 @@ static PyMethodDef module_methods[] = {
 static int
 multiprocessing_exec(PyObject *module)
 {
-#ifdef HAVE_MP_SEMAPHORE
+#if defined(MS_WINDOWS) ||                                              \
+  (defined(HAVE_SEM_OPEN) && !defined(POSIX_SEMAPHORES_NOT_ENABLED))
 
     /* Add _PyMp_SemLock type to module */
     if (PyModule_AddType(module, &_PyMp_SemLockType) < 0) {

@@ -74,4 +74,5 @@ the `Python Package Index <https://pypi.org>`_.
    windows.rst
    unix.rst
    superseded.rst
+   undoc.rst
    security_warnings.rst

@@ -3,7 +3,6 @@
 
 .. module:: chunk
    :synopsis: Module to read IFF chunks.
-   :deprecated:
 
 .. moduleauthor:: Sjoerd Mullender <sjoerd@acm.org>
 .. sectionauthor:: Sjoerd Mullender <sjoerd@acm.org>
@@ -16,10 +15,6 @@
    single: AIFF-C
    single: Real Media File Format
    single: RMFF
-
-.. deprecated-removed:: 3.11 3.13
-   The :mod:`chunk` module is deprecated
-   (see :pep:`PEP 594 <594#chunk>` for details).
 
 --------------
 

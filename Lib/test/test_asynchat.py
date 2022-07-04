@@ -3,7 +3,6 @@
 from test import support
 from test.support import socket_helper
 from test.support import threading_helper
-from test.support import warnings_helper
 
 import errno
 import socket
@@ -13,11 +12,11 @@ import time
 import unittest
 import unittest.mock
 
-
-asynchat = warnings_helper.import_deprecated('asynchat')
-asyncore = warnings_helper.import_deprecated('asyncore')
-
-support.requires_working_socket(module=True)
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', DeprecationWarning)
+    import asynchat
+    import asyncore
 
 HOST = socket_helper.HOST
 SERVER_QUIT = b'QUIT\n'

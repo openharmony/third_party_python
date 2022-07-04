@@ -6,11 +6,9 @@
 
 /* Standard definitions */
 #include "Python.h"
-
-#include <errno.h>
-#include <signal.h>
 #include <stddef.h>
-#include <stdlib.h>               // free()
+#include <signal.h>
+#include <errno.h>
 #include <sys/time.h>
 
 #if defined(HAVE_SETLOCALE)

@@ -86,8 +86,8 @@ Bookkeeping functions
    .. versionchanged:: 3.2
       Moved to the version 2 scheme which uses all of the bits in a string seed.
 
-   .. versionchanged:: 3.11
-      The *seed* must be one of the following types:
+   .. deprecated:: 3.9
+      In the future, the *seed* must be one of the following types:
       *NoneType*, :class:`int`, :class:`float`, :class:`str`,
       :class:`bytes`, or :class:`bytearray`.
 
@@ -123,26 +123,27 @@ Functions for integers
 .. function:: randrange(stop)
               randrange(start, stop[, step])
 
-   Return a randomly selected element from ``range(start, stop, step)``.
+   Return a randomly selected element from ``range(start, stop, step)``.  This is
+   equivalent to ``choice(range(start, stop, step))``, but doesn't actually build a
+   range object.
 
-   This is roughly equivalent to ``choice(range(start, stop, step))`` but
-   supports arbitrarily large ranges and is optimized for common cases.
-
-   The positional argument pattern matches the :func:`range` function.
-
-   Keyword arguments should not be used because they can interpreted
-   in unexpected ways. For example ``range(start=100)`` is interpreted
-   as ``range(0, 100, 1)``.
+   The positional argument pattern matches that of :func:`range`.  Keyword arguments
+   should not be used because the function may use them in unexpected ways.
 
    .. versionchanged:: 3.2
       :meth:`randrange` is more sophisticated about producing equally distributed
       values.  Formerly it used a style like ``int(random()*n)`` which could produce
       slightly uneven distributions.
 
-   .. versionchanged:: 3.12
-      Automatic conversion of non-integer types is no longer supported.
-      Calls such as ``randrange(10.0)`` and ``randrange(Fraction(10, 1))``
-      now raise a :exc:`TypeError`.
+   .. deprecated:: 3.10
+      The automatic conversion of non-integer types to equivalent integers is
+      deprecated.  Currently ``randrange(10.0)`` is losslessly converted to
+      ``randrange(10)``.  In the future, this will raise a :exc:`TypeError`.
+
+   .. deprecated:: 3.10
+      The exception raised for non-integral values such as ``randrange(10.5)``
+      or ``randrange('10')`` will be changed from :exc:`ValueError` to
+      :exc:`TypeError`.
 
 .. function:: randint(a, b)
 
@@ -207,9 +208,12 @@ Functions for sequences
       Raises a :exc:`ValueError` if all weights are zero.
 
 
-.. function:: shuffle(x)
+.. function:: shuffle(x[, random])
 
    Shuffle the sequence *x* in place.
+
+   The optional argument *random* is a 0-argument function returning a random
+   float in [0.0, 1.0); by default, this is the function :func:`.random`.
 
    To shuffle an immutable sequence and return a new shuffled list, use
    ``sample(x, k=len(x))`` instead.
@@ -226,8 +230,8 @@ Functions for sequences
 
 .. function:: sample(population, k, *, counts=None)
 
-   Return a *k* length list of unique elements chosen from the population
-   sequence.  Used for random sampling without replacement.
+   Return a *k* length list of unique elements chosen from the population sequence
+   or set. Used for random sampling without replacement.
 
    Returns a new list containing elements from the population while leaving the
    original population unchanged.  The resulting list is in selection order so that
@@ -253,10 +257,11 @@ Functions for sequences
    .. versionchanged:: 3.9
       Added the *counts* parameter.
 
-   .. versionchanged:: 3.11
-
-      The *population* must be a sequence.  Automatic conversion of sets
-      to lists is no longer supported.
+   .. deprecated:: 3.9
+      In the future, the *population* must be a sequence.  Instances of
+      :class:`set` are no longer supported.  The set must first be converted
+      to a :class:`list` or :class:`tuple`, preferably in a deterministic
+      order so that the sample is reproducible.
 
 
 .. _real-valued-distributions:
@@ -319,7 +324,7 @@ be found in any statistics text.
                    math.gamma(alpha) * beta ** alpha
 
 
-.. function:: gauss(mu=0.0, sigma=1.0)
+.. function:: gauss(mu, sigma)
 
    Normal distribution, also called the Gaussian distribution.  *mu* is the mean,
    and *sigma* is the standard deviation.  This is slightly faster than
@@ -332,9 +337,6 @@ be found in any statistics text.
    number generator. 2) Put locks around all calls. 3) Use the
    slower, but thread-safe :func:`normalvariate` function instead.
 
-   .. versionchanged:: 3.11
-      *mu* and *sigma* now have default arguments.
-
 
 .. function:: lognormvariate(mu, sigma)
 
@@ -344,12 +346,9 @@ be found in any statistics text.
    zero.
 
 
-.. function:: normalvariate(mu=0.0, sigma=1.0)
+.. function:: normalvariate(mu, sigma)
 
    Normal distribution.  *mu* is the mean, and *sigma* is the standard deviation.
-
-   .. versionchanged:: 3.11
-      *mu* and *sigma* now have default arguments.
 
 
 .. function:: vonmisesvariate(mu, kappa)

@@ -66,10 +66,6 @@
 
 /* ---------------------------------------------------------------*/
 
-#ifndef Py_BUILD_CORE_BUILTIN
-#  define Py_BUILD_CORE_MODULE 1
-#endif
-
 #include "Python.h"
 #include "pycore_moduleobject.h"  // _PyModule_GetState()
 #ifdef HAVE_PROCESS_H
@@ -99,7 +95,7 @@ get_random_state(PyObject *module)
 static struct PyModuleDef _randommodule;
 
 #define _randomstate_type(type) \
-    (get_random_state(PyType_GetModuleByDef(type, &_randommodule)))
+    (get_random_state(_PyType_GetModuleByDef(type, &_randommodule)))
 
 typedef struct {
     PyObject_HEAD
@@ -258,11 +254,7 @@ random_seed_time_pid(RandomObject *self)
     key[0] = (uint32_t)(now & 0xffffffffU);
     key[1] = (uint32_t)(now >> 32);
 
-#ifdef HAVE_GETPID
     key[2] = (uint32_t)getpid();
-#else
-    key[2] = 0;
-#endif
 
     now = _PyTime_GetMonotonicClock();
     key[3] = (uint32_t)(now & 0xffffffffU);
@@ -271,10 +263,10 @@ random_seed_time_pid(RandomObject *self)
     init_by_array(self, key, Py_ARRAY_LENGTH(key));
 }
 
-static int
+static PyObject *
 random_seed(RandomObject *self, PyObject *arg)
 {
-    int result = -1;  /* guilty until proved innocent */
+    PyObject *result = NULL;            /* guilty until proved innocent */
     PyObject *n = NULL;
     uint32_t *key = NULL;
     size_t bits, keyused;
@@ -288,7 +280,7 @@ random_seed(RandomObject *self, PyObject *arg)
                use the current time and process identifier. */
             random_seed_time_pid(self);
         }
-        return 0;
+        Py_RETURN_NONE;
     }
 
     /* This algorithm relies on the number being unsigned.
@@ -347,7 +339,8 @@ random_seed(RandomObject *self, PyObject *arg)
 #endif
     init_by_array(self, key, keyused);
 
-    result = 0;
+    Py_INCREF(Py_None);
+    result = Py_None;
 
 Done:
     Py_XDECREF(n);
@@ -372,10 +365,7 @@ static PyObject *
 _random_Random_seed_impl(RandomObject *self, PyObject *n)
 /*[clinic end generated code: output=0fad1e16ba883681 input=78d6ef0d52532a54]*/
 {
-    if (random_seed(self, n) < 0) {
-        return NULL;
-    }
-    Py_RETURN_NONE;
+    return random_seed(self, n);
 }
 
 /*[clinic input]
@@ -525,27 +515,39 @@ _random_Random_getrandbits_impl(RandomObject *self, int k)
     return result;
 }
 
-static int
-random_init(RandomObject *self, PyObject *args, PyObject *kwds)
+static PyObject *
+random_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    RandomObject *self;
+    PyObject *tmp;
     PyObject *arg = NULL;
-    _randomstate *state = _randomstate_type(Py_TYPE(self));
+    _randomstate *state = _randomstate_type(type);
 
-    if ((Py_IS_TYPE(self, (PyTypeObject *)state->Random_Type) ||
-         Py_TYPE(self)->tp_init == ((PyTypeObject*)state->Random_Type)->tp_init) &&
-        !_PyArg_NoKeywords("Random", kwds)) {
-        return -1;
+    if (type == (PyTypeObject*)state->Random_Type &&
+        !_PyArg_NoKeywords("Random()", kwds)) {
+        return NULL;
     }
+
+    self = (RandomObject *)PyType_GenericAlloc(type, 0);
+    if (self == NULL)
+        return NULL;
 
     if (PyTuple_GET_SIZE(args) > 1) {
         PyErr_SetString(PyExc_TypeError, "Random() requires 0 or 1 argument");
-        return -1;
+        return NULL;
     }
 
     if (PyTuple_GET_SIZE(args) == 1)
         arg = PyTuple_GET_ITEM(args, 0);
 
-    return random_seed(self, arg);
+    tmp = random_seed(self, arg);
+    if (tmp == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    Py_DECREF(tmp);
+
+    return (PyObject *)self;
 }
 
 
@@ -564,8 +566,7 @@ PyDoc_STRVAR(random_doc,
 static PyType_Slot Random_Type_slots[] = {
     {Py_tp_doc, (void *)random_doc},
     {Py_tp_methods, random_methods},
-    {Py_tp_new, PyType_GenericNew},
-    {Py_tp_init, random_init},
+    {Py_tp_new, random_new},
     {Py_tp_free, PyObject_Free},
     {0, 0},
 };

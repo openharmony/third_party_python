@@ -48,11 +48,12 @@ you - by calling your self.found_terminator() method.
 import asyncore
 from collections import deque
 
-from warnings import _deprecated
-
-_DEPRECATION_MSG = ('The {name} module is deprecated and will be removed in '
-                    'Python {remove}. The recommended replacement is asyncio')
-_deprecated(__name__, _DEPRECATION_MSG, remove=(3, 12))
+from warnings import warn
+warn(
+    'The asynchat module is deprecated. '
+    'The recommended replacement is asyncio',
+    DeprecationWarning,
+    stacklevel=2)
 
 
 

@@ -56,7 +56,7 @@ set binaries=%binaries%     gpg
 set binaries=%binaries%     htmlhelp
 set binaries=%binaries%     nuget
 set binaries=%binaries%     redist-1
-set binaries=%binaries%     wix-314
+set binaries=%binaries%     wix
 
 for %%b in (%binaries%) do (
     if exist "%EXTERNALS_DIR%\%%b" (

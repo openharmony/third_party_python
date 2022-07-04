@@ -12,7 +12,6 @@
  */
 
 #define PY_SSIZE_T_CLEAN
-#define NEEDS_PY_IDENTIFIER
 
 #include "Python.h"
 #include "structmember.h"         // PyMemberDef
@@ -35,6 +34,17 @@
    32-bit platforms. */
 
 /* -------------------------------------------------------------------- */
+
+#if 0
+static int memory = 0;
+#define ALLOC(size, comment)\
+do { memory += size; printf("%8d - %s\n", memory, comment); } while (0)
+#define RELEASE(size, comment)\
+do { memory -= size; printf("%8d - %s\n", memory, comment); } while (0)
+#else
+#define ALLOC(size, comment)
+#define RELEASE(size, comment)
+#endif
 
 /* compiler tweaks */
 #if defined(_MSC_VER)
@@ -290,6 +300,7 @@ create_new_element(PyObject* tag, PyObject* attrib)
 
     self->weakreflist = NULL;
 
+    ALLOC(sizeof(ElementObject), "create element");
     PyObject_GC_Track(self);
 
     if (attrib != NULL && !is_empty_dict(attrib)) {
@@ -664,6 +675,7 @@ element_dealloc(ElementObject* self)
     */
     element_gc_clear(self);
 
+    RELEASE(sizeof(ElementObject), "destroy element");
     Py_TYPE(self)->tp_free((PyObject *)self);
     Py_TRASHCAN_END
 }
@@ -1121,7 +1133,7 @@ checkpath(PyObject* tag)
     if (PyUnicode_Check(tag)) {
         const Py_ssize_t len = PyUnicode_GET_LENGTH(tag);
         const void *data = PyUnicode_DATA(tag);
-        int kind = PyUnicode_KIND(tag);
+        unsigned int kind = PyUnicode_KIND(tag);
         if (len >= 3 && PyUnicode_READ(kind, data, 0) == '{' && (
                 PyUnicode_READ(kind, data, 1) == '}' || (
                 PyUnicode_READ(kind, data, 1) == '*' &&
@@ -3624,7 +3636,7 @@ ignore_attribute_error(PyObject *value)
 _elementtree.XMLParser.__init__
 
     *
-    target: object = None
+    target: object = NULL
     encoding: str(accept={str, NoneType}) = None
 
 [clinic start generated code]*/
@@ -3632,7 +3644,7 @@ _elementtree.XMLParser.__init__
 static int
 _elementtree_XMLParser___init___impl(XMLParserObject *self, PyObject *target,
                                      const char *encoding)
-/*[clinic end generated code: output=3ae45ec6cdf344e4 input=7e716dd6e4f3e439]*/
+/*[clinic end generated code: output=3ae45ec6cdf344e4 input=53e35a829ae043e8]*/
 {
     self->entity = PyDict_New();
     if (!self->entity)
@@ -3657,7 +3669,7 @@ _elementtree_XMLParser___init___impl(XMLParserObject *self, PyObject *target,
                            (unsigned long)_Py_HashSecret.expat.hashsalt);
     }
 
-    if (target != Py_None) {
+    if (target) {
         Py_INCREF(target);
     } else {
         target = treebuilder_new(&TreeBuilder_Type, NULL, NULL);
@@ -4349,7 +4361,7 @@ static PyTypeObject XMLParser_Type = {
 /* python module interface */
 
 static PyMethodDef _functions[] = {
-    {"SubElement", _PyCFunction_CAST(subelement), METH_VARARGS | METH_KEYWORDS},
+    {"SubElement", (PyCFunction)(void(*)(void)) subelement, METH_VARARGS | METH_KEYWORDS},
     _ELEMENTTREE__SET_FACTORIES_METHODDEF
     {NULL, NULL}
 };
@@ -4370,7 +4382,7 @@ static struct PyModuleDef elementtreemodule = {
 PyMODINIT_FUNC
 PyInit__elementtree(void)
 {
-    PyObject *m;
+    PyObject *m, *temp;
     elementtreestate *st;
 
     m = PyState_FindModule(&elementtreemodule);
@@ -4394,7 +4406,11 @@ PyInit__elementtree(void)
         return NULL;
     st = get_elementtree_state(m);
 
-    st->deepcopy_obj = _PyImport_GetModuleAttrString("copy", "deepcopy");
+    if (!(temp = PyImport_ImportModule("copy")))
+        return NULL;
+    st->deepcopy_obj = PyObject_GetAttrString(temp, "deepcopy");
+    Py_XDECREF(temp);
+
     if (st->deepcopy_obj == NULL) {
         return NULL;
     }

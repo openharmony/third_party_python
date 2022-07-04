@@ -28,7 +28,7 @@ _weakref_getweakrefcount_impl(PyObject *module, PyObject *object)
 {
     PyWeakReference **list;
 
-    if (!_PyType_SUPPORTS_WEAKREFS(Py_TYPE(object)))
+    if (!PyType_SUPPORTS_WEAKREFS(Py_TYPE(object)))
         return 0;
 
     list = GET_WEAKREFS_LISTPTR(object);
@@ -76,21 +76,16 @@ _weakref__remove_dead_weakref_impl(PyObject *module, PyObject *dct,
 }
 
 
-/*[clinic input]
-_weakref.getweakrefs
-    object: object
-    /
-
-Return a list of all weak reference objects pointing to 'object'.
-[clinic start generated code]*/
+PyDoc_STRVAR(weakref_getweakrefs__doc__,
+"getweakrefs(object) -- return a list of all weak reference objects\n"
+"that point to 'object'.");
 
 static PyObject *
-_weakref_getweakrefs(PyObject *module, PyObject *object)
-/*[clinic end generated code: output=25c7731d8e011824 input=00c6d0e5d3206693]*/
+weakref_getweakrefs(PyObject *self, PyObject *object)
 {
     PyObject *result = NULL;
 
-    if (_PyType_SUPPORTS_WEAKREFS(Py_TYPE(object))) {
+    if (PyType_SUPPORTS_WEAKREFS(Py_TYPE(object))) {
         PyWeakReference **list = GET_WEAKREFS_LISTPTR(object);
         Py_ssize_t count = _PyWeakref_GetWeakrefCount(*list);
 
@@ -112,24 +107,22 @@ _weakref_getweakrefs(PyObject *module, PyObject *object)
 }
 
 
-/*[clinic input]
-
-_weakref.proxy
-    object: object
-    callback: object(c_default="NULL") = None
-    /
-
-Create a proxy object that weakly references 'object'.
-
-'callback', if given, is called with a reference to the
-proxy when 'object' is about to be finalized.
-[clinic start generated code]*/
+PyDoc_STRVAR(weakref_proxy__doc__,
+"proxy(object[, callback]) -- create a proxy object that weakly\n"
+"references 'object'.  'callback', if given, is called with a\n"
+"reference to the proxy when 'object' is about to be finalized.");
 
 static PyObject *
-_weakref_proxy_impl(PyObject *module, PyObject *object, PyObject *callback)
-/*[clinic end generated code: output=d68fa4ad9ea40519 input=4808adf22fd137e7]*/
+weakref_proxy(PyObject *self, PyObject *args)
 {
-    return PyWeakref_NewProxy(object, callback);
+    PyObject *object;
+    PyObject *callback = NULL;
+    PyObject *result = NULL;
+
+    if (PyArg_UnpackTuple(args, "proxy", 1, 2, &object, &callback)) {
+        result = PyWeakref_NewProxy(object, callback);
+    }
+    return result;
 }
 
 
@@ -137,8 +130,10 @@ static PyMethodDef
 weakref_functions[] =  {
     _WEAKREF_GETWEAKREFCOUNT_METHODDEF
     _WEAKREF__REMOVE_DEAD_WEAKREF_METHODDEF
-    _WEAKREF_GETWEAKREFS_METHODDEF
-    _WEAKREF_PROXY_METHODDEF
+    {"getweakrefs",     weakref_getweakrefs,            METH_O,
+     weakref_getweakrefs__doc__},
+    {"proxy",           weakref_proxy,                  METH_VARARGS,
+     weakref_proxy__doc__},
     {NULL, NULL, 0, NULL}
 };
 

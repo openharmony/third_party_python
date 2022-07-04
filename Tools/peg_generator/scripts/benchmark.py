@@ -76,10 +76,7 @@ def run_benchmark_stdlib(subcommand):
         parse_directory(
             "../../Lib",
             verbose=False,
-            excluded_files=[
-                "*/bad*",
-                "*/test/test_lib2to3/data/*",
-            ],
+            excluded_files=["*/bad*", "*/lib2to3/tests/data/*",],
             short=True,
             mode=modes[subcommand],
         )

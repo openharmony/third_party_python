@@ -43,7 +43,7 @@ def transform_children(child_dict, modname=None):
                 # If obj.name != key, it has already been suffixed.
                 supers = []
                 for sup in obj.super:
-                    if isinstance(sup, str):
+                    if type(sup) is type(''):
                         sname = sup
                     else:
                         sname = sup.name

@@ -64,7 +64,7 @@ class ExtensionTestCase(unittest.TestCase):
                           "Unknown Extension options: 'chic'")
 
 def test_suite():
-    return unittest.TestLoader().loadTestsFromTestCase(ExtensionTestCase)
+    return unittest.makeSuite(ExtensionTestCase)
 
 if __name__ == "__main__":
     run_unittest(test_suite())

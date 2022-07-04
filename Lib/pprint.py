@@ -149,9 +149,8 @@ class PrettyPrinter:
         self._underscore_numbers = underscore_numbers
 
     def pprint(self, object):
-        if self._stream is not None:
-            self._format(object, self._stream, 0, 0, {}, 0)
-            self._stream.write("\n")
+        self._format(object, self._stream, 0, 0, {}, 0)
+        self._stream.write("\n")
 
     def pformat(self, object):
         sio = _StringIO()

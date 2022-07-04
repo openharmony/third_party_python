@@ -1,12 +1,9 @@
 import os
 import unittest
 from test.support import import_helper
-import warnings
 
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", DeprecationWarning)
-    spwd = import_helper.import_module('spwd')
+spwd = import_helper.import_module('spwd')
 
 
 @unittest.skipUnless(hasattr(os, 'geteuid') and os.geteuid() == 0,

@@ -8,18 +8,20 @@ import unittest
 
 from test.test_contextlib import TestBaseExitStack
 
-support.requires_working_socket(module=True)
 
 def _async_test(func):
     """Decorator to turn an async function into a test case."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         coro = func(*args, **kwargs)
-        asyncio.run(coro)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+            asyncio.set_event_loop_policy(None)
     return wrapper
-
-def tearDownModule():
-    asyncio.set_event_loop_policy(None)
 
 
 class TestAbstractAsyncContextManager(unittest.TestCase):
@@ -316,82 +318,6 @@ class AsyncContextManagerTestCase(unittest.TestCase):
         self.assertEqual(ncols, 10)
         self.assertEqual(depth, 0)
 
-    @_async_test
-    async def test_decorator(self):
-        entered = False
-
-        @asynccontextmanager
-        async def context():
-            nonlocal entered
-            entered = True
-            yield
-            entered = False
-
-        @context()
-        async def test():
-            self.assertTrue(entered)
-
-        self.assertFalse(entered)
-        await test()
-        self.assertFalse(entered)
-
-    @_async_test
-    async def test_decorator_with_exception(self):
-        entered = False
-
-        @asynccontextmanager
-        async def context():
-            nonlocal entered
-            try:
-                entered = True
-                yield
-            finally:
-                entered = False
-
-        @context()
-        async def test():
-            self.assertTrue(entered)
-            raise NameError('foo')
-
-        self.assertFalse(entered)
-        with self.assertRaisesRegex(NameError, 'foo'):
-            await test()
-        self.assertFalse(entered)
-
-    @_async_test
-    async def test_decorating_method(self):
-
-        @asynccontextmanager
-        async def context():
-            yield
-
-
-        class Test(object):
-
-            @context()
-            async def method(self, a, b, c=None):
-                self.a = a
-                self.b = b
-                self.c = c
-
-        # these tests are for argument passing when used as a decorator
-        test = Test()
-        await test.method(1, 2)
-        self.assertEqual(test.a, 1)
-        self.assertEqual(test.b, 2)
-        self.assertEqual(test.c, None)
-
-        test = Test()
-        await test.method('a', 'b', 'c')
-        self.assertEqual(test.a, 'a')
-        self.assertEqual(test.b, 'b')
-        self.assertEqual(test.c, 'c')
-
-        test = Test()
-        await test.method(a=1, b=2)
-        self.assertEqual(test.a, 1)
-        self.assertEqual(test.b, 2)
-
 
 class AclosingTestCase(unittest.TestCase):
 
@@ -457,14 +383,16 @@ class TestAsyncExitStack(TestBaseExitStack, unittest.TestCase):
     class SyncAsyncExitStack(AsyncExitStack):
         @staticmethod
         def run_coroutine(coro):
-            loop = asyncio.get_event_loop_policy().get_event_loop()
-            t = loop.create_task(coro)
-            t.add_done_callback(lambda f: loop.stop())
+            loop = asyncio.get_event_loop()
+
+            f = asyncio.ensure_future(coro)
+            f.add_done_callback(lambda f: loop.stop())
             loop.run_forever()
 
-            exc = t.exception()
+            exc = f.exception()
+
             if not exc:
-                return t.result()
+                return f.result()
             else:
                 context = exc.__context__
 
@@ -484,13 +412,6 @@ class TestAsyncExitStack(TestBaseExitStack, unittest.TestCase):
             return self.run_coroutine(self.__aexit__(*exc_details))
 
     exit_stack = SyncAsyncExitStack
-    callback_error_internal_frames = [
-        ('__exit__', 'return self.run_coroutine(self.__aexit__(*exc_details))'),
-        ('run_coroutine', 'raise exc'),
-        ('run_coroutine', 'raise exc'),
-        ('__aexit__', 'raise exc_details[1]'),
-        ('__aexit__', 'cb_suppress = cb(*exc_details)'),
-    ]
 
     def setUp(self):
         self.loop = asyncio.new_event_loop()
@@ -578,7 +499,7 @@ class TestAsyncExitStack(TestBaseExitStack, unittest.TestCase):
             1/0
 
     @_async_test
-    async def test_enter_async_context(self):
+    async def test_async_enter_context(self):
         class TestCM(object):
             async def __aenter__(self):
                 result.append(1)
@@ -598,26 +519,6 @@ class TestAsyncExitStack(TestBaseExitStack, unittest.TestCase):
             result.append(2)
 
         self.assertEqual(result, [1, 2, 3, 4])
-
-    @_async_test
-    async def test_enter_async_context_errors(self):
-        class LacksEnterAndExit:
-            pass
-        class LacksEnter:
-            async def __aexit__(self, *exc_info):
-                pass
-        class LacksExit:
-            async def __aenter__(self):
-                pass
-
-        async with self.exit_stack() as stack:
-            with self.assertRaisesRegex(TypeError, 'asynchronous context manager'):
-                await stack.enter_async_context(LacksEnterAndExit())
-            with self.assertRaisesRegex(TypeError, 'asynchronous context manager'):
-                await stack.enter_async_context(LacksEnter())
-            with self.assertRaisesRegex(TypeError, 'asynchronous context manager'):
-                await stack.enter_async_context(LacksExit())
-            self.assertFalse(stack._exit_callbacks)
 
     @_async_test
     async def test_async_exit_exception_chaining(self):
@@ -685,18 +586,6 @@ class TestAsyncExitStack(TestBaseExitStack, unittest.TestCase):
                     self.assertIsNone(exc.__context__)
                 else:
                     self.fail("Expected IndexError, but no exception was raised")
-
-    @_async_test
-    async def test_instance_bypass_async(self):
-        class Example(object): pass
-        cm = Example()
-        cm.__aenter__ = object()
-        cm.__aexit__ = object()
-        stack = self.exit_stack()
-        with self.assertRaisesRegex(TypeError, 'asynchronous context manager'):
-            await stack.enter_async_context(cm)
-        stack.push_async_exit(cm)
-        self.assertIs(stack._exit_callbacks[-1][1], cm)
 
 
 class TestAsyncNullcontext(unittest.TestCase):

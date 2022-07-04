@@ -46,8 +46,6 @@ The :mod:`pprint` module defines one class:
 
    *stream* (default ``sys.stdout``) is a :term:`file-like object` to
    which the output will be written by calling its :meth:`write` method.
-   If both *stream* and ``sys.stdout`` are ``None``, then
-   :meth:`~PrettyPrinter.pprint` silently returns.
 
    Other values configure the manner in which nesting of complex data
    structures is displayed.
@@ -86,9 +84,6 @@ The :mod:`pprint` module defines one class:
    .. versionchanged:: 3.10
       Added the *underscore_numbers* parameter.
 
-   .. versionchanged:: 3.11
-      No longer attempts to write to ``sys.stdout`` if it is ``None``.
-
       >>> import pprint
       >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
       >>> stuff.insert(0, stuff[:])
@@ -112,13 +107,24 @@ The :mod:`pprint` module defines one class:
       >>> pp.pprint(tup)
       ('spam', ('eggs', ('lumberjack', ('knights', ('ni', ('dead', (...)))))))
 
+
+The :mod:`pprint` module also provides several shortcut functions:
+
 .. function:: pformat(object, indent=1, width=80, depth=None, *, \
                       compact=False, sort_dicts=True, underscore_numbers=False)
 
    Return the formatted representation of *object* as a string.  *indent*,
-   *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* are
-   passed to the :class:`PrettyPrinter` constructor as formatting parameters
-   and their meanings are as described in its documentation above.
+   *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* will be passed to the
+   :class:`PrettyPrinter` constructor as formatting parameters.
+
+   .. versionchanged:: 3.4
+      Added the *compact* parameter.
+
+   .. versionchanged:: 3.8
+      Added the *sort_dicts* parameter.
+
+   .. versionchanged:: 3.10
+      Added the *underscore_numbers* parameter.
 
 
 .. function:: pp(object, *args, sort_dicts=False, **kwargs)
@@ -136,15 +142,20 @@ The :mod:`pprint` module defines one class:
                      compact=False, sort_dicts=True, underscore_numbers=False)
 
    Prints the formatted representation of *object* on *stream*, followed by a
-   newline.  If *stream* is ``None``, ``sys.stdout`` is used. This may be used
+   newline.  If *stream* is ``None``, ``sys.stdout`` is used.  This may be used
    in the interactive interpreter instead of the :func:`print` function for
    inspecting values (you can even reassign ``print = pprint.pprint`` for use
-   within a scope).
+   within a scope).  *indent*, *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* will
+   be passed to the :class:`PrettyPrinter` constructor as formatting parameters.
 
-   The configuration parameters *stream*, *indent*, *width*, *depth*,
-   *compact*, *sort_dicts* and *underscore_numbers* are passed to the
-   :class:`PrettyPrinter` constructor and their meanings are as
-   described in its documentation above.
+   .. versionchanged:: 3.4
+      Added the *compact* parameter.
+
+   .. versionchanged:: 3.8
+      Added the *sort_dicts* parameter.
+
+   .. versionchanged:: 3.10
+      Added the *underscore_numbers* parameter.
 
       >>> import pprint
       >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
@@ -156,6 +167,7 @@ The :mod:`pprint` module defines one class:
        'lumberjack',
        'knights',
        'ni']
+
 
 .. function:: isreadable(object)
 
@@ -171,21 +183,17 @@ The :mod:`pprint` module defines one class:
 
 .. function:: isrecursive(object)
 
-   Determine if *object* requires a recursive representation.  This function is
-   subject to the same limitations as noted in :func:`saferepr` below and may raise an
-   :exc:`RecursionError` if it fails to detect a recursive object.
+   Determine if *object* requires a recursive representation.
 
 
 One more support function is also defined:
 
 .. function:: saferepr(object)
 
-   Return a string representation of *object*, protected against recursion in
-   some common data structures, namely instances of :class:`dict`, :class:`list`
-   and :class:`tuple` or subclasses whose ``__repr__`` has not been overridden.  If the
-   representation of object exposes a recursive entry, the recursive reference
-   will be represented as ``<Recursion on typename with id=number>``.  The
-   representation is not otherwise formatted.
+   Return a string representation of *object*, protected against recursive data
+   structures.  If the representation of *object* exposes a recursive entry, the
+   recursive reference will be represented as ``<Recursion on typename with
+   id=number>``.  The representation is not otherwise formatted.
 
    >>> pprint.saferepr(stuff)
    "[<Recursion on list with id=...>, 'spam', 'eggs', 'lumberjack', 'knights', 'ni']"

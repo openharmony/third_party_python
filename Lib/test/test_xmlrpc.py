@@ -25,8 +25,6 @@ try:
 except ImportError:
     gzip = None
 
-support.requires_working_socket(module=True)
-
 alist = [{'astring': 'foo@bar.baz.spam',
           'afloat': 7283.43,
           'anint': 2**20,

@@ -268,12 +268,7 @@ class TestCurses(unittest.TestCase):
         stdscr.echochar(b'A')
         stdscr.echochar(65)
         with self.assertRaises((UnicodeEncodeError, OverflowError)):
-            # Unicode is not fully supported yet, but at least it does
-            # not crash.
-            # It is supposed to fail because either the character is
-            # not encodable with the current encoding, or it is encoded to
-            # a multibyte sequence.
-            stdscr.echochar('\u0114')
+            stdscr.echochar('\u20ac')
         stdscr.echochar('A', curses.A_BOLD)
         self.assertIs(stdscr.is_wintouched(), False)
 

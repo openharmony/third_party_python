@@ -89,7 +89,8 @@ def _timegm(tt):
 DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-MONTHS_LOWER = [month.lower() for month in MONTHS]
+MONTHS_LOWER = []
+for month in MONTHS: MONTHS_LOWER.append(month.lower())
 
 def time2isoz(t=None):
     """Return a string representing time in seconds since epoch, t.
@@ -1043,13 +1044,12 @@ class DefaultCookiePolicy(CookiePolicy):
             else:
                 undotted_domain = domain
             embedded_dots = (undotted_domain.find(".") >= 0)
-            if not embedded_dots and not erhn.endswith(".local"):
+            if not embedded_dots and domain != ".local":
                 _debug("   non-local domain %s contains no embedded dot",
                        domain)
                 return False
             if cookie.version == 0:
-                if (not (erhn.endswith(domain) or
-                         erhn.endswith(f"{undotted_domain}.local")) and
+                if (not erhn.endswith(domain) and
                     (not erhn.startswith(".") and
                      not ("."+erhn).endswith(domain))):
                     _debug("   effective request-host %s (even with added "
@@ -1224,9 +1224,14 @@ class DefaultCookiePolicy(CookiePolicy):
         _debug("  %s does not path-match %s", req_path, path)
         return False
 
+def vals_sorted_by_key(adict):
+    keys = sorted(adict.keys())
+    return map(adict.get, keys)
+
 def deepvalues(mapping):
-    """Iterates over nested mapping, depth-first"""
-    for obj in list(mapping.values()):
+    """Iterates over nested mapping, depth-first, in sorted order by key."""
+    values = vals_sorted_by_key(mapping)
+    for obj in values:
         mapping = False
         try:
             obj.items
@@ -1890,7 +1895,7 @@ class LWPCookieJar(FileCookieJar):
             if self.filename is not None: filename = self.filename
             else: raise ValueError(MISSING_FILENAME_TEXT)
 
-        with os.fdopen(os.open(filename, os.O_CREAT | os.O_WRONLY, 0o600), 'w') as f:
+        with open(filename, "w") as f:
             # There really isn't an LWP Cookies 2.0 format, but this indicates
             # that there is extra information in here (domain_dot and
             # port_spec) while still being compatible with libwww-perl, I hope.
@@ -2086,7 +2091,7 @@ class MozillaCookieJar(FileCookieJar):
             if self.filename is not None: filename = self.filename
             else: raise ValueError(MISSING_FILENAME_TEXT)
 
-        with os.fdopen(os.open(filename, os.O_CREAT | os.O_WRONLY, 0o600), 'w') as f:
+        with open(filename, "w") as f:
             f.write(NETSCAPE_HEADER_TEXT)
             now = time.time()
             for cookie in self:

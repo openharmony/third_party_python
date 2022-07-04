@@ -6,11 +6,13 @@ __author__ = "Steve Dower <steve.dower@python.org>"
 __version__ = "3.8"
 
 
+import collections
 import ctypes
 import io
 import os
+import sys
 
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 from xml.etree import ElementTree as ET
 
 from .constants import *
@@ -410,22 +412,14 @@ def get_appxmanifest(ns):
         if value:
             node.text = value
 
-    try:
-        winver = tuple(int(i) for i in os.getenv("APPX_DATA_WINVER", "").split(".", maxsplit=3))
-    except (TypeError, ValueError):
-        winver = ()
-
-    # Default "known good" version is 10.0.22000, first Windows 11 release
-    winver = winver or (10, 0, 22000)
-
+    winver = sys.getwindowsversion()[:3]
     if winver < (10, 0, 17763):
         winver = 10, 0, 17763
     find_or_add(xml, "m:Dependencies/m:TargetDeviceFamily").set(
-        "MaxVersionTested", "{}.{}.{}.{}".format(*(winver + (0, 0, 0, 0)[:4]))
+        "MaxVersionTested", "{}.{}.{}.0".format(*winver)
     )
 
-    # Only for Python 3.11 and later. Older versions do not disable virtualization
-    if (VER_MAJOR, VER_MINOR) >= (3, 11) and winver > (10, 0, 17763):
+    if winver > (10, 0, 17763):
         disable_registry_virtualization(xml)
 
     app = add_application(

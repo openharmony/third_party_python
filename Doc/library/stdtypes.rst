@@ -353,7 +353,7 @@ Notes:
    The numeric literals accepted include the digits ``0`` to ``9`` or any
    Unicode equivalent (code points with the ``Nd`` property).
 
-   See https://www.unicode.org/Public/14.0.0/ucd/extracted/DerivedNumericType.txt
+   See https://www.unicode.org/Public/13.0.0/ucd/extracted/DerivedNumericType.txt
    for a complete list of code points with the ``Nd`` property.
 
 
@@ -500,7 +500,7 @@ class`. In addition, it provides a few more methods:
 
     .. versionadded:: 3.10
 
-.. method:: int.to_bytes(length=1, byteorder='big', *, signed=False)
+.. method:: int.to_bytes(length, byteorder, *, signed=False)
 
     Return an array of bytes representing an integer.
 
@@ -514,45 +514,25 @@ class`. In addition, it provides a few more methods:
         >>> x.to_bytes((x.bit_length() + 7) // 8, byteorder='little')
         b'\xe8\x03'
 
-    The integer is represented using *length* bytes, and defaults to 1.  An
-    :exc:`OverflowError` is raised if the integer is not representable with
-    the given number of bytes.
+    The integer is represented using *length* bytes.  An :exc:`OverflowError`
+    is raised if the integer is not representable with the given number of
+    bytes.
 
     The *byteorder* argument determines the byte order used to represent the
-    integer, and defaults to ``"big"``.  If *byteorder* is
-    ``"big"``, the most significant byte is at the beginning of the byte
-    array.  If *byteorder* is ``"little"``, the most significant byte is at
-    the end of the byte array.
+    integer.  If *byteorder* is ``"big"``, the most significant byte is at the
+    beginning of the byte array.  If *byteorder* is ``"little"``, the most
+    significant byte is at the end of the byte array.  To request the native
+    byte order of the host system, use :data:`sys.byteorder` as the byte order
+    value.
 
     The *signed* argument determines whether two's complement is used to
     represent the integer.  If *signed* is ``False`` and a negative integer is
     given, an :exc:`OverflowError` is raised. The default value for *signed*
     is ``False``.
 
-    The default values can be used to conveniently turn an integer into a
-    single byte object.  However, when using the default arguments, don't try
-    to convert a value greater than 255 or you'll get an :exc:`OverflowError`::
-
-        >>> (65).to_bytes()
-        b'A'
-
-    Equivalent to::
-
-        def to_bytes(n, length=1, byteorder='big', signed=False):
-            if byteorder == 'little':
-                order = range(length)
-            elif byteorder == 'big':
-                order = reversed(range(length))
-            else:
-                raise ValueError("byteorder must be either 'little' or 'big'")
-
-            return bytes((n >> i*8) & 0xff for i in order)
-
     .. versionadded:: 3.2
-    .. versionchanged:: 3.11
-       Added default argument values for ``length`` and ``byteorder``.
 
-.. classmethod:: int.from_bytes(bytes, byteorder='big', *, signed=False)
+.. classmethod:: int.from_bytes(bytes, byteorder, *, signed=False)
 
     Return the integer represented by the given array of bytes.
 
@@ -571,34 +551,16 @@ class`. In addition, it provides a few more methods:
     iterable producing bytes.
 
     The *byteorder* argument determines the byte order used to represent the
-    integer, and defaults to ``"big"``.  If *byteorder* is
-    ``"big"``, the most significant byte is at the beginning of the byte
-    array.  If *byteorder* is ``"little"``, the most significant byte is at
-    the end of the byte array.  To request the native byte order of the host
-    system, use :data:`sys.byteorder` as the byte order value.
+    integer.  If *byteorder* is ``"big"``, the most significant byte is at the
+    beginning of the byte array.  If *byteorder* is ``"little"``, the most
+    significant byte is at the end of the byte array.  To request the native
+    byte order of the host system, use :data:`sys.byteorder` as the byte order
+    value.
 
     The *signed* argument indicates whether two's complement is used to
     represent the integer.
 
-    Equivalent to::
-
-        def from_bytes(bytes, byteorder='big', signed=False):
-            if byteorder == 'little':
-                little_ordered = list(bytes)
-            elif byteorder == 'big':
-                little_ordered = list(reversed(bytes))
-            else:
-                raise ValueError("byteorder must be either 'little' or 'big'")
-
-            n = sum(b << i*8 for i, b in enumerate(little_ordered))
-            if signed and little_ordered and (little_ordered[-1] & 0x80):
-                n -= 1 << 8*len(little_ordered)
-
-            return n
-
     .. versionadded:: 3.2
-    .. versionchanged:: 3.11
-       Added default argument value for ``byteorder``.
 
 .. method:: int.as_integer_ratio()
 
@@ -1517,8 +1479,7 @@ multiple fragments.
    depends on whether *encoding* or *errors* is given, as follows.
 
    If neither *encoding* nor *errors* is given, ``str(object)`` returns
-   :meth:`type(object).__str__(object) <object.__str__>`,
-   which is the "informal" or nicely
+   :meth:`object.__str__() <object.__str__>`, which is the "informal" or nicely
    printable string representation of *object*.  For string objects, this is
    the string itself.  If *object* does not have a :meth:`~object.__str__`
    method, then :func:`str` falls back to returning
@@ -1866,8 +1827,6 @@ expression support in the :mod:`re` module).
 
 
 
-.. _meth-str-join:
-
 .. method:: str.join(iterable)
 
    Return a string which is the concatenation of the strings in *iterable*.
@@ -2191,11 +2150,7 @@ expression support in the :mod:`re` module).
         >>> "they're bill's friends from the UK".title()
         "They'Re Bill'S Friends From The Uk"
 
-   The :func:`string.capwords` function does not have this problem, as it
-   splits words on spaces only.
-
-   Alternatively, a workaround for apostrophes can be constructed using regular
-   expressions::
+   A workaround for apostrophes can be constructed using regular expressions::
 
         >>> import re
         >>> def titlecase(s):
@@ -2574,6 +2529,16 @@ and slicing will produce a string of length 1)
 The representation of bytes objects uses the literal format (``b'...'``)
 since it is often more useful than e.g. ``bytes([46, 46, 46])``.  You can
 always convert a bytes object into a list of integers using ``list(b)``.
+
+.. note::
+   For Python 2.x users: In the Python 2.x series, a variety of implicit
+   conversions between 8-bit strings (the closest thing 2.x offers to a
+   built-in binary data type) and Unicode strings were permitted. This was a
+   backwards compatibility workaround to account for the fact that Python
+   originally only supported 8-bit text, and Unicode text was a later
+   addition. In Python 3.x, those implicit conversions are gone - conversions
+   between 8-bit binary data and Unicode text must be explicit, and bytes and
+   string objects will always compare unequal.
 
 
 .. _typebytearray:
@@ -3614,7 +3579,7 @@ The conversion types are:
 |            | be used for Python2/3 code bases.                   |       |
 +------------+-----------------------------------------------------+-------+
 | ``'a'``    | Bytes (converts any Python object using             | \(5)  |
-|            | ``repr(obj).encode('ascii', 'backslashreplace')``). |       |
+|            | ``repr(obj).encode('ascii','backslashreplace)``).   |       |
 +------------+-----------------------------------------------------+-------+
 | ``'r'``    | ``'r'`` is an alias for ``'a'`` and should only     | \(7)  |
 |            | be used for Python2/3 code bases.                   |       |
@@ -3825,7 +3790,7 @@ copying.
          Previous versions compared the raw memory disregarding the item format
          and the logical array structure.
 
-   .. method:: tobytes(order='C')
+   .. method:: tobytes(order=None)
 
       Return the data in the buffer as a bytestring.  This is equivalent to
       calling the :class:`bytes` constructor on the memoryview. ::
@@ -4375,6 +4340,10 @@ then they can be used interchangeably to index the same dictionary entry.  (Note
 however, that since computers store floating-point numbers as approximations it
 is usually unwise to use them as dictionary keys.)
 
+Dictionaries can be created by placing a comma-separated list of ``key: value``
+pairs within braces, for example: ``{'jack': 4098, 'sjoerd': 4127}`` or ``{4098:
+'jack', 4127: 'sjoerd'}``, or by the :class:`dict` constructor.
+
 .. class:: dict(**kwargs)
            dict(mapping, **kwargs)
            dict(iterable, **kwargs)
@@ -4827,54 +4796,33 @@ Generic Alias Type
    object: GenericAlias
    pair: Generic; Alias
 
-``GenericAlias`` objects are generally created by
-:ref:`subscripting <subscriptions>` a class. They are most often used with
-:ref:`container classes <sequence-types>`, such as :class:`list` or
-:class:`dict`. For example, ``list[int]`` is a ``GenericAlias`` object created
-by subscripting the ``list`` class with the argument :class:`int`.
-``GenericAlias`` objects are intended primarily for use with
+``GenericAlias`` objects are created by subscripting a class (usually a
+container), such as ``list[int]``.  They are intended primarily for
 :term:`type annotations <annotation>`.
 
+Usually, the :ref:`subscription <subscriptions>` of container objects calls the
+method :meth:`__getitem__` of the object.  However, the subscription of some
+containers' classes may call the classmethod :meth:`__class_getitem__` of the
+class instead. The classmethod :meth:`__class_getitem__` should return a
+``GenericAlias`` object.
+
 .. note::
+   If the :meth:`__getitem__` of the class' metaclass is present, it will take
+   precedence over the :meth:`__class_getitem__` defined in the class (see
+   :pep:`560` for more details).
 
-   It is generally only possible to subscript a class if the class implements
-   the special method :meth:`~object.__class_getitem__`.
+The ``GenericAlias`` object acts as a proxy for :term:`generic types
+<generic type>`, implementing *parameterized generics* - a specific instance
+of a generic which provides the types for container elements.
 
-A ``GenericAlias`` object acts as a proxy for a :term:`generic type`,
-implementing *parameterized generics*.
-
-For a container class, the
-argument(s) supplied to a :ref:`subscription <subscriptions>` of the class may
-indicate the type(s) of the elements an object contains. For example,
-``set[bytes]`` can be used in type annotations to signify a :class:`set` in
-which all the elements are of type :class:`bytes`.
-
-For a class which defines :meth:`~object.__class_getitem__` but is not a
-container, the argument(s) supplied to a subscription of the class will often
-indicate the return type(s) of one or more methods defined on an object. For
-example, :mod:`regular expressions <re>` can be used on both the :class:`str` data
-type and the :class:`bytes` data type:
-
-* If ``x = re.search('foo', 'foo')``, ``x`` will be a
-  :ref:`re.Match <match-objects>` object where the return values of
-  ``x.group(0)`` and ``x[0]`` will both be of type :class:`str`. We can
-  represent this kind of object in type annotations with the ``GenericAlias``
-  ``re.Match[str]``.
-
-* If ``y = re.search(b'bar', b'bar')``, (note the ``b`` for :class:`bytes`),
-  ``y`` will also be an instance of ``re.Match``, but the return
-  values of ``y.group(0)`` and ``y[0]`` will both be of type
-  :class:`bytes`. In type annotations, we would represent this
-  variety of :ref:`re.Match <match-objects>` objects with ``re.Match[bytes]``.
-
-``GenericAlias`` objects are instances of the class
-:class:`types.GenericAlias`, which can also be used to create ``GenericAlias``
-objects directly.
+The user-exposed type for the ``GenericAlias`` object can be accessed from
+:class:`types.GenericAlias` and used for :func:`isinstance` checks.  It can
+also be used to create ``GenericAlias`` objects directly.
 
 .. describe:: T[X, Y, ...]
 
-   Creates a ``GenericAlias`` representing a type ``T`` parameterized by types
-   *X*, *Y*, and more depending on the ``T`` used.
+   Creates a ``GenericAlias`` representing a type ``T`` containing elements
+   of types *X*, *Y*, and more depending on the ``T`` used.
    For example, a function expecting a :class:`list` containing
    :class:`float` elements::
 
@@ -4899,7 +4847,7 @@ The builtin functions :func:`isinstance` and :func:`issubclass` do not accept
 
 The Python runtime does not enforce :term:`type annotations <annotation>`.
 This extends to generic types and their type parameters. When creating
-a container object from a ``GenericAlias``, the elements in the container are not checked
+an object from a ``GenericAlias``, container elements are not checked
 against their type. For example, the following code is discouraged, but will
 run without errors::
 
@@ -4926,8 +4874,8 @@ Calling :func:`repr` or :func:`str` on a generic shows the parameterized type::
    >>> str(list[int])
    'list[int]'
 
-The :meth:`~object.__getitem__` method of generic containers will raise an
-exception to disallow mistakes like ``dict[str][str]``::
+The :meth:`__getitem__` method of generics will raise an exception to disallow
+mistakes like ``dict[str][str]``::
 
    >>> dict[str][str]
    Traceback (most recent call last):
@@ -4936,7 +4884,7 @@ exception to disallow mistakes like ``dict[str][str]``::
 
 However, such expressions are valid when :ref:`type variables <generics>` are
 used.  The index must have as many elements as there are type variable items
-in the ``GenericAlias`` object's :attr:`~genericalias.__args__`. ::
+in the ``GenericAlias`` object's :attr:`__args__ <genericalias.__args__>`. ::
 
    >>> from typing import TypeVar
    >>> Y = TypeVar('Y')
@@ -4944,11 +4892,10 @@ in the ``GenericAlias`` object's :attr:`~genericalias.__args__`. ::
    dict[str, int]
 
 
-Standard Generic Classes
-^^^^^^^^^^^^^^^^^^^^^^^^
+Standard Generic Collections
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The following standard library classes support parameterized generics. This
-list is non-exhaustive.
+These standard library collections support parameterized generics.
 
 * :class:`tuple`
 * :class:`list`
@@ -4986,29 +4933,12 @@ list is non-exhaustive.
 * :class:`collections.abc.ValuesView`
 * :class:`contextlib.AbstractContextManager`
 * :class:`contextlib.AbstractAsyncContextManager`
-* :class:`dataclasses.Field`
-* :class:`functools.cached_property`
-* :class:`functools.partialmethod`
-* :class:`os.PathLike`
-* :class:`queue.LifoQueue`
-* :class:`queue.Queue`
-* :class:`queue.PriorityQueue`
-* :class:`queue.SimpleQueue`
 * :ref:`re.Pattern <re-objects>`
 * :ref:`re.Match <match-objects>`
-* :class:`shelve.BsdDbShelf`
-* :class:`shelve.DbfilenameShelf`
-* :class:`shelve.Shelf`
-* :class:`types.MappingProxyType`
-* :class:`weakref.WeakKeyDictionary`
-* :class:`weakref.WeakMethod`
-* :class:`weakref.WeakSet`
-* :class:`weakref.WeakValueDictionary`
 
 
-
-Special Attributes of ``GenericAlias`` objects
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Special Attributes of Generic Alias
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 All parameterized generics implement special read-only attributes.
 
@@ -5023,8 +4953,8 @@ All parameterized generics implement special read-only attributes.
 .. attribute:: genericalias.__args__
 
    This attribute is a :class:`tuple` (possibly of length 1) of generic
-   types passed to the original :meth:`~object.__class_getitem__` of the
-   generic class::
+   types passed to the original :meth:`__class_getitem__`
+   of the generic container::
 
       >>> dict[str, list[int]].__args__
       (<class 'str'>, list[int])
@@ -5047,28 +4977,11 @@ All parameterized generics implement special read-only attributes.
       have correct ``__parameters__`` after substitution because
       :class:`typing.ParamSpec` is intended primarily for static type checking.
 
-
-.. attribute:: genericalias.__unpacked__
-
-   A boolean that is true if the alias has been unpacked using the
-   ``*`` operator (see :data:`~typing.TypeVarTuple`).
-
-   .. versionadded:: 3.11
-
-
 .. seealso::
 
-   :pep:`484` - Type Hints
-      Introducing Python's framework for type annotations.
-
-   :pep:`585` - Type Hinting Generics In Standard Collections
-      Introducing the ability to natively parameterize standard-library
-      classes, provided they implement the special class method
-      :meth:`~object.__class_getitem__`.
-
-   :ref:`Generics`, :ref:`user-defined generics <user-defined-generics>` and :class:`typing.Generic`
-      Documentation on how to implement generic classes that can be
-      parameterized at runtime and understood by static type-checkers.
+   * :pep:`585` -- "Type Hinting Generics In Standard Collections"
+   * :meth:`__class_getitem__` -- Used to implement parameterized generics.
+   * :ref:`generics` -- Generics in the :mod:`typing` module.
 
 .. versionadded:: 3.9
 
