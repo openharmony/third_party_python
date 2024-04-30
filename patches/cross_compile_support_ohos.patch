@@ -1,0 +1,78 @@
+diff --git a/config.sub b/config.sub
+index d74fb6d..e5e15e4 100755
+--- a/config.sub
++++ b/config.sub
+@@ -1748,7 +1748,7 @@ case $os in
+ 	     | skyos* | haiku* | rdos* | toppers* | drops* | es* \
+ 	     | onefs* | tirtos* | phoenix* | fuchsia* | redox* | bme* \
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+-	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr*)
++	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* | ohos*)
+ 		;;
+ 	# This one is extra strict with allowed versions
+ 	sco3.2v2 | sco3.2v[4-9]* | sco5v6*)
+@@ -1786,6 +1786,8 @@ case $kernel-$os in
+ 		;;
+ 	*-eabi* | *-gnueabi*)
+ 		;;
++	*-ohos*)
++		;;
+ 	-*)
+ 		# Blank kernel with real OS is always fine.
+ 		;;
+diff --git a/configure.ac b/configure.ac
+index 5aa91cb..219426d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -742,6 +742,8 @@ cat >> conftest.c <<EOF
+ # elif defined(__aarch64__) && defined(__AARCH64EL__)
+ #  if defined(__ILP32__)
+         aarch64_ilp32-linux-gnu
++#  elif defined(__OHOS__)
++        aarch64-linux-ohos
+ #  else
+         aarch64-linux-gnu
+ #  endif
+@@ -760,8 +762,10 @@ cat >> conftest.c <<EOF
+         armeb-linux-gnueabihf
+ #  endif
+ # elif defined(__ARM_EABI__) && !defined(__ARM_PCS_VFP)
+-#  if defined(__ARMEL__)
++#  if defined(__ARMEL__) && !defined(__OHOS__)
+         arm-linux-gnueabi
++#  elif defined(__OHOS__)
++        arm-linux-ohos
+ #  else
+         armeb-linux-gnueabi
+ #  endif
+@@ -876,7 +880,7 @@ AC_MSG_CHECKING([for multiarch])
+ AS_CASE([$ac_sys_system],
+   [Darwin*], [MULTIARCH=""],
+   [FreeBSD*], [MULTIARCH=""],
+-  [MULTIARCH=$($CC --print-multiarch 2>/dev/null)]
++  [MULTIARCH=$($CC $CFLAGS --print-multiarch 2>/dev/null)]
+ )
+ AC_SUBST([MULTIARCH])
+ AC_MSG_RESULT([$MULTIARCH])
+diff --git a/setup.py b/setup.py
+index 43e807f..b1d0c0a 100644
+--- a/setup.py
++++ b/setup.py
+@@ -827,10 +827,11 @@ def configure_compiler(self):
+         if not CROSS_COMPILING:
+             add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
+             add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
++            self.add_multiarch_paths()
+         # only change this for cross builds for 3.3, issues on Mageia
+         if CROSS_COMPILING:
+             self.add_cross_compiling_paths()
+-        self.add_multiarch_paths()
++        self.compiler.add_library('python%s' % sys.version.split()[0][:4])
+         self.add_ldflags_cppflags()
+ 
+     def init_inc_lib_dirs(self):
+diff --git a/support_ohos_ignorefile.txt b/support_ohos_ignorefile.txt
+new file mode 100644
+index 0000000000..dc3802e6c5
+--- /dev/null
++++ b/support_ohos_ignorefile.txt
