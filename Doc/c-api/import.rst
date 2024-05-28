@@ -41,7 +41,7 @@ Importing Modules
 
 .. c:function:: PyObject* PyImport_ImportModuleEx(const char *name, PyObject *globals, PyObject *locals, PyObject *fromlist)
 
-   .. index:: builtin: __import__
+   .. index:: pair: built-in function; __import__
 
    Import a module.  This is best described by referring to the built-in Python
    function :func:`__import__`.
@@ -120,7 +120,7 @@ Importing Modules
 
 .. c:function:: PyObject* PyImport_ExecCodeModule(const char *name, PyObject *co)
 
-   .. index:: builtin: compile
+   .. index:: pair: built-in function; compile
 
    Given a module name (possibly of the form ``package.module``) and a code object
    read from a Python bytecode file or obtained from the built-in function
@@ -243,7 +243,7 @@ Importing Modules
    UTF-8 encoded string instead of a Unicode object.
 
 
-.. c:type:: struct _frozen
+.. c:struct:: _frozen
 
    .. index:: single: freeze utility
 
@@ -256,12 +256,16 @@ Importing Modules
           const char *name;
           const unsigned char *code;
           int size;
+          bool is_package;
       };
 
+   .. versionchanged:: 3.11
+      The new ``is_package`` field indicates whether the module is a package or not.
+      This replaces setting the ``size`` field to a negative value.
 
 .. c:var:: const struct _frozen* PyImport_FrozenModules
 
-   This pointer is initialized to point to an array of :c:type:`struct _frozen`
+   This pointer is initialized to point to an array of :c:struct:`_frozen`
    records, terminated by one whose members are all ``NULL`` or zero.  When a frozen
    module is imported, it is searched in this table.  Third-party code could play
    tricks with this to provide a dynamically created collection of frozen modules.
@@ -277,7 +281,7 @@ Importing Modules
    :c:func:`Py_Initialize`.
 
 
-.. c:type:: struct _inittab
+.. c:struct:: _inittab
 
    Structure describing a single entry in the list of built-in modules.  Each of
    these structures gives the name and initialization function for a module built

@@ -22,11 +22,18 @@ from test import support
 from test.support import os_helper
 from test.libregrtest import utils, setup
 
+if not support.has_subprocess_support:
+    raise unittest.SkipTest("test module requires subprocess")
 
 Py_DEBUG = hasattr(sys, 'gettotalrefcount')
 ROOT_DIR = os.path.join(os.path.dirname(__file__), '..', '..')
 ROOT_DIR = os.path.abspath(os.path.normpath(ROOT_DIR))
 LOG_PREFIX = r'[0-9]+:[0-9]+:[0-9]+ (?:load avg: [0-9]+\.[0-9]{2} )?'
+
+EXITCODE_BAD_TEST = 2
+EXITCODE_ENV_CHANGED = 3
+EXITCODE_NO_TESTS_RAN = 4
+EXITCODE_INTERRUPTED = 130
 
 TEST_INTERRUPTED = textwrap.dedent("""
     from signal import SIGINT, raise_signal
@@ -1113,6 +1120,160 @@ class ArgsTestCase(BaseTestCase):
         self.check_executed_tests(output, [testname],
                                   rerun={testname: "test_fail_once"})
 
+    def test_rerun_setup_class_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.TestCase):
+                @classmethod
+                def setUpClass(self):
+                    raise RuntimeError('Fail')
+
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "ExampleTests"})
+
+    def test_rerun_teardown_class_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.TestCase):
+                @classmethod
+                def tearDownClass(self):
+                    raise RuntimeError('Fail')
+
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "ExampleTests"})
+
+    def test_rerun_setup_module_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            def setUpModule():
+                raise RuntimeError('Fail')
+
+            class ExampleTests(unittest.TestCase):
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: testname})
+
+    def test_rerun_teardown_module_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            def tearDownModule():
+                raise RuntimeError('Fail')
+
+            class ExampleTests(unittest.TestCase):
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: testname})
+
+    def test_rerun_setup_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.TestCase):
+                def setUp(self):
+                    raise RuntimeError('Fail')
+
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "test_success"})
+
+    def test_rerun_teardown_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.TestCase):
+                def tearDown(self):
+                    raise RuntimeError('Fail')
+
+                def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "test_success"})
+
+    def test_rerun_async_setup_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.IsolatedAsyncioTestCase):
+                async def asyncSetUp(self):
+                    raise RuntimeError('Fail')
+
+                async def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "test_success"})
+
+    def test_rerun_async_teardown_hook_failure(self):
+        # FAILURE then FAILURE
+        code = textwrap.dedent("""
+            import unittest
+
+            class ExampleTests(unittest.IsolatedAsyncioTestCase):
+                async def asyncTearDown(self):
+                    raise RuntimeError('Fail')
+
+                async def test_success(self):
+                    return
+        """)
+        testname = self.create_test(code=code)
+
+        output = self.run_tests("-w", testname, exitcode=EXITCODE_BAD_TEST)
+        self.check_executed_tests(output, testname,
+                                  failed=[testname],
+                                  rerun={testname: "test_success"})
+
     def test_no_tests_ran(self):
         code = textwrap.dedent("""
             import unittest
@@ -1178,7 +1339,7 @@ class ArgsTestCase(BaseTestCase):
                                   no_test_ran=[testname])
 
     @support.cpython_only
-    def test_findleaks(self):
+    def test_uncollectable(self):
         code = textwrap.dedent(r"""
             import _testcapi
             import gc
@@ -1199,12 +1360,6 @@ class ArgsTestCase(BaseTestCase):
         testname = self.create_test(code=code)
 
         output = self.run_tests("--fail-env-changed", testname, exitcode=3)
-        self.check_executed_tests(output, [testname],
-                                  env_changed=[testname],
-                                  fail_env_changed=True)
-
-        # --findleaks is now basically an alias to --fail-env-changed
-        output = self.run_tests("--findleaks", testname, exitcode=3)
         self.check_executed_tests(output, [testname],
                                   env_changed=[testname],
                                   fail_env_changed=True)
@@ -1300,10 +1455,50 @@ class ArgsTestCase(BaseTestCase):
         self.assertIn("Warning -- Uncaught thread exception", output)
         self.assertIn("Exception: bug in thread", output)
 
+    def test_print_warning(self):
+        # bpo-45410: The order of messages must be preserved when -W and
+        # support.print_warning() are used.
+        code = textwrap.dedent(r"""
+            import sys
+            import unittest
+            from test import support
+
+            class MyObject:
+                pass
+
+            def func_bug():
+                raise Exception("bug in thread")
+
+            class Tests(unittest.TestCase):
+                def test_print_warning(self):
+                    print("msg1: stdout")
+                    support.print_warning("msg2: print_warning")
+                    # Fail with ENV CHANGED to see print_warning() log
+                    support.environment_altered = True
+        """)
+        testname = self.create_test(code=code)
+
+        # Expect an output like:
+        #
+        #   test_threading_excepthook (test.test_x.Tests) ... msg1: stdout
+        #   Warning -- msg2: print_warning
+        #   ok
+        regex = (r"test_print_warning.*msg1: stdout\n"
+                 r"Warning -- msg2: print_warning\n"
+                 r"ok\n")
+        for option in ("-v", "-W"):
+            with self.subTest(option=option):
+                cmd = ["--fail-env-changed", option, testname]
+                output = self.run_tests(*cmd, exitcode=3)
+                self.check_executed_tests(output, [testname],
+                                          env_changed=[testname],
+                                          fail_env_changed=True)
+                self.assertRegex(output, regex)
+
     def test_unicode_guard_env(self):
         guard = os.environ.get(setup.UNICODE_GUARD_ENV)
         self.assertIsNotNone(guard, f"{setup.UNICODE_GUARD_ENV} not set")
-        if guard != "\N{SMILING FACE WITH SUNGLASSES}":
+        if guard.isascii():
             # Skip to signify that the env var value was changed by the user;
             # possibly to something ASCII to work around Unicode issues.
             self.skipTest("Modified guard")

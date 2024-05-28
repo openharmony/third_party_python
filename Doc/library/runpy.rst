@@ -30,7 +30,7 @@ The :mod:`runpy` module provides two functions:
 .. function:: run_module(mod_name, init_globals=None, run_name=None, alter_sys=False)
 
    .. index::
-      module: __main__
+      pair: module; __main__
 
    Execute the code of the specified module and return the resulting module
    globals dictionary. The module's code is first located using the standard
@@ -93,10 +93,10 @@ The :mod:`runpy` module provides two functions:
       run this way, as well as ensuring the real module name is always
       accessible as ``__spec__.name``.
 
-.. function:: run_path(file_path, init_globals=None, run_name=None)
+.. function:: run_path(path_name, init_globals=None, run_name=None)
 
    .. index::
-      module: __main__
+      pair: module; __main__
 
    Execute the code at the named filesystem location and return the resulting
    module globals dictionary. As with a script name supplied to the CPython
@@ -140,7 +140,7 @@ The :mod:`runpy` module provides two functions:
 
    A number of alterations are also made to the :mod:`sys` module. Firstly,
    ``sys.path`` may be altered as described above. ``sys.argv[0]`` is updated
-   with the value of ``file_path`` and ``sys.modules[__name__]`` is updated
+   with the value of ``path_name`` and ``sys.modules[__name__]`` is updated
    with a temporary module object for the module being executed. All
    modifications to items in :mod:`sys` are reverted before the function
    returns.

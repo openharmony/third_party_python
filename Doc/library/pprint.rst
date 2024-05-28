@@ -46,6 +46,8 @@ The :mod:`pprint` module defines one class:
 
    *stream* (default ``sys.stdout``) is a :term:`file-like object` to
    which the output will be written by calling its :meth:`write` method.
+   If both *stream* and ``sys.stdout`` are ``None``, then
+   :meth:`~PrettyPrinter.pprint` silently returns.
 
    Other values configure the manner in which nesting of complex data
    structures is displayed.
@@ -84,6 +86,9 @@ The :mod:`pprint` module defines one class:
    .. versionchanged:: 3.10
       Added the *underscore_numbers* parameter.
 
+   .. versionchanged:: 3.11
+      No longer attempts to write to ``sys.stdout`` if it is ``None``.
+
       >>> import pprint
       >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
       >>> stuff.insert(0, stuff[:])
@@ -107,24 +112,13 @@ The :mod:`pprint` module defines one class:
       >>> pp.pprint(tup)
       ('spam', ('eggs', ('lumberjack', ('knights', ('ni', ('dead', (...)))))))
 
-
-The :mod:`pprint` module also provides several shortcut functions:
-
 .. function:: pformat(object, indent=1, width=80, depth=None, *, \
                       compact=False, sort_dicts=True, underscore_numbers=False)
 
    Return the formatted representation of *object* as a string.  *indent*,
-   *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* will be passed to the
-   :class:`PrettyPrinter` constructor as formatting parameters.
-
-   .. versionchanged:: 3.4
-      Added the *compact* parameter.
-
-   .. versionchanged:: 3.8
-      Added the *sort_dicts* parameter.
-
-   .. versionchanged:: 3.10
-      Added the *underscore_numbers* parameter.
+   *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* are
+   passed to the :class:`PrettyPrinter` constructor as formatting parameters
+   and their meanings are as described in its documentation above.
 
 
 .. function:: pp(object, *args, sort_dicts=False, **kwargs)
@@ -142,20 +136,15 @@ The :mod:`pprint` module also provides several shortcut functions:
                      compact=False, sort_dicts=True, underscore_numbers=False)
 
    Prints the formatted representation of *object* on *stream*, followed by a
-   newline.  If *stream* is ``None``, ``sys.stdout`` is used.  This may be used
+   newline.  If *stream* is ``None``, ``sys.stdout`` is used. This may be used
    in the interactive interpreter instead of the :func:`print` function for
    inspecting values (you can even reassign ``print = pprint.pprint`` for use
-   within a scope).  *indent*, *width*, *depth*, *compact*, *sort_dicts* and *underscore_numbers* will
-   be passed to the :class:`PrettyPrinter` constructor as formatting parameters.
+   within a scope).
 
-   .. versionchanged:: 3.4
-      Added the *compact* parameter.
-
-   .. versionchanged:: 3.8
-      Added the *sort_dicts* parameter.
-
-   .. versionchanged:: 3.10
-      Added the *underscore_numbers* parameter.
+   The configuration parameters *stream*, *indent*, *width*, *depth*,
+   *compact*, *sort_dicts* and *underscore_numbers* are passed to the
+   :class:`PrettyPrinter` constructor and their meanings are as
+   described in its documentation above.
 
       >>> import pprint
       >>> stuff = ['spam', 'eggs', 'lumberjack', 'knights', 'ni']
@@ -168,10 +157,9 @@ The :mod:`pprint` module also provides several shortcut functions:
        'knights',
        'ni']
 
-
 .. function:: isreadable(object)
 
-   .. index:: builtin: eval
+   .. index:: pair: built-in function; eval
 
    Determine if the formatted representation of *object* is "readable", or can be
    used to reconstruct the value using :func:`eval`.  This always returns ``False``
@@ -226,7 +214,7 @@ created.
 
 .. method:: PrettyPrinter.isreadable(object)
 
-   .. index:: builtin: eval
+   .. index:: pair: built-in function; eval
 
    Determine if the formatted representation of the object is "readable," or can be
    used to reconstruct the value using :func:`eval`.  Note that this returns
