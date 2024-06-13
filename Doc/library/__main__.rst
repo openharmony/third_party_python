@@ -124,7 +124,7 @@ This is where using the ``if __name__ == '__main__'`` code block comes in
 handy. Code within this block won't run unless the module is executed in the
 top-level environment.
 
-Putting as few statements as possible in the block below ``if __name___ ==
+Putting as few statements as possible in the block below ``if __name__ ==
 '__main__'`` can improve code clarity and correctness. Most often, a function
 named ``main`` encapsulates the program's primary behavior::
 
@@ -253,13 +253,13 @@ attribute will include the package's path if imported::
 
 This won't work for ``__main__.py`` files in the root directory of a .zip file
 though.  Hence, for consistency, minimal ``__main__.py`` like the :mod:`venv`
-one mentioned above are preferred.
+one mentioned below are preferred.
 
 .. seealso::
 
    See :mod:`venv` for an example of a package with a minimal ``__main__.py``
    in the standard library. It doesn't contain a ``if __name__ == '__main__'``
-   block. You can invoke it with ``python3 -m venv [directory]``.
+   block. You can invoke it with ``python -m venv [directory]``.
 
    See :mod:`runpy` for more details on the :option:`-m` flag to the
    interpreter executable.

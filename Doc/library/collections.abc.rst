@@ -22,7 +22,7 @@
 
 This module provides :term:`abstract base classes <abstract base class>` that
 can be used to test whether a class provides a particular interface; for
-example, whether it is hashable or whether it is a mapping.
+example, whether it is :term:`hashable` or whether it is a mapping.
 
 An :func:`issubclass` or :func:`isinstance` test for an interface works in one
 of three ways.
@@ -300,7 +300,7 @@ Collections Abstract Base Classes -- Detailed Descriptions
 
    .. note::
       In CPython, generator-based coroutines (generators decorated with
-      :func:`types.coroutine` or :func:`asyncio.coroutine`) are
+      :func:`types.coroutine`) are
       *awaitables*, even though they do not have an :meth:`__await__` method.
       Using ``isinstance(gencoro, Awaitable)`` for them will return ``False``.
       Use :func:`inspect.isawaitable` to detect them.
@@ -318,7 +318,7 @@ Collections Abstract Base Classes -- Detailed Descriptions
 
    .. note::
       In CPython, generator-based coroutines (generators decorated with
-      :func:`types.coroutine` or :func:`asyncio.coroutine`) are
+      :func:`types.coroutine`) are
       *awaitables*, even though they do not have an :meth:`__await__` method.
       Using ``isinstance(gencoro, Coroutine)`` for them will return ``False``.
       Use :func:`inspect.isawaitable` to detect them.
@@ -406,7 +406,7 @@ Notes on using :class:`Set` and :class:`MutableSet` as a mixin:
 (3)
    The :class:`Set` mixin provides a :meth:`_hash` method to compute a hash value
    for the set; however, :meth:`__hash__` is not defined because not all sets
-   are hashable or immutable.  To add set hashability using mixins,
+   are :term:`hashable` or immutable.  To add set hashability using mixins,
    inherit from both :meth:`Set` and :meth:`Hashable`, then define
    ``__hash__ = Set._hash``.
 

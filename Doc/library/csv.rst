@@ -383,6 +383,8 @@ Dialects support the following attributes:
    :const:`False`. On reading, the *escapechar* removes any special meaning from
    the following character. It defaults to :const:`None`, which disables escaping.
 
+   .. versionchanged:: 3.11
+      An empty *escapechar* is not allowed.
 
 .. attribute:: Dialect.lineterminator
 
@@ -402,6 +404,8 @@ Dialects support the following attributes:
    as the *delimiter* or *quotechar*, or which contain new-line characters.  It
    defaults to ``'"'``.
 
+   .. versionchanged:: 3.11
+      An empty *quotechar* is not allowed.
 
 .. attribute:: Dialect.quoting
 
@@ -412,7 +416,7 @@ Dialects support the following attributes:
 
 .. attribute:: Dialect.skipinitialspace
 
-   When :const:`True`, whitespace immediately following the *delimiter* is ignored.
+   When :const:`True`, spaces immediately following the *delimiter* are ignored.
    The default is :const:`False`.
 
 
@@ -450,7 +454,7 @@ Reader objects have the following public attributes:
 
 DictReader objects have the following public attribute:
 
-.. attribute:: csvreader.fieldnames
+.. attribute:: DictReader.fieldnames
 
    If not passed as a parameter when creating the object, this attribute is
    initialized upon first access or when the first record is read from the
@@ -538,7 +542,7 @@ The corresponding simplest possible writing example is::
 
 Since :func:`open` is used to open a CSV file for reading, the file
 will by default be decoded into unicode using the system default
-encoding (see :func:`locale.getpreferredencoding`).  To decode a file
+encoding (see :func:`locale.getencoding`).  To decode a file
 using a different encoding, use the ``encoding`` argument of open::
 
    import csv

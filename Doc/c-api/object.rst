@@ -81,8 +81,9 @@ Object Protocol
    return ``0`` on success.  This is the equivalent of the Python statement
    ``o.attr_name = v``.
 
-   If *v* is ``NULL``, the attribute is deleted, however this feature is
-   deprecated in favour of using :c:func:`PyObject_DelAttr`.
+   If *v* is ``NULL``, the attribute is deleted. This behaviour is deprecated
+   in favour of using :c:func:`PyObject_DelAttr`, but there are currently no
+   plans to remove it.
 
 
 .. c:function:: int PyObject_SetAttrString(PyObject *o, const char *attr_name, PyObject *v)
@@ -92,7 +93,7 @@ Object Protocol
    return ``0`` on success.  This is the equivalent of the Python statement
    ``o.attr_name = v``.
 
-   If *v* is ``NULL``, the attribute is deleted, however this feature is
+   If *v* is ``NULL``, the attribute is deleted, but this feature is
    deprecated in favour of using :c:func:`PyObject_DelAttrString`.
 
 
@@ -125,6 +126,14 @@ Object Protocol
    A generic implementation for the getter of a ``__dict__`` descriptor. It
    creates the dictionary if necessary.
 
+   This function may also be called to get the :py:attr:`~object.__dict__`
+   of the object *o*. Pass ``NULL`` for *context* when calling it.
+   Since this function may need to allocate memory for the
+   dictionary, it may be more efficient to call :c:func:`PyObject_GetAttr`
+   when accessing an attribute on the object.
+
+   On failure, returns ``NULL`` with an exception set.
+
    .. versionadded:: 3.3
 
 
@@ -134,6 +143,16 @@ Object Protocol
    implementation does not allow the dictionary to be deleted.
 
    .. versionadded:: 3.3
+
+
+.. c:function:: PyObject** _PyObject_GetDictPtr(PyObject *obj)
+
+   Return a pointer to :py:attr:`~object.__dict__` of the object *obj*.
+   If there is no ``__dict__``, return ``NULL`` without setting an exception.
+
+   This function may need to allocate memory for the
+   dictionary, so it may be more efficient to call :c:func:`PyObject_GetAttr`
+   when accessing an attribute on the object.
 
 
 .. c:function:: PyObject* PyObject_RichCompare(PyObject *o1, PyObject *o2, int opid)
@@ -160,9 +179,18 @@ Object Protocol
    If *o1* and *o2* are the same object, :c:func:`PyObject_RichCompareBool`
    will always return ``1`` for :const:`Py_EQ` and ``0`` for :const:`Py_NE`.
 
+.. c:function:: PyObject* PyObject_Format(PyObject *obj, PyObject *format_spec)
+
+   Format *obj* using *format_spec*. This is equivalent to the Python
+   expression ``format(obj, format_spec)``.
+
+   *format_spec* may be ``NULL``. In this case the call is equivalent
+   to ``format(obj)``.
+   Returns the formatted string on success, ``NULL`` on failure.
+
 .. c:function:: PyObject* PyObject_Repr(PyObject *o)
 
-   .. index:: builtin: repr
+   .. index:: pair: built-in function; repr
 
    Compute a string representation of object *o*.  Returns the string
    representation on success, ``NULL`` on failure.  This is the equivalent of the
@@ -174,7 +202,7 @@ Object Protocol
 
 .. c:function:: PyObject* PyObject_ASCII(PyObject *o)
 
-   .. index:: builtin: ascii
+   .. index:: pair: built-in function; ascii
 
    As :c:func:`PyObject_Repr`, compute a string representation of object *o*, but
    escape the non-ASCII characters in the string returned by
@@ -199,7 +227,7 @@ Object Protocol
 
 .. c:function:: PyObject* PyObject_Bytes(PyObject *o)
 
-   .. index:: builtin: bytes
+   .. index:: pair: built-in function; bytes
 
    Compute a bytes representation of object *o*.  ``NULL`` is returned on
    failure and a bytes object on success.  This is equivalent to the Python
@@ -250,19 +278,19 @@ Object Protocol
 
 .. c:function:: Py_hash_t PyObject_Hash(PyObject *o)
 
-   .. index:: builtin: hash
+   .. index:: pair: built-in function; hash
 
    Compute and return the hash value of an object *o*.  On failure, return ``-1``.
    This is the equivalent of the Python expression ``hash(o)``.
 
    .. versionchanged:: 3.2
       The return type is now Py_hash_t.  This is a signed integer the same size
-      as Py_ssize_t.
+      as :c:type:`Py_ssize_t`.
 
 
 .. c:function:: Py_hash_t PyObject_HashNotImplemented(PyObject *o)
 
-   Set a :exc:`TypeError` indicating that ``type(o)`` is not hashable and return ``-1``.
+   Set a :exc:`TypeError` indicating that ``type(o)`` is not :term:`hashable` and return ``-1``.
    This function receives special treatment when stored in a ``tp_hash`` slot,
    allowing a type to explicitly indicate to the interpreter that it is not
    hashable.
@@ -284,14 +312,14 @@ Object Protocol
 
 .. c:function:: PyObject* PyObject_Type(PyObject *o)
 
-   .. index:: builtin: type
+   .. index:: pair: built-in function; type
 
    When *o* is non-``NULL``, returns a type object corresponding to the object type
    of object *o*. On failure, raises :exc:`SystemError` and returns ``NULL``.  This
    is equivalent to the Python expression ``type(o)``. This function increments the
    reference count of the return value. There's really no reason to use this
-   function instead of the common expression ``o->ob_type``, which returns a
-   pointer of type :c:type:`PyTypeObject*`, except when the incremented reference
+   function instead of the :c:func:`Py_TYPE()` function, which returns a
+   pointer of type :c:expr:`PyTypeObject*`, except when the incremented reference
    count is needed.
 
 
@@ -304,7 +332,7 @@ Object Protocol
 .. c:function:: Py_ssize_t PyObject_Size(PyObject *o)
                Py_ssize_t PyObject_Length(PyObject *o)
 
-   .. index:: builtin: len
+   .. index:: pair: built-in function; len
 
    Return the length of object *o*.  If the object *o* provides either the sequence
    and mapping protocols, the sequence length is returned.  On error, ``-1`` is

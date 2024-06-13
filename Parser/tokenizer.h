@@ -20,7 +20,7 @@ enum decoding_state {
 };
 
 enum interactive_underflow_t {
-    /* Normal mode of operation: return a new token when asked in interactie mode */
+    /* Normal mode of operation: return a new token when asked in interactive mode */
     IUNDERFLOW_NORMAL,
     /* Forcefully return ENDMARKER when asked for a new token in interactive mode. This
      * can be used to prevent the tokenizer to prompt the user for new tokens */
@@ -84,14 +84,15 @@ struct tok_state {
                              NEWLINE token after it. */
     /* How to proceed when asked for a new token in interactive mode */
     enum interactive_underflow_t interactive_underflow;
+    int report_warnings;
 };
 
-extern struct tok_state *PyTokenizer_FromString(const char *, int);
-extern struct tok_state *PyTokenizer_FromUTF8(const char *, int);
-extern struct tok_state *PyTokenizer_FromFile(FILE *, const char*,
+extern struct tok_state *_PyTokenizer_FromString(const char *, int);
+extern struct tok_state *_PyTokenizer_FromUTF8(const char *, int);
+extern struct tok_state *_PyTokenizer_FromFile(FILE *, const char*,
                                               const char *, const char *);
-extern void PyTokenizer_Free(struct tok_state *);
-extern int PyTokenizer_Get(struct tok_state *, const char **, const char **);
+extern void _PyTokenizer_Free(struct tok_state *);
+extern int _PyTokenizer_Get(struct tok_state *, const char **, const char **);
 
 #define tok_dump _Py_tok_dump
 

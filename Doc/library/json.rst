@@ -120,7 +120,7 @@ See :ref:`json-commandline` for detailed documentation.
 
 .. note::
 
-   JSON is a subset of `YAML <http://yaml.org/>`_ 1.2.  The JSON produced by
+   JSON is a subset of `YAML <https://yaml.org/>`_ 1.2.  The JSON produced by
    this module's default settings (in particular, the default *separators*
    value) is also a subset of YAML 1.0 and 1.1.  This module can thus also be
    used as a YAML serializer.
@@ -129,13 +129,6 @@ See :ref:`json-commandline` for detailed documentation.
 
    This module's encoders and decoders preserve input and output order by
    default.  Order is only lost if the underlying containers are unordered.
-
-   Prior to Python 3.7, :class:`dict` was not guaranteed to be ordered, so
-   inputs and outputs were typically scrambled unless
-   :class:`collections.OrderedDict` was specifically requested.  Starting
-   with Python 3.7, the regular :class:`dict` became order preserving, so
-   it is no longer necessary to specify :class:`collections.OrderedDict` for
-   JSON generation and parsing.
 
 
 Basic Usage
@@ -164,7 +157,7 @@ Basic Usage
 
    If *check_circular* is false (default: ``True``), then the circular
    reference check for container types will be skipped and a circular reference
-   will result in an :exc:`RecursionError` (or worse).
+   will result in a :exc:`RecursionError` (or worse).
 
    If *allow_nan* is false (default: ``True``), then it will be a
    :exc:`ValueError` to serialize out of range :class:`float` values (``nan``,
@@ -238,7 +231,7 @@ Basic Usage
    *object_hook* is an optional function that will be called with the result of
    any object literal decoded (a :class:`dict`).  The return value of
    *object_hook* will be used instead of the :class:`dict`.  This feature can be used
-   to implement custom decoders (e.g. `JSON-RPC <http://www.jsonrpc.org>`_
+   to implement custom decoders (e.g. `JSON-RPC <https://www.jsonrpc.org>`_
    class hinting).
 
    *object_pairs_hook* is an optional function that will be called with the
@@ -260,7 +253,7 @@ Basic Usage
    be used to use another datatype or parser for JSON integers
    (e.g. :class:`float`).
 
-   .. versionchanged:: 3.10.7
+   .. versionchanged:: 3.11
       The default *parse_int* of :func:`int` now limits the maximum length of
       the integer string via the interpreter's :ref:`integer string
       conversion length limitation <int_max_str_digits>` to help avoid denial
@@ -344,7 +337,7 @@ Encoders and Decoders
    *object_hook*, if specified, will be called with the result of every JSON
    object decoded and its return value will be used in place of the given
    :class:`dict`.  This can be used to provide custom deserializations (e.g. to
-   support `JSON-RPC <http://www.jsonrpc.org>`_ class hinting).
+   support `JSON-RPC <https://www.jsonrpc.org>`_ class hinting).
 
    *object_pairs_hook*, if specified will be called with the result of every
    JSON object decoded with an ordered list of pairs.  The return value of
@@ -443,7 +436,7 @@ Encoders and Decoders
 
    If *check_circular* is true (the default), then lists, dicts, and custom
    encoded objects will be checked for circular references during encoding to
-   prevent an infinite recursion (which would cause an :exc:`RecursionError`).
+   prevent an infinite recursion (which would cause a :exc:`RecursionError`).
    Otherwise, no such check takes place.
 
    If *allow_nan* is true (the default), then ``NaN``, ``Infinity``, and
