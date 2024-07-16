@@ -4680,7 +4680,7 @@ index c86ed40..e459255 100644
      if (FAILED(PathCchCombineEx(buffer, bufsize, dirname, relfile,
          PATHCCH_ALLOW_LONG_PATHS))) {
          return -1;
-@@ -2193,11 +2212,16 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2195,11 +2214,16 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
      wchar_t *minP2 = path;  // the beginning of the destination range
      wchar_t lastC = L'\0';  // the last ljusted character, p2[-1] in most cases
  
@@ -4699,7 +4699,7 @@ index c86ed40..e459255 100644
  #endif
  #define SEP_OR_END(x) (IS_SEP(x) || IS_END(x))
  
-@@ -2208,7 +2232,7 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2210,7 +2234,7 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
              path++;
          }
          p1 = p2 = minP2 = path;
@@ -4708,7 +4708,7 @@ index c86ed40..e459255 100644
      }
  #ifdef MS_WINDOWS
      // Skip past drive segment and update minP2
-@@ -2222,13 +2246,13 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2224,13 +2248,13 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
      // and network paths, including the first segment.
      else if (IS_SEP(&p1[0]) && IS_SEP(&p1[1])) {
          int sepCount = 2;
@@ -4725,7 +4725,7 @@ index c86ed40..e459255 100644
              } else {
                  *p2++ = lastC = *p1;
              }
-@@ -2245,7 +2269,7 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2243,7 +2267,7 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
          *p2++ = *p1++;
          *p2++ = *p1++;
          minP2 = p2 - 1;  // Absolute path has SEP at minP2
@@ -4734,7 +4734,7 @@ index c86ed40..e459255 100644
      }
  #endif /* MS_WINDOWS */
  
-@@ -2253,18 +2277,18 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2251,18 +2275,18 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
      for (; !IS_END(p1); ++p1) {
          wchar_t c = *p1;
  #ifdef ALTSEP
@@ -4758,7 +4758,7 @@ index c86ed40..e459255 100644
                      if (p2 == minP2
                          || (p3[0] == L'.' && p3[1] == L'.' && IS_SEP(&p3[2])))
                      {
-@@ -2273,7 +2297,7 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2271,7 +2295,7 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
                          *p2++ = L'.';
                          *p2++ = L'.';
                          lastC = L'.';
@@ -4767,7 +4767,7 @@ index c86ed40..e459255 100644
                          // Absolute path, so absorb segment
                          p2 = p3 + 1;
                      } else {
-@@ -2284,7 +2308,7 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2282,7 +2306,7 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
                  } else {
                      *p2++ = lastC = c;
                  }
@@ -4776,7 +4776,7 @@ index c86ed40..e459255 100644
              } else {
                  *p2++ = lastC = c;
              }
-@@ -2294,7 +2318,7 @@ _Py_normpath(wchar_t *path, Py_ssize_t size)
+@@ -2292,7 +2316,7 @@ _Py_normpath_and_size(wchar_t *path, Py_ssize_t size, Py_ssize_t *normsize)
      }
      *p2 = L'\0';
      if (p2 != minP2) {
@@ -4784,7 +4784,7 @@ index c86ed40..e459255 100644
 +        while (--p2 != minP2 && *p2 == sep) {
              *p2 = L'\0';
          }
-     }
+     } else {
 diff --git a/Python/frozenmain.c b/Python/frozenmain.c
 index 8743e08..c6f5f19 100644
 --- a/Python/frozenmain.c
