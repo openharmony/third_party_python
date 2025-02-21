@@ -1,5 +1,5 @@
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
-new file mode 100755
+new file mode 100644
 index 0000000..c2293cb
 --- /dev/null
 +++ b/.github/workflows/build.yml
@@ -499,7 +499,7 @@ index 981c962..ed9e6a7 100644
  /* options */
  /* non-emulated condition variables are provided for those that want
 diff --git a/Include/iscygpty.h b/Include/iscygpty.h
-new file mode 100755
+new file mode 100644
 index 0000000..82fd0af
 --- /dev/null
 +++ b/Include/iscygpty.h
@@ -1462,7 +1462,7 @@ index f603a89..7693d05 100644
  assert all(len(sep) == 1 for sep in path_separators)
  path_sep = path_separators[0]
 diff --git a/Lib/ntpath.py b/Lib/ntpath.py
-index 0444b0f..0bc5956 100644
+index 0246419..7d5c3a5 100644
 --- a/Lib/ntpath.py
 +++ b/Lib/ntpath.py
 @@ -11,9 +11,7 @@
@@ -1667,7 +1667,7 @@ index 0444b0f..0bc5956 100644
          except (OSError, ValueError):
              return _abspath_fallback(path)
  
-@@ -719,6 +731,7 @@ def realpath(path, *, strict=False):
+@@ -731,6 +743,7 @@ def realpath(path, *, strict=False):
                  # strip the prefix anyway.
                  if ex.winerror == initial_winerror:
                      path = spath
@@ -1675,7 +1675,7 @@ index 0444b0f..0bc5956 100644
          return path
  
  
-@@ -729,12 +742,11 @@ def realpath(path, *, strict=False):
+@@ -741,12 +754,11 @@ def realpath(path, *, strict=False):
  def relpath(path, start=None):
      """Return a relative version of a path"""
      path = os.fspath(path)
@@ -1689,7 +1689,7 @@ index 0444b0f..0bc5956 100644
          curdir = '.'
          pardir = '..'
  
-@@ -789,13 +801,11 @@ def commonpath(paths):
+@@ -801,13 +813,11 @@ def commonpath(paths):
          raise ValueError('commonpath() arg is an empty sequence')
  
      paths = tuple(map(os.fspath, paths))
@@ -1802,7 +1802,7 @@ index 69670d9..41b9cf1 100644
      else:
          eof = 'Ctrl-D (i.e. EOF)'
 diff --git a/Lib/ssl.py b/Lib/ssl.py
-index ebac1d6..cac0c37 100644
+index ced87d4..ebb6b6f 100644
 --- a/Lib/ssl.py
 +++ b/Lib/ssl.py
 @@ -254,7 +254,7 @@ class _TLSMessageType:
@@ -2204,19 +2204,10 @@ index d96371d..a75a664 100644
                  # whereas posix_prefix does.
                  if name == 'platlib':
 diff --git a/Lib/venv/__init__.py b/Lib/venv/__init__.py
-index 6bce308..1cd57d0 100644
+index 4403f2b..ab5be51 100644
 --- a/Lib/venv/__init__.py
 +++ b/Lib/venv/__init__.py
-@@ -11,7 +11,7 @@
- import sys
- import sysconfig
- import types
--
-+from sysconfig import _POSIX_BUILD
- 
- CORE_VENV_DEPS = ('pip', 'setuptools')
- logger = logging.getLogger(__name__)
-@@ -301,7 +301,7 @@ def setup_python(self, context):
+@@ -302,7 +302,7 @@ def setup_python(self, context):
                      if not os.path.islink(path):
                          os.chmod(path, 0o755)
          else:
@@ -2225,7 +2216,7 @@ index 6bce308..1cd57d0 100644
                  # For symlinking, we need a complete copy of the root directory
                  # If symlinks fail, you'll get unnecessary copies of files, but
                  # we assume that if you've opted into symlinks on Windows then
-@@ -325,6 +325,12 @@ def setup_python(self, context):
+@@ -326,6 +326,12 @@ def setup_python(self, context):
                  if os.path.lexists(src):
                      copier(src, os.path.join(binpath, suffix))
  
@@ -2238,7 +2229,7 @@ index 6bce308..1cd57d0 100644
              if sysconfig.is_python_build():
                  # copy init.tcl
                  for root, dirs, files in os.walk(context.python_dir):
-@@ -349,6 +355,7 @@ def _call_new_python(self, context, *py_args, **kwargs):
+@@ -350,6 +356,7 @@ def _call_new_python(self, context, *py_args, **kwargs):
          env['VIRTUAL_ENV'] = context.env_dir
          env.pop('PYTHONHOME', None)
          env.pop('PYTHONPATH', None)
@@ -2246,21 +2237,8 @@ index 6bce308..1cd57d0 100644
          kwargs['cwd'] = context.env_dir
          kwargs['executable'] = context.env_exec_cmd
          subprocess.check_output(args, **kwargs)
-diff --git a/Lib/venv/scripts/common/activate b/Lib/venv/scripts/common/activate
-index 6fbc2b8..9c3d58d 100644
---- a/Lib/venv/scripts/common/activate
-+++ b/Lib/venv/scripts/common/activate
-@@ -38,7 +38,7 @@ deactivate () {
- # unset irrelevant variables
- deactivate nondestructive
- 
--VIRTUAL_ENV="__VENV_DIR__"
-+VIRTUAL_ENV=$(cygpath "__VENV_DIR__")
- export VIRTUAL_ENV
- 
- _OLD_VIRTUAL_PATH="$PATH"
 diff --git a/Makefile.pre.in b/Makefile.pre.in
-index 3ea8653..2707d04 100644
+index 3ea8653..e4730eb 100644
 --- a/Makefile.pre.in
 +++ b/Makefile.pre.in
 @@ -39,6 +39,7 @@ CXX=		@CXX@
@@ -2526,7 +2504,7 @@ index 3ea8653..2707d04 100644
  		config.cache config.log pyconfig.h Modules/config.c
  	-rm -rf build platform
 diff --git a/Misc/NEWS.d/3.11.4.rst b/Misc/NEWS.d/3.11.4.rst
-new file mode 100755
+new file mode 100644
 index 0000000..71ed43d
 --- /dev/null
 +++ b/Misc/NEWS.d/3.11.4.rst
@@ -3317,7 +3295,7 @@ index 0000000..71ed43d
 +
 +Fix IDLE test hang on macOS.
 diff --git a/Misc/config_mingw b/Misc/config_mingw
-new file mode 100755
+new file mode 100644
 index 0000000..9be43fd
 --- /dev/null
 +++ b/Misc/config_mingw
@@ -3338,7 +3316,7 @@ index 0000000..9be43fd
 +# force detection of winsock2 functionality - require wxp or newer
 +ac_cv_func_getpeername=yes
 diff --git a/Misc/cross_mingw32 b/Misc/cross_mingw32
-new file mode 100755
+new file mode 100644
 index 0000000..03fde9e
 --- /dev/null
 +++ b/Misc/cross_mingw32
@@ -4021,10 +3999,10 @@ index 6904e3f..5c8708e 100644
  
  
 diff --git a/Modules/posixmodule.c b/Modules/posixmodule.c
-index a01662d..c2362a6 100644
+index 8d09f54..cc668df 100644
 --- a/Modules/posixmodule.c
 +++ b/Modules/posixmodule.c
-@@ -50,6 +50,7 @@
+@@ -55,6 +55,7 @@
  #ifdef __ANDROID__
  #  undef HAVE_FACCESSAT
  #endif
@@ -4032,7 +4010,7 @@ index a01662d..c2362a6 100644
  
  #include <stdio.h>                // ctermid()
  #include <stdlib.h>               // system()
-@@ -350,6 +351,32 @@ corresponding Unix manual entries for more information on calls.");
+@@ -355,6 +356,32 @@ corresponding Unix manual entries for more information on calls.");
  #    define HAVE_CWAIT      1
  #    define HAVE_FSYNC      1
  #    define fsync _commit
@@ -4065,7 +4043,7 @@ index a01662d..c2362a6 100644
  #  endif  /* _MSC_VER */
  #endif  /* ! __WATCOMC__ || __QNX__ */
  
-@@ -428,7 +455,7 @@ extern char        *ctermid_r(char *);
+@@ -433,7 +460,7 @@ extern char        *ctermid_r(char *);
  #  endif
  #endif
  
@@ -4074,7 +4052,7 @@ index a01662d..c2362a6 100644
  #  ifdef HAVE_DIRECT_H
  #    include <direct.h>
  #  endif
-@@ -439,7 +466,7 @@ extern char        *ctermid_r(char *);
+@@ -444,7 +471,7 @@ extern char        *ctermid_r(char *);
  #    include <process.h>
  #  endif
  #  include <malloc.h>
@@ -4083,7 +4061,7 @@ index a01662d..c2362a6 100644
  
  #ifndef MAXPATHLEN
  #  if defined(PATH_MAX) && PATH_MAX > 1024
-@@ -1593,9 +1620,9 @@ win32_get_reparse_tag(HANDLE reparse_point_handle, ULONG *reparse_tag)
+@@ -1598,9 +1625,9 @@ win32_get_reparse_tag(HANDLE reparse_point_handle, ULONG *reparse_tag)
  ** man environ(7).
  */
  #include <crt_externs.h>
@@ -4095,7 +4073,7 @@ index a01662d..c2362a6 100644
  
  static PyObject *
  convertenviron(void)
-@@ -3815,6 +3842,7 @@ posix_getcwd(int use_bytes)
+@@ -3820,6 +3847,7 @@ posix_getcwd(int use_bytes)
          return PyErr_SetFromWindowsErr(0);
      }
  
@@ -4103,7 +4081,7 @@ index a01662d..c2362a6 100644
      PyObject *resobj = PyUnicode_FromWideChar(wbuf2, len);
      if (wbuf2 != wbuf) {
          PyMem_RawFree(wbuf2);
-@@ -4419,6 +4447,7 @@ os__getfinalpathname_impl(PyObject *module, path_t *path)
+@@ -4424,6 +4452,7 @@ os__getfinalpathname_impl(PyObject *module, path_t *path)
          target_path = tmp;
      }
  
@@ -4111,7 +4089,7 @@ index a01662d..c2362a6 100644
      result = PyUnicode_FromWideChar(target_path, result_length);
      if (result && path->narrow) {
          Py_SETREF(result, PyUnicode_EncodeFSDefault(result));
-@@ -5467,7 +5496,7 @@ os_utime_impl(PyObject *module, path_t *path, PyObject *times, PyObject *ns,
+@@ -5507,7 +5536,7 @@ os_utime_impl(PyObject *module, path_t *path, PyObject *times, PyObject *ns,
  /*[clinic end generated code: output=cfcac69d027b82cf input=2fbd62a2f228f8f4]*/
  {
  #ifdef MS_WINDOWS
@@ -4120,7 +4098,7 @@ index a01662d..c2362a6 100644
      FILETIME atime, mtime;
  #else
      int result;
-@@ -10194,7 +10223,7 @@ os_isatty_impl(PyObject *module, int fd)
+@@ -10234,7 +10263,7 @@ os_isatty_impl(PyObject *module, int fd)
      int return_value;
      Py_BEGIN_ALLOW_THREADS
      _Py_BEGIN_SUPPRESS_IPH
@@ -4129,7 +4107,7 @@ index a01662d..c2362a6 100644
      _Py_END_SUPPRESS_IPH
      Py_END_ALLOW_THREADS
      return return_value;
-@@ -14682,7 +14711,7 @@ os__add_dll_directory_impl(PyObject *module, path_t *path)
+@@ -14722,7 +14751,7 @@ os__add_dll_directory_impl(PyObject *module, path_t *path)
         loaded. */
      Py_BEGIN_ALLOW_THREADS
      if (!(hKernel32 = GetModuleHandleW(L"kernel32")) ||
@@ -4138,7 +4116,7 @@ index a01662d..c2362a6 100644
              hKernel32, "AddDllDirectory")) ||
          !(cookie = (*AddDllDirectory)(path->wide))) {
          err = GetLastError();
-@@ -14732,7 +14761,7 @@ os__remove_dll_directory_impl(PyObject *module, PyObject *cookie)
+@@ -14772,7 +14801,7 @@ os__remove_dll_directory_impl(PyObject *module, PyObject *cookie)
         loaded. */
      Py_BEGIN_ALLOW_THREADS
      if (!(hKernel32 = GetModuleHandleW(L"kernel32")) ||
@@ -4589,7 +4567,7 @@ index 5dc4095..fcb7321 100644
  #if !USE_UNICODE_WCHAR_CACHE
          PyMem_Free(wpathname);
 diff --git a/Python/fileutils.c b/Python/fileutils.c
-index c86ed40..e459255 100644
+index b310a6c..c575e5a 100644
 --- a/Python/fileutils.c
 +++ b/Python/fileutils.c
 @@ -1,4 +1,5 @@
@@ -4867,7 +4845,7 @@ index d81cbaf..c54d238 100644
  #else
  #  define PYTHONHOMEHELP "<prefix>/lib/pythonX.X"
 diff --git a/Python/iscygpty.c b/Python/iscygpty.c
-new file mode 100755
+new file mode 100644
 index 0000000..722f88f
 --- /dev/null
 +++ b/Python/iscygpty.c
@@ -6318,7 +6296,7 @@ index 1c25abd..5cf7085 100644
  # substitute multiline block, must come after last PY_STDLIB_MOD()
  AC_SUBST([MODULE_BLOCK])
 diff --git a/mingw_ignorefile.txt b/mingw_ignorefile.txt
-new file mode 100755
+new file mode 100644
 index 0000000..54093f1
 --- /dev/null
 +++ b/mingw_ignorefile.txt
@@ -6366,7 +6344,7 @@ index 0000000..54093f1
 +test.test_logging.SysLogHandlerTest.*
 +test.test_logging.IPv6SysLogHandlerTest.*
 diff --git a/mingw_smoketests.py b/mingw_smoketests.py
-new file mode 100755
+new file mode 100644
 index 0000000..ca1f652
 --- /dev/null
 +++ b/mingw_smoketests.py
