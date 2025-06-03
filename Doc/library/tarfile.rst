@@ -237,6 +237,15 @@ The :mod:`tarfile` module defines the following exceptions:
    Raised to refuse extracting a symbolic link pointing outside the destination
    directory.
 
+.. exception:: LinkFallbackError
+
+   Raised to refuse emulating a link (hard or symbolic) by extracting another
+   archive member, when that member would be rejected by the filter location.
+   The exception that was raised to reject the replacement member is available
+   as :attr:`!BaseException.__context__`.
+
+   .. versionadded:: 3.11.13
+
 
 The following constants are available at the module level:
 
@@ -976,6 +985,10 @@ reused in custom filters:
     to ``None``, so that extraction methods skip setting it.
 
   Return the modified ``TarInfo`` member.
+
+  .. versionchanged:: 3.11.13
+
+     Link targets are now normalized.
 
 
 .. _tarfile-extraction-refuse:

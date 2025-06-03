@@ -374,6 +374,15 @@ the :mod:`glob` module.)
    .. versionchanged:: 3.10
       The *strict* parameter was added.
 
+   .. versionchanged:: 3.11.13
+      The :py:data:`~os.path.ALLOW_MISSING` value for the *strict* parameter
+      was added.
+
+.. data:: ALLOW_MISSING
+
+   Special value used for the *strict* argument in :func:`realpath`.
+
+   .. versionadded:: 3.11.13
 
 .. function:: relpath(path, start=os.curdir)
 
