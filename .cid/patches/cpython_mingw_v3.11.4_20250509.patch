@@ -1,3 +1,108 @@
+From fda6ecc6446980906f83b53e4c8add6d6023a5ba Mon Sep 17 00:00:00 2001
+From: luming <luming29@huawei.com>
+Date: Fri, 9 May 2025 08:45:54 +0800
+Subject: [PATCH] cpython 3.11.4 for mingw
+
+Change-Id: I7ae3759608e3fc26eb2ebef1fb200e46b3add264
+---
+ .github/workflows/build.yml                 | 418 +++++++++++
+ .gitignore                                  |   5 +-
+ Include/bytesobject.h                       |   4 +-
+ Include/fileobject.h                        |   2 +-
+ Include/internal/pycore_condvar.h           |  10 +
+ Include/iscygpty.h                          |  41 +
+ Include/osdefs.h                            |   1 -
+ Include/py_curses.h                         |   7 +
+ Include/pyerrors.h                          |   4 +-
+ Include/pylifecycle.h                       |   9 +
+ Include/pyport.h                            |  41 +-
+ Include/pythread.h                          |   6 +
+ Include/sysmodule.h                         |   4 +-
+ Lib/compileall.py                           |   2 +
+ Lib/ctypes/__init__.py                      |   4 +-
+ Lib/ctypes/util.py                          |   9 +
+ Lib/distutils/ccompiler.py                  |   4 +-
+ Lib/distutils/command/build_ext.py          |  27 +-
+ Lib/distutils/command/install.py            |  10 +-
+ Lib/distutils/cygwinccompiler.py            | 188 ++---
+ Lib/distutils/msvc9compiler.py              |   4 +-
+ Lib/distutils/sysconfig.py                  |  39 +-
+ Lib/distutils/tests/test_cygwinccompiler.py |  36 +-
+ Lib/distutils/unixccompiler.py              |   8 +-
+ Lib/distutils/util.py                       |  42 +-
+ Lib/importlib/_bootstrap_external.py        |   4 +
+ Lib/ntpath.py                               | 108 +--
+ Lib/pathlib.py                              |   2 +
+ Lib/site.py                                 |  38 +-
+ Lib/ssl.py                                  |   4 +-
+ Lib/sysconfig.py                            | 107 ++-
+ Lib/test/__main__.py                        |   8 +
+ Lib/test/test_bytes.py                      |   2 +-
+ Lib/test/test_getpath.py                    |   9 +
+ Lib/test/test_httpservers.py                |   4 +-
+ Lib/test/test_importlib/test_windows.py     |  17 +
+ Lib/test/test_sysconfig.py                  |   8 +-
+ Lib/venv/__init__.py                        |   9 +-
+ Makefile.pre.in                             |  88 ++-
+ Misc/NEWS.d/3.11.4.rst                      | 785 ++++++++++++++++++++
+ Misc/config_mingw                           |  15 +
+ Misc/cross_mingw32                          |  11 +
+ Misc/python-config.sh.in                    |  62 +-
+ Misc/python.pc.in                           |   2 +-
+ Modules/Setup.bootstrap.in                  |  11 +-
+ Modules/_ctypes/_ctypes.c                   |  19 +
+ Modules/_gdbmmodule.c                       |   2 +-
+ Modules/_io/fileio.c                        |   3 +-
+ Modules/_localemodule.c                     |   7 +
+ Modules/_multiprocessing/multiprocessing.c  |   2 +-
+ Modules/_multiprocessing/multiprocessing.h  |   5 +-
+ Modules/_winapi.c                           |   4 +-
+ Modules/_xxsubinterpretersmodule.c          |   2 +-
+ Modules/getpath.c                           |  40 +
+ Modules/getpath.py                          |  81 +-
+ Modules/main.c                              |   3 +-
+ Modules/posixmodule.c                       |  45 +-
+ Modules/selectmodule.c                      |   6 +-
+ Modules/socketmodule.c                      |   8 +-
+ Modules/socketmodule.h                      |   2 +
+ Modules/timemodule.c                        |   2 +-
+ Objects/fileobject.c                        |   3 +-
+ PC/_testconsole.c                           |   4 +-
+ PC/launcher.c                               |  33 +-
+ PC/msvcrtmodule.c                           |   2 +
+ PC/pylauncher.rc                            |  20 +-
+ PC/python3dll.c                             |   8 +
+ PC/python_exe.rc                            |   2 +-
+ PC/pythonw_exe.rc                           |   2 +-
+ PC/winreg.c                                 |  20 +
+ Python/bltinmodule.c                        |   5 +-
+ Python/dynamic_annotations.c                |   2 +-
+ Python/dynload_win.c                        |  24 +-
+ Python/fileutils.c                          |  70 +-
+ Python/frozenmain.c                         |   3 +-
+ Python/getcompiler.c                        |  34 +-
+ Python/initconfig.c                         |   2 +-
+ Python/iscygpty.c                           | 185 +++++
+ Python/pathconfig.c                         | 157 +++-
+ Python/pylifecycle.c                        |   5 +-
+ Python/sysmodule.c                          |   4 +-
+ Python/thread_nt.h                          |   3 +-
+ Python/traceback.c                          |   2 +-
+ configure.ac                                | 545 +++++++++++++-
+ mingw_ignorefile.txt                        |  42 ++
+ mingw_smoketests.py                         | 358 +++++++++
+ pyconfig.h.in                               |   7 +-
+ setup.py                                    | 112 ++-
+ 88 files changed, 3606 insertions(+), 498 deletions(-)
+ create mode 100644 .github/workflows/build.yml
+ create mode 100644 Include/iscygpty.h
+ create mode 100644 Misc/NEWS.d/3.11.4.rst
+ create mode 100644 Misc/config_mingw
+ create mode 100644 Misc/cross_mingw32
+ create mode 100644 Python/iscygpty.c
+ create mode 100644 mingw_ignorefile.txt
+ create mode 100644 mingw_smoketests.py
+
 diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
 new file mode 100644
 index 0000000..c2293cb
@@ -423,7 +528,7 @@ index 0000000..c2293cb
 +    - name: Tests
 +      run: xvfb-run make buildbottest TESTOPTS="-j4 -uall,-cpu"
 diff --git a/.gitignore b/.gitignore
-index 0ddfd71..d42e111 100644
+index 0ddfd71..ea6e3a8 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -114,6 +114,7 @@ PCbuild/win32/
@@ -434,13 +539,14 @@ index 0ddfd71..d42e111 100644
  /config.cache
  /config.log
  /config.status
-@@ -150,6 +151,3 @@ Python/frozen_modules/MANIFEST
+@@ -150,6 +151,4 @@ Python/frozen_modules/MANIFEST
  # Ignore ./python binary on Unix but still look into ./Python/ directory.
  /python
  !/Python/
 -
 -# main branch only: ABI files are not checked/maintained
 -Doc/data/python*.abi
++.cid/*
 diff --git a/Include/bytesobject.h b/Include/bytesobject.h
 index 4c4dc40..cd88bed 100644
 --- a/Include/bytesobject.h
@@ -2238,7 +2344,7 @@ index 4403f2b..ab5be51 100644
          kwargs['executable'] = context.env_exec_cmd
          subprocess.check_output(args, **kwargs)
 diff --git a/Makefile.pre.in b/Makefile.pre.in
-index 3ea8653..e4730eb 100644
+index 3ea8653..2707d04 100644
 --- a/Makefile.pre.in
 +++ b/Makefile.pre.in
 @@ -39,6 +39,7 @@ CXX=		@CXX@
@@ -6740,10 +6846,10 @@ index 75f1d90..3b89b9e 100644
  
  /* Define to `int' if <sys/types.h> doesn't define. */
 diff --git a/setup.py b/setup.py
-index 4f122b6..e4f15d8 100644
+index 4f122b6..bf93153 100644
 --- a/setup.py
 +++ b/setup.py
-@@ -77,9 +77,24 @@ def get_platform():
+@@ -77,9 +77,29 @@ def get_platform():
      return sys.platform
  
  
@@ -6761,15 +6867,20 @@ index 4f122b6..e4f15d8 100644
 +    # set PYTHONLEGACYWINDOWSDLLLOADING to 1 to load DLLs from PATH
 +    # This is needed while building core extensions of Python
 +    os.environ["PYTHONLEGACYWINDOWSDLLLOADING"] = "1"
++    
 +
  CROSS_COMPILING = ("_PYTHON_HOST_PLATFORM" in os.environ)
  HOST_PLATFORM = get_platform()
 -MS_WINDOWS = (HOST_PLATFORM == 'win32')
 +MS_WINDOWS = (HOST_PLATFORM == 'win32' or HOST_PLATFORM == 'mingw')
++
++if MS_WINDOWS:
++    os.environ["PYTHONLEGACYWINDOWSDLLLOADING"] = "1"
++    
  CYGWIN = (HOST_PLATFORM == 'cygwin')
  MACOS = (HOST_PLATFORM == 'darwin')
  AIX = (HOST_PLATFORM.startswith('aix'))
-@@ -687,7 +702,7 @@ def check_extension_import(self, ext):
+@@ -687,7 +707,7 @@ def check_extension_import(self, ext):
      def add_multiarch_paths(self):
          # Debian/Ubuntu multiarch support.
          # https://wiki.ubuntu.com/MultiarchSpec
@@ -6778,7 +6889,7 @@ index 4f122b6..e4f15d8 100644
          if not os.path.exists(self.build_temp):
              os.makedirs(self.build_temp)
          ret = run_command(
-@@ -712,7 +727,7 @@ def add_multiarch_paths(self):
+@@ -712,7 +732,7 @@ def add_multiarch_paths(self):
          opt = ''
          if CROSS_COMPILING:
              opt = '-t' + sysconfig.get_config_var('HOST_GNU_TYPE')
@@ -6787,7 +6898,7 @@ index 4f122b6..e4f15d8 100644
          if not os.path.exists(self.build_temp):
              os.makedirs(self.build_temp)
          ret = run_command(
-@@ -774,7 +789,7 @@ def add_search_path(line):
+@@ -774,7 +794,7 @@ def add_search_path(line):
                  pass
  
      def add_cross_compiling_paths(self):
@@ -6796,7 +6907,7 @@ index 4f122b6..e4f15d8 100644
          if not os.path.exists(self.build_temp):
              os.makedirs(self.build_temp)
          # bpo-38472: With a German locale, GCC returns "gcc-Version 9.1.0
-@@ -796,14 +811,25 @@ def add_cross_compiling_paths(self):
+@@ -796,14 +816,25 @@ def add_cross_compiling_paths(self):
                          elif line.startswith("End of search list"):
                              in_incdirs = False
                          elif (is_gcc or is_clang) and line.startswith("LIBRARY_PATH"):
@@ -6824,7 +6935,7 @@ index 4f122b6..e4f15d8 100644
          finally:
              os.unlink(tmpfile)
  
-@@ -849,10 +875,10 @@ def configure_compiler(self):
+@@ -849,6 +880,7 @@ def configure_compiler(self):
          if not CROSS_COMPILING:
              add_dir_to_list(self.compiler.library_dirs, '/usr/local/lib')
              add_dir_to_list(self.compiler.include_dirs, '/usr/local/include')
@@ -6832,11 +6943,15 @@ index 4f122b6..e4f15d8 100644
          # only change this for cross builds for 3.3, issues on Mageia
          if CROSS_COMPILING:
              self.add_cross_compiling_paths()
--        self.add_multiarch_paths()
-         self.add_ldflags_cppflags()
- 
-     def init_inc_lib_dirs(self):
-@@ -898,7 +924,7 @@ def init_inc_lib_dirs(self):
+@@ -867,7 +899,6 @@ def init_inc_lib_dirs(self):
+                             sysconfig.get_config_var("LIBDIR"))
+             add_dir_to_list(self.compiler.include_dirs,
+                             sysconfig.get_config_var("INCLUDEDIR"))
+-
+         system_lib_dirs = ['/lib64', '/usr/lib64', '/lib', '/usr/lib']
+         system_include_dirs = ['/usr/include']
+         # lib_dirs and inc_dirs are used to search for files;
+@@ -898,7 +929,7 @@ def init_inc_lib_dirs(self):
          if HOST_PLATFORM == 'hp-ux11':
              self.lib_dirs += ['/usr/lib/hpux64', '/usr/lib/hpux32']
  
@@ -6845,7 +6960,30 @@ index 4f122b6..e4f15d8 100644
              # This should work on any unixy platform ;-)
              # If the user has bothered specifying additional -I and -L flags
              # in OPT and LDFLAGS we might as well use them here.
-@@ -970,11 +996,15 @@ def detect_simple_extensions(self):
+@@ -915,7 +946,21 @@ def init_inc_lib_dirs(self):
+             for item in ldflags.split():
+                 if item.startswith('-L'):
+                     self.lib_dirs.append(item[2:])
+-
++            to_remove_inc = ['/usr/include', '/usr/include/x86_64-linux-gnu', '/usr/local/include']
++            for path in to_remove_inc:
++              if path in self.inc_dirs:
++                self.inc_dirs.remove(path)
++                self.compiler.include_dirs.remove(path)
++            to_remove_lib = ['/usr/lib', '/lib', '/usr/lib/x86_64-linux-gnu', '/lib64', '/lib/x86_64-linux-gnu', '/usr/lib64']
++            for path in to_remove_lib:
++              if path in self.lib_dirs:
++                self.lib_dirs.remove(path)
++                self.compiler.library_dirs.remove(path)
++            
++            log.info(f'Print compiler.include_dirs:{self.compiler.include_dirs}')
++            log.info(f'Print compiler.library_dirs:{self.compiler.library_dirs}')
++                
++                
+     def detect_simple_extensions(self):
+         #
+         # The following modules are all pretty straightforward, and compile
+@@ -970,11 +1015,15 @@ def detect_simple_extensions(self):
          # grp(3)
          self.addext(Extension('grp', ['grpmodule.c']))
  
@@ -6863,7 +7001,7 @@ index 4f122b6..e4f15d8 100644
  
          # Memory-mapped files (also works on Win32).
          self.addext(Extension('mmap', ['mmapmodule.c']))
-@@ -1033,12 +1063,15 @@ def detect_test_extensions(self):
+@@ -1033,12 +1082,15 @@ def detect_test_extensions(self):
              ['_xxtestfuzz/_xxtestfuzz.c', '_xxtestfuzz/fuzzer.c']
          ))
  
@@ -6880,7 +7018,7 @@ index 4f122b6..e4f15d8 100644
          if not os.path.exists(self.build_temp):
              os.makedirs(self.build_temp)
          # Determine if readline is already linked against curses or tinfo.
-@@ -1101,6 +1134,8 @@ def detect_readline_curses(self):
+@@ -1101,6 +1153,8 @@ def detect_readline_curses(self):
                  # readline package
                  if find_file('readline/rlconf.h', self.inc_dirs, []) is None:
                      do_readline = False
@@ -6889,7 +7027,7 @@ index 4f122b6..e4f15d8 100644
          if do_readline:
              readline_libs = [readline_lib]
              if readline_termcap_library:
-@@ -1124,8 +1159,7 @@ def detect_readline_curses(self):
+@@ -1124,8 +1178,7 @@ def detect_readline_curses(self):
          panel_library = 'panel'
          if curses_library == 'ncursesw':
              curses_defines.append(('HAVE_NCURSESW', '1'))
@@ -6899,7 +7037,7 @@ index 4f122b6..e4f15d8 100644
              # Bug 1464056: If _curses.so links with ncursesw,
              # _curses_panel.so must link with panelw.
              panel_library = 'panelw'
-@@ -1209,7 +1243,7 @@ def detect_dbm_gdbm(self):
+@@ -1209,7 +1262,7 @@ def detect_dbm_gdbm(self):
              if dbm_args:
                  dbm_order = [arg.split('=')[-1] for arg in dbm_args][-1].split(":")
              else:
@@ -6908,7 +7046,7 @@ index 4f122b6..e4f15d8 100644
              dbmext = None
              for cand in dbm_order:
                  if cand == "ndbm":
-@@ -1282,6 +1316,19 @@ def detect_platform_specific_exts(self):
+@@ -1282,6 +1335,19 @@ def detect_platform_specific_exts(self):
          # macOS-only, needs SystemConfiguration and CoreFoundation framework
          self.addext(Extension('_scproxy', ['_scproxy.c']))
  
@@ -6928,7 +7066,7 @@ index 4f122b6..e4f15d8 100644
      def detect_compress_exts(self):
          # Andrew Kuchling's zlib module.
          self.addext(Extension('zlib', ['zlibmodule.c']))
-@@ -1329,9 +1376,10 @@ def detect_multiprocessing(self):
+@@ -1329,9 +1395,10 @@ def detect_multiprocessing(self):
          if (
              sysconfig.get_config_var('HAVE_SEM_OPEN') and not
              sysconfig.get_config_var('POSIX_SEMAPHORES_NOT_ENABLED')
@@ -6941,7 +7079,7 @@ index 4f122b6..e4f15d8 100644
          self.addext(Extension('_posixshmem', ['_multiprocessing/posixshmem.c']))
  
      def detect_uuid(self):
-@@ -1414,11 +1462,16 @@ def detect_ctypes(self):
+@@ -1414,11 +1481,16 @@ def detect_ctypes(self):
                          include_dirs=include_dirs,
                          extra_compile_args=extra_compile_args,
                          extra_link_args=extra_link_args,
@@ -6960,7 +7098,7 @@ index 4f122b6..e4f15d8 100644
  
          ffi_inc = sysconfig.get_config_var("LIBFFI_INCLUDEDIR")
          ffi_lib = None
-@@ -1568,7 +1621,7 @@ def copy_scripts(self):
+@@ -1568,7 +1640,7 @@ def copy_scripts(self):
              else:
                  newfilename = filename + minoronly
              log.info(f'renaming {filename} to {newfilename}')
@@ -6969,3 +7107,6 @@ index 4f122b6..e4f15d8 100644
              newoutfiles.append(newfilename)
              if filename in updated_files:
                  newupdated_files.append(newfilename)
+-- 
+2.34.1
+
