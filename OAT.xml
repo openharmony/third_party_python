@@ -99,7 +99,9 @@ Note:If the text contains special characters, please escape them according to th
 				<filteritem type="filepath" name="Doc/.*" desc="filter binary file"/>
 				<filteritem type="filepath" name="Lib/test/.*" desc="filter binary file"/>
 				<filteritem type="filepath" name="Mac/.*" desc="filter binary file"/>
+				<filteritem type="filepath" name="Modules/.*" desc="filter binary file"/>
 				<filteritem type="filepath" name="PC/.*" desc="filter binary file"/>
+				<filteritem type="filepath" name="Tools/.*" desc="filter binary file"/>
 			</filefilter>
 		</filefilterlist>
     </oatconfig>
