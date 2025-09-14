@@ -19,7 +19,10 @@ import argparse
 import logging
 import shutil
 from pathlib import Path
-from python_builder import MinGWPythonBuilder, BuildConfig
+from python_builder import BuildConfig
+from darwin_python_builder import DarwinPythonBuilder
+from linux_python_builder import LinuxPythonBuilder
+from mingw_python_builder import MinGWPythonBuilder
 
 
 def main():
@@ -27,8 +30,8 @@ def main():
     parser.add_argument('--repo-root', default='.', help='Repository root directory')
     parser.add_argument('--out-path', default='./out', help='Output directory')
     parser.add_argument('--lldb-py-version', default='3.11.4', help='LLDB Python version')
-    parser.add_argument('--lldb-py-detailed-version', default='3.11.4_20250509', help='LLDB Python detailed version')
-    parser.add_argument('--mingw-triple', default='x86_64-w64-mingw32', help='MinGW triple')
+    parser.add_argument('--target-os', default='linux', help='Target OS')
+    parser.add_argument('--target-arch', default='x86', help='Target architecture')
 
     args = parser.parse_args()
     build_config = BuildConfig(args)
@@ -41,15 +44,20 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
                         filename=build_config.OUT_PATH + '/build.log')
-
+    
     try:
-        mingw_builder = MinGWPythonBuilder(build_config)
-        mingw_builder.build()
-        mingw_builder.prepare_for_package()
-        mingw_builder.package()
-        logging.info("MinGW Python 构建、准备和打包完成。")
+        if args.target_os == 'linux':
+            python_builder = LinuxPythonBuilder(build_config)
+        elif args.target_os == 'mingw':
+            python_builder = MinGWPythonBuilder(build_config)
+        elif args.target_os == 'darwin':
+            python_builder = DarwinPythonBuilder(build_config)
+        else:
+            raise ValueError(f"Unsupported target OS: {args.target_os}")
+        python_builder.build()
+        logging.info("Python 构建、准备和打包完成。")
     except Exception as e:
-        logging.error(f"MinGW 构建过程中发生错误: {str(e)}")
+        logging.exception(f"构建过程中发生错误: {str(e)}")
 
 
 if __name__ == "__main__":
