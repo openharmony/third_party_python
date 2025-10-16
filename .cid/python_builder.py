@@ -21,15 +21,18 @@ from pathlib import Path
 import shutil
 import subprocess
 from typing import List, Mapping
-import binascii
-import glob
+import datetime
+import platform
 import tarfile
+import glob
+import re
+
 
 
 # 配置日志记录
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s',
     handlers=[
         logging.StreamHandler()
     ]
@@ -54,9 +57,12 @@ class BuildConfig:
         self.REPOROOT_DIR = args.repo_root
         self.OUT_PATH = args.out_path
         self.LLDB_PY_VERSION = args.lldb_py_version
-        self.LLDB_PY_DETAILED_VERSION = args.lldb_py_detailed_version
-        self.MINGW_TRIPLE = args.mingw_triple
-
+        self.LLDB_PY_DETAILED_VERSION = f"{args.lldb_py_version}_{datetime.datetime.now().strftime('%Y%m%d')}"
+        self.TARGET_OS = args.target_os
+        self.TARGET_ARCH = args.target_arch
+        self.HOST_OS = platform.system().lower()
+        self.HOST_ARCH = 'x86' if platform.machine().startswith('x86') else 'arm64'
+        self.PACKAGE_NAME = "windows-x86" if args.target_os == "mingw" else f"{args.target_os}-{args.target_arch}"
 
 class PythonBuilder:
     target_platform = ""
@@ -67,17 +73,19 @@ class PythonBuilder:
         self.build_config = build_config
         self.repo_root = Path(build_config.REPOROOT_DIR).resolve()
         self._out_dir = Path(build_config.OUT_PATH).resolve()
+        self._source_dir = self.repo_root / 'third_party' / 'python'
+        self._patch_dir = self._source_dir / '.cid' / 'patches' / build_config.TARGET_OS
+        self._build_dir = self._out_dir / 'python-build'
+        self._deps_dir = self._out_dir / 'python-deps'
+        self._install_dir = self._out_dir / 'python-install' / build_config.PACKAGE_NAME / build_config.LLDB_PY_VERSION
         self._lldb_py_version = build_config.LLDB_PY_VERSION
         self._version = build_config.LLDB_PY_DETAILED_VERSION
         version_parts = self._version.split('.')
+        prebuilt_python_sub_dir = f'{build_config.HOST_OS}-{build_config.HOST_ARCH}'
         self._major_version = version_parts[0]
-        self._source_dir = self.repo_root / 'third_party' / 'python'
-        self._patch_dir = self._source_dir / '.cid' / 'patches'
         self._prebuilts_path = os.path.join(self.repo_root, 'prebuilts')
-        self._prebuilts_python_path = os.path.join(self._prebuilts_path, 'python', 'linux-x86', self._lldb_py_version, 'bin',
+        self._prebuilts_python_path = os.path.join(self._prebuilts_path, 'python', prebuilt_python_sub_dir, 'current', 'bin',
                                                   f'python{self._major_version}')
-        self._install_dir = ""
-        self._clean_patches()
         logging.getLogger(__name__).addHandler(logging.FileHandler(self._out_dir / 'build.log'))
 
     @property
@@ -86,7 +94,7 @@ class PythonBuilder:
 
     @property
     def _cc(self) -> Path:
-        return self._clang_toolchain_dir / 'bin' / 'clang'
+        return Path('/usr/bin/gcc')
 
     @property
     def _cflags(self) -> List[str]:
@@ -98,11 +106,11 @@ class PythonBuilder:
 
     @property
     def _cxx(self) -> Path:
-        return self._clang_toolchain_dir / 'bin' / 'clang++'
+        return Path('/usr/bin/g++')
 
     @property
     def _strip(self) -> Path:
-        return self._clang_toolchain_dir / 'bin' / 'llvm-strip'
+        return Path('/usr/bin/strip')
 
     @property
     def _cxxflags(self) -> List[str]:
@@ -115,39 +123,47 @@ class PythonBuilder:
     @property
     def _env(self) -> Mapping[str, str]:
         env = os.environ.copy()
-        clang_bin_dir = self._clang_toolchain_dir / 'bin'
-
         env.update({
             'CC': str(self._cc),
             'CXX': str(self._cxx),
-            'WINDRES': str(clang_bin_dir / 'llvm-windres'),
-            'AR': str(clang_bin_dir / 'llvm-ar'),
-            'READELF': str(clang_bin_dir / 'llvm-readelf'),
-            'LD': str(clang_bin_dir / 'ld.lld'),
-            'DLLTOOL': str(clang_bin_dir / 'llvm-dlltoo'),
-            'RANLIB': str(clang_bin_dir / 'llvm-ranlib'),
             'STRIP': str(self._strip),
             'CFLAGS': ' '.join(self._cflags),
             'CXXFLAGS': ' '.join(self._cxxflags),
             'LDFLAGS': ' '.join(self._ldflags),
             'RCFLAGS': ' '.join(self._rcflags),
             'CPPFLAGS': ' '.join(self._cflags),
-            'LIBS': '-lffi'
         })
         return env
+    
+    
+    @property
+    def install_dir(self) -> str:
+        return str(self._install_dir)
+    
+    def build(self) -> None:
+        self._logger.info("Starting build process...")
+        self._pre_build()
+        self._build()
+        self._post_build()
 
-    def _configure(self) -> None:
-        self._logger.info("Starting configuration...")
-        return
+    
+    def _pre_build(self) -> None:
+        self._deps_build()
+        if self.build_config.TARGET_OS == "mingw":
+            self._clean_patches()
+            self._apply_patches()
 
+    
     def _clean_patches(self) -> None:
         self._logger.info("Cleaning patches...")
         run_command(['git', 'reset', '--hard', 'HEAD'], cwd=self._source_dir)
         run_command(['git', 'clean', '-df', '--exclude=.cid'], cwd=self._source_dir)
 
-    def _pre_build(self) -> None:
-        self._deps_build()
-        self._apply_patches()
+
+    def _deps_build(self) -> None:
+        self._logger.info("Starting dependency build process...")
+        return
+
 
     def _apply_patches(self) -> None:
       if hasattr(self, '_patch_ignore_file') and self._patch_ignore_file.is_file():
@@ -157,21 +173,20 @@ class PythonBuilder:
       if not self._patch_dir.is_dir():
           self._logger.warning('Patches are not found, skip patching')
           return
-
       for patch in self._patch_dir.iterdir():
-          if patch.is_file() and patch.name in self.patches:
+          if patch.is_file():
               cmd = ['git', 'apply', str(patch)]
               self._logger.info(f"Applying patch: {patch.name}")
               run_command(cmd, cwd=self._source_dir)
 
 
-    def _deps_build(self) -> None:
-        self._logger.info("Starting dependency build process...")
-        return
+    def _build(self):
+        self._prepare_build_dir()
+        self._configure()
+        self._install()
 
-    def build(self) -> None:
-        self._logger.info("Starting build process...")
-        self._pre_build()
+
+    def _prepare_build_dir(self):
         if hasattr(self, '_build_dir') and self._build_dir.exists():
             self._logger.info(f"Removing existing build directory: {self._build_dir}")
             shutil.rmtree(self._build_dir)
@@ -182,53 +197,67 @@ class PythonBuilder:
             self._build_dir.mkdir(parents=True)
         if isinstance(self._install_dir, Path):
             self._install_dir.mkdir(parents=True)
-        self._configure()
-        self._install()
+
+
+    def _configure(self) -> None:
+        self._logger.info("Starting configuration...")
+        return
+
 
     def _install(self) -> None:
         self._logger.info("Starting installation...")
         num_jobs = os.cpu_count() or 8
         cmd = ['make', f'-j{num_jobs}', 'install']
         run_command(cmd, cwd=self._build_dir)
-
+        
+    
+    def _post_build(self) -> None:
+        self._logger.info("Starting post-build...")
+        self._prepare_package()
+        self._package("")
+        
+    
+    def _prepare_package(self) -> None:
+        self._logger.info("Preparing package...")
+        if self.build_config.TARGET_OS != "mingw":
+            self._modify_bin_file_shebang()
+            self._upgrade_pip_and_setuptools()
+        self._clean_bin_dir()
+        self._clean_share_dir()
+        self._clean_lib_dir()
+        self._copy_external_libs()
+        self._strip_libs()
+            
+    
+    
+    def _clean_bin_dir(self) -> None:
+        self._logger.info("ByPass Cleaning bin directory...")
+    
+    
     def _strip_in_place(self, file: Path) -> None:
         self._logger.info(f"Stripping file: {file}")
         cmd = [
             str(self._strip),
+            '-x',
+            '-S',
             str(file),
         ]
         run_command(cmd)
-
-    def _clean_bin_dir(self) -> None:
-        self._logger.info("Cleaning bin directory...")
-        python_bin_dir = self._install_dir / 'bin'
-        if not python_bin_dir.is_dir():
-            return
-
-        windows_suffixes = ('.exe', '.dll')
-        for f in python_bin_dir.iterdir():
-            if f.suffix not in windows_suffixes or f.is_symlink():
-                self._logger.info(f"Removing file: {f}")
-                f.unlink()
-                continue
-            self._strip_in_place(f)
-
-    def _remove_dir(self, dir_path: Path) -> None:
-        if dir_path.is_dir():
-            self._logger.info(f"Removing directory: {dir_path}")
-            shutil.rmtree(dir_path)
+            
 
     def _clean_share_dir(self) -> None:
         self._logger.info("Cleaning share directory...")
         share_dir = self._install_dir / 'share'
         self._remove_dir(share_dir)
 
+
     def _clean_lib_dir(self) -> None:
         self._logger.info("Cleaning lib directory...")
         python_lib_dir = self._install_dir / 'lib'
         pkgconfig_dir = python_lib_dir / 'pkgconfig'
         self._remove_dir(pkgconfig_dir)
-
+    
+    
     def _remove_exclude(self) -> None:
         self._logger.info("Removing excluded files and directories...")
         exclude_dirs_tuple = (
@@ -254,22 +283,66 @@ class PythonBuilder:
                 if item.endswith(exclude_files_tuple):
                     self._logger.info(f"Removing file: {os.path.join(root, item)}")
                     os.remove(os.path.join(root, item))
+    
+    
+    def _strip_libs(self) -> None:
+        so_pattern = re.compile(r'.+\.so(\.\d+)*$')
+        directories = [
+            self._install_dir / 'lib',
+            self._install_dir / 'lib' / 'python3.11' / 'lib-dynload'
+        ]
+        
+        for root_dir in directories:
+            if not root_dir.exists():
+                self._logger.warning(f"Directory not found: {root_dir}")
+                continue
+                
+            for root, _, files in os.walk(root_dir):
+                for item in files:
+                    if so_pattern.match(item):
+                        file_path = os.path.join(root, item)
+                        self._logger.info(f"Stripping file: {file_path}")
+                        self._strip_in_place(file_path)
+    
+    
+    def _package(self, glibc_version="") -> None:
+        self._logger.info("Packaging build...")
+        platform = self.build_config.PACKAGE_NAME
+        if glibc_version: 
+            package_name = f"python-{platform}-GLIBC{glibc_version}-{self._version}.tar.gz"
+        else:
+            package_name = f"python-{platform}-{self._version}.tar.gz"
+        archive = self._out_dir / package_name
+        package_dir = self._out_dir / 'python-install'
+        if archive.exists():
+            self._logger.info(f"Removing existing archive: {archive}")
+            archive.unlink()
+        exclude_dirs = [
+            "lib/python*/config-*",
+            "*.pyc",
+            "__pycache__",
+            "*.pickle",
+            "test",
+            "tests",
+            "tkinker",
+            "turtledemo",
+            "idlelib",
+            "turtle.py",
+            "wininst-*",
+            "bdist_wininst.py",
+            "*.whl"
+        ]
+        cmd = [
+            'tar',
+            '-czf',
+            str(archive),
+        ]
+        for p in exclude_dirs:
+          cmd.append("--exclude")
+          cmd.append(p)
+        cmd += [f.name for f in package_dir.iterdir()]
+        run_command(cmd, cwd=package_dir )
 
-    def _copy_external_libs(self) -> None:
-        self._logger.info("Copying external libraries...")
-        # 定义源文件路径
-        _external_libs = [self._deps_dir / 'ffi' / 'bin' / 'libffi-8.dll', self._clang_toolchain_dir / self.build_config.MINGW_TRIPLE / 'bin' / 'libssp-0.dll']
-        # 定义目标目录
-        target_dir = self._install_dir / 'lib' / 'python3.11' / 'lib-dynload'
-        # 创建目标目录（如果不存在）
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            for lib in _external_libs :
-                # 调用提取的方法拷贝 libffi-8.dll
-                self._copy_file_if_exists(lib, target_dir)
-        except Exception as e:
-            self._logger.error(f"Error copying external libraries: {e}")
 
     def _copy_file_if_exists(self, src_path: Path, dest_dir: Path) -> None:
         """
@@ -283,37 +356,14 @@ class PythonBuilder:
             self._logger.info(f"Copied {src_path} to {dest_dir}")
         else:
             self._logger.warning(f"{src_path} does not exist. Skipping.")
-
-    def _is_elf_file(self, file_path: Path) -> bool:
-        with open(file_path, 'rb') as f:
-            magic_numbers = f.read(4)
-            hex_magic_number = binascii.hexlify(magic_numbers).decode('utf-8')
-            return hex_magic_number == '7f454c46'
-
-    @property
-    def install_dir(self) -> str:
-        return str(self._install_dir)
-
-
-class MinGWPythonBuilder(PythonBuilder):
-    def __init__(self, build_config) -> None:
-        super().__init__(build_config)
-
-        self.target_platform = "x86_64-w64-mingw32"
-        self.patches = [f'cpython_mingw_v{self._version}.patch']
-        self._clang_toolchain_dir = Path(
-            os.path.join(self._prebuilts_path, 'mingw-w64', 'ohos', 'linux-x86_64', 'clang-mingw')).resolve()
-        self._mingw_install_dir = self._clang_toolchain_dir / build_config.MINGW_TRIPLE
-        self._build_dir = self._out_dir / 'python-windows-build'
-        self._install_dir = self._out_dir / 'python-windows-install'
-        self._deps_dir = self._out_dir / 'python-windows-deps'
-        # This file is used to detect whether patches are applied
-        self._patch_ignore_file = self._source_dir / 'mingw_ignorefile.txt'
-
-        for directory in (self._mingw_install_dir, self._source_dir):
-            if not directory.is_dir():
-                raise ValueError(f'No such directory "{directory}"')
-
+    
+    
+    def _remove_dir(self, dir_path: Path) -> None:
+        if dir_path.is_dir():
+            self._logger.info(f"Removing directory: {dir_path}")
+            shutil.rmtree(dir_path)
+    
+    
     def _extract_libffi(self):
         """
         定位 libffi-*.tar.gz 文件，清理输出目录后，将其直接解压到 out/libffi 目录。
@@ -350,119 +400,96 @@ class MinGWPythonBuilder(PythonBuilder):
                 self._logger.error("Failed to get inner directory of libffi tarball.")
                 raise Exception("Failed to get inner directory of libffi tarball.")
         return libffi_inner_dir
+    
 
-    @property
-    def _cflags(self) -> List[str]:
-        cflags = [
-            f'-target {self.target_platform}',
-            f'--sysroot={self._mingw_install_dir}',
-            f'-fstack-protector-strong',
-            f'-I{str(self._deps_dir / "ffi" / "include")}',
-            f'-nostdinc',
-            f'-I{str(self._mingw_install_dir / "include")}',
-            f'-I{str(self._clang_toolchain_dir / "lib" / "clang" / "15.0.4" / "include")}'
-        ]
-        return cflags
+    def _copy_file_or_symlink_target(self, source_path, dest_dir):
+        """
+        拷贝文件到目标目录：
+        - 若源路径是符号链接，则拷贝其指向的实际文件
+        - 若源路径是普通文件，则直接拷贝该文件本身
+        
+        参数:
+            source_path: 源文件或符号链接的路径
+            dest_dir: 拷贝操作的目标目录
+        """
+        # Check if source path exists
+        if not os.path.exists(source_path):
+            self._logger.error(f"Source path does not exist: {source_path}")
+            return
+        
+        # Determine the actual file path to copy
+        if os.path.islink(source_path):
+            # For symbolic links, get the target path
+            actual_path = os.path.realpath(source_path)
+            self._logger.info(f"Symbolic link detected, pointing to: {actual_path}")
+        else:
+            # For regular files, use the source path directly
+            actual_path = source_path
+        
+        # Ensure target directory exists
+        os.makedirs(dest_dir, exist_ok=True)
+        
+        # Perform the copy operation (preserving metadata)
+        shutil.copy2(actual_path, dest_dir)
+        self._logger.info(f"Successfully copied to {os.path.join(dest_dir, os.path.basename(actual_path))}")
+    
+    
+    def _modify_bin_file_shebang(self):
+        self._logger.info("Modify bin file shebang...")
+        python_bin_dir = self._install_dir / 'bin'
+        for file in python_bin_dir.iterdir():
+            self._modify_file_shebang(file)
+    
 
-    @property
-    def _ldflags(self) -> List[str]:
-        ldflags = [
-            f'--sysroot={self._mingw_install_dir}',
-            f'-rtlib=compiler-rt',
-            f'-target {self.target_platform}',
-            f'-lucrt',
-            f'-lucrtbase',
-            f'-fuse-ld=lld',
-            f'-L{str(self._deps_dir / "ffi" / "lib")}',
-        ]
-        return ldflags
+    def _modify_file_shebang(self, file_path):
+        """
+        修改文件中的shebang行，仅校验第一行是否以#!开头
+        
+        参数:
+            file_path: 要修改的文件路径
+        返回:
+            bool: 修改成功返回True，否则返回False
+        """
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            self._logger.error(f"File not found: {file_path}")
+            return False
 
-    @property
-    def _rcflags(self) -> List[str]:
-        return [f'-I{self._mingw_install_dir}/include']
+        # 检查文件是否可读写
+        if not os.access(file_path, os.R_OK | os.W_OK):
+            self._logger.error(f"No read/write permission for file: {file_path}")
+            return False
 
-    def _deps_build(self) -> None:
-        self._logger.info("Starting MinGW dependency build process...")
-        # 调用提取的方法
-        libffi_inner_dir = self._extract_libffi()
+        try:
+            # 读取文件第一行
+            with open(file_path, 'r') as f:
+                first_line = f.readline().rstrip('\n')  # 移除换行符
 
-        env = os.environ.copy()
-        env.update({
-            'CC': "/bin/x86_64-w64-mingw32-gcc",
-            'CXX': "/bin/x86_64-w64-mingw32-g++",
-            'WINDRES': "/bin/x86_64-w64-mingw32-windres",
-            'AR': "/bin/x86_64-w64-mingw32-ar",
-            'READELF': "/bin/x86_64-w64-mingw32-readelf",
-            'LD': "/bin/x86_64-w64-mingw32-ld",
-            'DLLTOOL': "/bin/x86_64-w64-mingw32-dlltool",
-            'RANLIB': "/bin/x86_64-w64-mingw32-gcc-ranlib",
-            'STRIP': "/bin/x86_64-w64-mingw32-strip",
-            'CFLAGS': "--sysroot=/usr/x86_64-w64-mingw32 -fstack-protector-strong",
-            'CXXFLAGS': "--sysroot=/usr/x86_64-w64-mingw32 -fstack-protector-strong",
-            'LDFLAGS': "--sysroot=/usr/x86_64-w64-mingw32",
-            'RCFLAGS': "-I/usr/x86_64-w64-mingw32/include",
-            'CPPFLAGS': "--sysroot=/usr/x86_64-w64-mingw32 -fstack-protector-strong"
-        })
+            # 只校验第一行是否以#!开头
+            if not first_line.startswith('#!'):
+                self._logger.info(f"File does not have a shebang line: {file_path}")
+                return False
+            # 检查是否需要修改
+            else:
+                # 读取所有内容并修改第一行
+                with open(file_path, 'r') as f:
+                    lines = f.readlines()
+                
+                lines[0] = '#!./python3.11\n'
+                
+                # 写回文件
+                with open(file_path, 'w') as f:
+                    f.writelines(lines)
+                
+                self._logger.info(f"Updated shebang in: {file_path}")
+                return True
 
-        configure_cmd = [
-            "./configure",
-            f"--prefix={self._deps_dir / 'ffi'}",
-            "--enable-shared",
-            "--build=x86_64-pc-linux-gnu",
-            "--host=x86_64-w64-mingw32",
-            "--disable-symvers",
-            "--disable-docs"
-        ]
-        run_command(configure_cmd, env=env, cwd=libffi_inner_dir)
-
-        # 执行 make -j16
-        make_cmd = ['make', '-j16']
-        run_command(make_cmd, env=env, cwd=libffi_inner_dir)
-
-        # 执行 make install
-        make_install_cmd = ['make', 'install']
-        run_command(make_install_cmd, env=env, cwd=libffi_inner_dir)
-
-    def _configure(self) -> None:
-        self._logger.info("Starting MinGW configuration...")
-        run_command(['autoreconf', '-vfi'], cwd=self._source_dir)
-        build_platform = subprocess.check_output(
-            ['./config.guess'], cwd=self._source_dir).decode().strip()
-        config_flags = [
-            f'--prefix={self._install_dir}',
-            f'--build={build_platform}',
-            f'--host={self.target_platform}',
-            f'--with-build-python={self._prebuilts_python_path}',
-            '--enable-shared',
-            '--without-ensurepip',
-            '--enable-loadable-sqlite-extensions',
-            '--disable-ipv6',
-            '--with-pydebug',
-            '--with-system-ffi'
-        ]
-        cmd = [str(self._source_dir / 'configure')] + config_flags
-        run_command(cmd, env=self._env, cwd=self._build_dir)
-
-    def prepare_for_package(self) -> None:
-        self._logger.info("Preparing MinGW build for packaging...")
-        self._clean_bin_dir()
-        self._clean_share_dir()
-        self._clean_lib_dir()
-        self._remove_exclude()
-        self._copy_external_libs()
-
-    def package(self) -> None:
-        self._logger.info("Packaging MinGW build...")
-        archive = self._out_dir / f'python-mingw-x86-{self._version}.tar.gz'
-        if archive.exists():
-            self._logger.info(f"Removing existing archive: {archive}")
-            archive.unlink()
-        cmd = [
-            'tar',
-            '-czf',
-            str(archive),
-            '--exclude=__pycache__',
-            '--transform',
-            f's,^,python/windows-x86/{self._lldb_py_version}/,',
-        ] + [f.name for f in self._install_dir.iterdir()]
-        run_command(cmd, cwd=self._install_dir)
+        except Exception as e:
+            self._logger.warning(f"Error updating shebang in {file_path}: {e}")
+    
+    
+    def _upgrade_pip_and_setuptools(self):
+        self._logger.info("Upgrade pip and setuptools...")
+        pip_path = self._install_dir / 'bin' / 'pip3'
+        run_command([str(pip_path), 'install', '--upgrade', 'pip', '--index-url', 'https://mirrors.huaweicloud.com/repository/pypi/simple', '--trusted-host', 'mirrors.huaweicloud.com'], cwd=self._install_dir / 'bin') 
+        run_command([str(pip_path), 'install', '--upgrade', 'setuptools', '--index-url', 'https://mirrors.huaweicloud.com/repository/pypi/simple', '--trusted-host', 'mirrors.huaweicloud.com'], cwd=self._install_dir / 'bin') 
