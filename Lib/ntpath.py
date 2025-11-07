@@ -412,7 +412,8 @@ def expandvars(path):
         rbrace = '}'
         dollar = '$'
         environ = os.environ
-     def repl(m):
+
+    def repl(m):
         lastindex = m.lastindex
         if lastindex is None:
             return m[0]

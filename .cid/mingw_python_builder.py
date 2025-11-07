@@ -53,7 +53,7 @@ class MinGWPythonBuilder(PythonBuilder):
             'LDFLAGS': ' '.join(self._ldflags),
             'RCFLAGS': ' '.join(self._rcflags),
             'CPPFLAGS': ' '.join(self._cflags),
-            'LIBS': '-lffi -lssl -lcrypto'
+            'LIBS': '-lffi'
         })
         return env
 

@@ -255,7 +255,7 @@ def _EndRecData64(fpin, offset, endrec):
         return endrec
     sig, diskno, reloff, disks = struct.unpack(structEndArchive64Locator, data)
     if sig != stringEndArchive64Locator:
-        raise OSError("Unknown I/O error")
+        return endrec
 
     if diskno != 0 or disks > 1:
         raise BadZipFile("zipfiles that span multiple disks are not supported")
