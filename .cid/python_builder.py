@@ -220,8 +220,8 @@ class PythonBuilder:
     def _prepare_package(self) -> None:
         self._logger.info("Preparing package...")
         if self.build_config.TARGET_OS != "mingw":
-            self._modify_bin_file_shebang()
             self._upgrade_pip_and_setuptools()
+            self._modify_bin_file_shebang()
         self._clean_bin_dir()
         self._clean_share_dir()
         self._clean_lib_dir()
