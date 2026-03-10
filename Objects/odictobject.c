@@ -789,6 +789,7 @@ _odict_clear_nodes(PyODictObject *od)
         _odictnode_DEALLOC(node);
         node = next;
     }
+    od->od_state++;
 }
 
 /* There isn't any memory management of nodes past this point. */
@@ -799,24 +800,40 @@ _odict_keys_equal(PyODictObject *a, PyODictObject *b)
 {
     _ODictNode *node_a, *node_b;
 
+    // keep operands' state to detect undesired mutations
+    const size_t state_a = a->od_state;
+    const size_t state_b = b->od_state;
+
     node_a = _odict_FIRST(a);
     node_b = _odict_FIRST(b);
     while (1) {
-        if (node_a == NULL && node_b == NULL)
+        if (node_a == NULL && node_b == NULL) {
             /* success: hit the end of each at the same time */
             return 1;
-        else if (node_a == NULL || node_b == NULL)
+        }
+        else if (node_a == NULL || node_b == NULL) {
             /* unequal length */
             return 0;
+        }
         else {
-            int res = PyObject_RichCompareBool(
-                                            (PyObject *)_odictnode_KEY(node_a),
-                                            (PyObject *)_odictnode_KEY(node_b),
-                                            Py_EQ);
-            if (res < 0)
+            PyObject *key_a = Py_NewRef(_odictnode_KEY(node_a));
+            PyObject *key_b = Py_NewRef(_odictnode_KEY(node_b));
+            int res = PyObject_RichCompareBool(key_a, key_b, Py_EQ);
+            Py_DECREF(key_a);
+            Py_DECREF(key_b);
+            if (res < 0) {
                 return res;
-            else if (res == 0)
+            }
+            else if (a->od_state != state_a || b->od_state != state_b) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "OrderedDict mutated during iteration");
+                return -1;
+            }
+            else if (res == 0) {
+                // This check comes after the check on the state
+                // in order for the exception to be set correctly.
                 return 0;
+            }
 
             /* otherwise it must match, so move on to the next one */
             node_a = _odictnode_NEXT(node_a);
@@ -889,8 +906,7 @@ odict_inplace_or(PyObject *self, PyObject *other)
     if (mutablemapping_update_arg(self, other) < 0) {
         return NULL;
     }
-    Py_INCREF(self);
-    return self;
+    return Py_NewRef(self);
 }
 
 /* tp_as_number */
@@ -1007,8 +1023,7 @@ OrderedDict_setdefault_impl(PyODictObject *self, PyObject *key,
                 return NULL;
             assert(_odict_find_node(self, key) == NULL);
             if (PyODict_SetItem((PyObject *)self, key, default_value) >= 0) {
-                result = default_value;
-                Py_INCREF(result);
+                result = Py_NewRef(default_value);
             }
         }
         else {
@@ -1024,8 +1039,7 @@ OrderedDict_setdefault_impl(PyODictObject *self, PyObject *key,
             result = PyObject_GetItem((PyObject *)self, key);
         }
         else if (PyObject_SetItem((PyObject *)self, key, default_value) >= 0) {
-            result = default_value;
-            Py_INCREF(result);
+            result = Py_NewRef(default_value);
         }
     }
 
@@ -1055,8 +1069,7 @@ _odict_popkey_hash(PyObject *od, PyObject *key, PyObject *failobj,
     else if (value == NULL && !PyErr_Occurred()) {
         /* Apply the fallback value, if necessary. */
         if (failobj) {
-            value = failobj;
-            Py_INCREF(failobj);
+            value = Py_NewRef(failobj);
         }
         else {
             PyErr_SetObject(PyExc_KeyError, key);
@@ -1118,8 +1131,7 @@ OrderedDict_popitem_impl(PyODictObject *self, int last)
     }
 
     node = last ? _odict_LAST(self) : _odict_FIRST(self);
-    key = _odictnode_KEY(node);
-    Py_INCREF(key);
+    key = Py_NewRef(_odictnode_KEY(node));
     value = _odict_popkey_hash((PyObject *)self, key, NULL, _odictnode_HASH(node));
     if (value == NULL)
         return NULL;
@@ -1372,7 +1384,7 @@ static PyObject *
 odict_repr(PyODictObject *self)
 {
     int i;
-    PyObject *pieces = NULL, *result = NULL;
+    PyObject *result = NULL, *dcopy = NULL;
 
     if (PyODict_SIZE(self) == 0)
         return PyUnicode_FromFormat("%s()", _PyType_Name(Py_TYPE(self)));
@@ -1382,57 +1394,17 @@ odict_repr(PyODictObject *self)
         return i > 0 ? PyUnicode_FromString("...") : NULL;
     }
 
-    if (PyODict_CheckExact(self)) {
-        Py_ssize_t count = 0;
-        _ODictNode *node;
-        pieces = PyList_New(PyODict_SIZE(self));
-        if (pieces == NULL)
-            goto Done;
-
-        _odict_FOREACH(self, node) {
-            PyObject *pair;
-            PyObject *key = _odictnode_KEY(node);
-            PyObject *value = _odictnode_VALUE(node, self);
-            if (value == NULL) {
-                if (!PyErr_Occurred())
-                    PyErr_SetObject(PyExc_KeyError, key);
-                goto Done;
-            }
-            pair = PyTuple_Pack(2, key, value);
-            if (pair == NULL)
-                goto Done;
-
-            if (count < PyList_GET_SIZE(pieces))
-                PyList_SET_ITEM(pieces, count, pair);  /* steals reference */
-            else {
-                if (PyList_Append(pieces, pair) < 0) {
-                    Py_DECREF(pair);
-                    goto Done;
-                }
-                Py_DECREF(pair);
-            }
-            count++;
-        }
-        if (count < PyList_GET_SIZE(pieces)) {
-            Py_SET_SIZE(pieces, count);
-        }
-    }
-    else {
-        PyObject *items = PyObject_CallMethodNoArgs(
-                (PyObject *)self, &_Py_ID(items));
-        if (items == NULL)
-            goto Done;
-        pieces = PySequence_List(items);
-        Py_DECREF(items);
-        if (pieces == NULL)
-            goto Done;
+    dcopy = PyDict_Copy((PyObject *)self);
+    if (dcopy == NULL) {
+        goto Done;
     }
 
     result = PyUnicode_FromFormat("%s(%R)",
-                                  _PyType_Name(Py_TYPE(self)), pieces);
+                                  _PyType_Name(Py_TYPE(self)),
+                                  dcopy);
+    Py_DECREF(dcopy);
 
 Done:
-    Py_XDECREF(pieces);
     Py_ReprLeave((PyObject *)self);
     return result;
 }
@@ -1497,8 +1469,7 @@ odict_richcompare(PyObject *v, PyObject *w, int op)
             return NULL;
 
         res = (eq == (op == Py_EQ)) ? Py_True : Py_False;
-        Py_INCREF(res);
-        return res;
+        return Py_NewRef(res);
     } else {
         Py_RETURN_NOTIMPLEMENTED;
     }
@@ -1602,10 +1573,9 @@ _PyODict_SetItem_KnownHash(PyObject *od, PyObject *key, PyObject *value,
         res = _odict_add_new_node((PyODictObject *)od, key, hash);
         if (res < 0) {
             /* Revert setting the value on the dict */
-            PyObject *exc, *val, *tb;
-            PyErr_Fetch(&exc, &val, &tb);
+            PyObject *exc = PyErr_GetRaisedException();
             (void) _PyDict_DelItem_KnownHash(od, key, hash);
-            _PyErr_ChainExceptions(exc, val, tb);
+            _PyErr_ChainExceptions1(exc);
         }
     }
     return res;
@@ -1714,8 +1684,7 @@ odictiter_nextkey(odictiterobject *di)
         di->di_current = NULL;
     }
     else {
-        di->di_current = _odictnode_KEY(node);
-        Py_INCREF(di->di_current);
+        di->di_current = Py_NewRef(_odictnode_KEY(node));
     }
 
     return key;
@@ -1872,12 +1841,10 @@ odictiter_new(PyODictObject *od, int kind)
 
     di->kind = kind;
     node = reversed ? _odict_LAST(od) : _odict_FIRST(od);
-    di->di_current = node ? _odictnode_KEY(node) : NULL;
-    Py_XINCREF(di->di_current);
+    di->di_current = node ? Py_NewRef(_odictnode_KEY(node)) : NULL;
     di->di_size = PyODict_SIZE(od);
     di->di_state = od->od_state;
-    di->di_odict = od;
-    Py_INCREF(od);
+    di->di_odict = (PyODictObject*)Py_NewRef(od);
 
     _PyObject_GC_TRACK(di);
     return (PyObject *)di;

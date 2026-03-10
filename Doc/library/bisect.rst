@@ -1,5 +1,5 @@
-:mod:`bisect` --- Array bisection algorithm
-===========================================
+:mod:`!bisect` --- Array bisection algorithm
+============================================
 
 .. module:: bisect
    :synopsis: Array bisection algorithms for binary searching.
@@ -13,10 +13,16 @@
 
 This module provides support for maintaining a list in sorted order without
 having to sort the list after each insertion.  For long lists of items with
-expensive comparison operations, this can be an improvement over the more common
-approach.  The module is called :mod:`bisect` because it uses a basic bisection
-algorithm to do its work.  The source code may be most useful as a working
-example of the algorithm (the boundary conditions are already right!).
+expensive comparison operations, this can be an improvement over
+linear searches or frequent resorting.
+
+The module is called :mod:`bisect` because it uses a basic bisection
+algorithm to do its work.  Unlike other bisection tools that search for a
+specific value, the functions in this module are designed to locate an
+insertion point. Accordingly, the functions never call an :meth:`~object.__eq__`
+method to determine whether a value has been found.  Instead, the
+functions only call the :meth:`~object.__lt__` method and will return an insertion
+point between values in an array.
 
 .. _bisect functions:
 
@@ -32,16 +38,17 @@ The following functions are provided:
    any existing entries.  The return value is suitable for use as the first
    parameter to ``list.insert()`` assuming that *a* is already sorted.
 
-   The returned insertion point *i* partitions the array *a* into two halves so
-   that ``all(val < x for val in a[lo : i])`` for the left side and
-   ``all(val >= x for val in a[i : hi])`` for the right side.
+   The returned insertion point *ip* partitions the array *a* into two
+   slices such that ``all(elem < x for elem in a[lo : ip])`` is true for the
+   left slice and ``all(elem >= x for elem in a[ip : hi])`` is true for the
+   right slice.
 
    *key* specifies a :term:`key function` of one argument that is used to
    extract a comparison key from each element in the array.  To support
    searching complex records, the key function is not applied to the *x* value.
 
-   If *key* is ``None``, the elements are compared directly with no
-   intervening function call.
+   If *key* is ``None``, the elements are compared directly and
+   no key function is called.
 
    .. versionchanged:: 3.10
       Added the *key* parameter.
@@ -53,16 +60,9 @@ The following functions are provided:
    Similar to :py:func:`~bisect.bisect_left`, but returns an insertion point which comes
    after (to the right of) any existing entries of *x* in *a*.
 
-   The returned insertion point *i* partitions the array *a* into two halves so
-   that ``all(val <= x for val in a[lo : i])`` for the left side and
-   ``all(val > x for val in a[i : hi])`` for the right side.
-
-   *key* specifies a :term:`key function` of one argument that is used to
-   extract a comparison key from each element in the array.  To support
-   searching complex records, the key function is not applied to the *x* value.
-
-   If *key* is ``None``, the elements are compared directly with no
-   intervening function call.
+   The returned insertion point *ip* partitions the array *a* into two slices
+   such that ``all(elem <= x for elem in a[lo : ip])`` is true for the left slice and
+   ``all(elem > x for elem in a[ip : hi])`` is true for the right slice.
 
    .. versionchanged:: 3.10
       Added the *key* parameter.
@@ -73,13 +73,13 @@ The following functions are provided:
    Insert *x* in *a* in sorted order.
 
    This function first runs :py:func:`~bisect.bisect_left` to locate an insertion point.
-   Next, it runs the :meth:`insert` method on *a* to insert *x* at the
+   Next, it runs the :meth:`!insert` method on *a* to insert *x* at the
    appropriate position to maintain sort order.
 
    To support inserting records in a table, the *key* function (if any) is
    applied to *x* for the search step but not for the insertion step.
 
-   Keep in mind that the ``O(log n)`` search is dominated by the slow O(n)
+   Keep in mind that the *O*\ (log *n*) search is dominated by the slow *O*\ (*n*)
    insertion step.
 
    .. versionchanged:: 3.10
@@ -93,13 +93,13 @@ The following functions are provided:
    entries of *x*.
 
    This function first runs :py:func:`~bisect.bisect_right` to locate an insertion point.
-   Next, it runs the :meth:`insert` method on *a* to insert *x* at the
+   Next, it runs the :meth:`!insert` method on *a* to insert *x* at the
    appropriate position to maintain sort order.
 
    To support inserting records in a table, the *key* function (if any) is
    applied to *x* for the search step but not for the insertion step.
 
-   Keep in mind that the ``O(log n)`` search is dominated by the slow O(n)
+   Keep in mind that the *O*\ (log *n*) search is dominated by the slow *O*\ (*n*)
    insertion step.
 
    .. versionchanged:: 3.10
@@ -115,7 +115,7 @@ thoughts in mind:
 * Bisection is effective for searching ranges of values.
   For locating specific values, dictionaries are more performant.
 
-* The *insort()* functions are ``O(n)`` because the logarithmic search step
+* The *insort()* functions are *O*\ (*n*) because the logarithmic search step
   is dominated by the linear time insertion step.
 
 * The search functions are stateless and discard key function results after

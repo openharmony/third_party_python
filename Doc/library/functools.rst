@@ -1,5 +1,5 @@
-:mod:`functools` --- Higher-order functions and operations on callable objects
-==============================================================================
+:mod:`!functools` --- Higher-order functions and operations on callable objects
+===============================================================================
 
 .. module:: functools
    :synopsis: Higher-order functions and operations on callable objects.
@@ -34,7 +34,7 @@ The :mod:`functools` module defines the following functions:
    Returns the same as ``lru_cache(maxsize=None)``, creating a thin
    wrapper around a dictionary lookup for the function arguments.  Because it
    never needs to evict old values, this is smaller and faster than
-   :func:`lru_cache()` with a size limit.
+   :func:`lru_cache` with a size limit.
 
    For example::
 
@@ -91,6 +91,14 @@ The :mod:`functools` module defines the following functions:
    The cached value can be cleared by deleting the attribute.  This
    allows the *cached_property* method to run again.
 
+   The *cached_property* does not prevent a possible race condition in
+   multi-threaded usage. The getter function could run more than once on the
+   same instance, with the latest run setting the cached value. If the cached
+   property is idempotent or otherwise not harmful to run more than once on an
+   instance, this is fine. If synchronization is needed, implement the necessary
+   locking inside the decorated getter function or around the cached property
+   access.
+
    Note, this decorator interferes with the operation of :pep:`412`
    key-sharing dictionaries.  This means that instance dictionaries
    can take more space than usual.
@@ -108,6 +116,13 @@ The :mod:`functools` module defines the following functions:
    :ref:`faq-cache-method-calls` for more details on how this differs from :func:`cached_property`.
 
    .. versionadded:: 3.8
+
+   .. versionchanged:: 3.12
+      Prior to Python 3.12, ``cached_property`` included an undocumented lock to
+      ensure that in multi-threaded usage the getter function was guaranteed to
+      run only once per instance. However, the lock was per-property, not
+      per-instance, which could result in unacceptably high lock contention. In
+      Python 3.12+ this locking is removed.
 
 
 .. function:: cmp_to_key(func)
@@ -179,7 +194,7 @@ The :mod:`functools` module defines the following functions:
    In contrast, the tuple arguments ``('answer', Decimal(42))`` and
    ``('answer', Fraction(42))`` are treated as equivalent.
 
-   The wrapped function is instrumented with a :func:`cache_parameters`
+   The wrapped function is instrumented with a :func:`!cache_parameters`
    function that returns a new :class:`dict` showing the values for *maxsize*
    and *typed*.  This is for information purposes only.  Mutating the values
    has no effect.
@@ -203,7 +218,7 @@ The :mod:`functools` module defines the following functions:
    cache.  See :ref:`faq-cache-method-calls`
 
    An `LRU (least recently used) cache
-   <https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)>`_
+   <https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_Recently_Used_(LRU)>`_
    works best when the most recent calls are the best predictors of upcoming
    calls (for example, the most popular articles on a news server tend to
    change each day).  The cache's size limit assures that the cache does not
@@ -211,15 +226,16 @@ The :mod:`functools` module defines the following functions:
 
    In general, the LRU cache should only be used when you want to reuse
    previously computed values.  Accordingly, it doesn't make sense to cache
-   functions with side-effects, functions that need to create distinct mutable
-   objects on each call, or impure functions such as time() or random().
+   functions with side-effects, functions that need to create
+   distinct mutable objects on each call (such as generators and async functions),
+   or impure functions such as time() or random().
 
    Example of an LRU cache for static web content::
 
         @lru_cache(maxsize=32)
         def get_pep(num):
             'Retrieve text of a Python Enhancement Proposal'
-            resource = 'https://peps.python.org/pep-%04d/' % num
+            resource = f'https://peps.python.org/pep-{num:04d}'
             try:
                 with urllib.request.urlopen(resource) as s:
                     return s.read()
@@ -259,8 +275,8 @@ The :mod:`functools` module defines the following functions:
    .. versionchanged:: 3.8
       Added the *user_function* option.
 
-   .. versionadded:: 3.9
-      Added the function :func:`cache_parameters`
+   .. versionchanged:: 3.9
+      Added the function :func:`!cache_parameters`
 
 .. decorator:: total_ordering
 
@@ -309,7 +325,7 @@ The :mod:`functools` module defines the following functions:
    .. versionadded:: 3.2
 
    .. versionchanged:: 3.4
-      Returning NotImplemented from the underlying comparison function for
+      Returning ``NotImplemented`` from the underlying comparison function for
       unrecognised types is now supported.
 
 .. function:: partial(func, /, *args, **keywords)
@@ -474,6 +490,25 @@ The :mod:`functools` module defines the following functions:
      ...     print(arg.real, arg.imag)
      ...
 
+   For code that dispatches on a collections type (e.g., ``list``), but wants
+   to typehint the items of the collection (e.g., ``list[int]``), the
+   dispatch type should be passed explicitly to the decorator itself with the
+   typehint going into the function definition::
+
+     >>> @fun.register(list)
+     ... def _(arg: list[int], verbose=False):
+     ...     if verbose:
+     ...         print("Enumerate this:")
+     ...     for i, elem in enumerate(arg):
+     ...         print(i, elem)
+
+   .. note::
+
+      At runtime the function will dispatch on an instance of a list regardless
+      of the type contained within the list i.e. ``[1,2,3]`` will be
+      dispatched the same as ``["foo", "bar", "baz"]``. The annotation
+      provided in this example is for static type checkers only and has no
+      runtime impact.
 
    To enable registering :term:`lambdas<lambda>` and pre-existing functions,
    the :func:`register` attribute can also be used in a functional form::
@@ -628,9 +663,11 @@ The :mod:`functools` module defines the following functions:
    attributes of the wrapper function are updated with the corresponding attributes
    from the original function. The default values for these arguments are the
    module level constants ``WRAPPER_ASSIGNMENTS`` (which assigns to the wrapper
-   function's ``__module__``, ``__name__``, ``__qualname__``, ``__annotations__``
-   and ``__doc__``, the documentation string) and ``WRAPPER_UPDATES`` (which
-   updates the wrapper function's ``__dict__``, i.e. the instance dictionary).
+   function's :attr:`~function.__module__`, :attr:`~function.__name__`,
+   :attr:`~function.__qualname__`, :attr:`~function.__annotations__`,
+   :attr:`~function.__type_params__`, and :attr:`~function.__doc__`, the
+   documentation string) and ``WRAPPER_UPDATES`` (which updates the wrapper
+   function's :attr:`~function.__dict__`, i.e. the instance dictionary).
 
    To allow access to the original function for introspection and other purposes
    (e.g. bypassing a caching decorator such as :func:`lru_cache`), this function
@@ -649,19 +686,18 @@ The :mod:`functools` module defines the following functions:
    on the wrapper function). :exc:`AttributeError` is still raised if the
    wrapper function itself is missing any attributes named in *updated*.
 
-   .. versionadded:: 3.2
-      Automatic addition of the ``__wrapped__`` attribute.
-
-   .. versionadded:: 3.2
-      Copying of the ``__annotations__`` attribute by default.
-
    .. versionchanged:: 3.2
+      The ``__wrapped__`` attribute is now automatically added.
+      The :attr:`~function.__annotations__` attribute is now copied by default.
       Missing attributes no longer trigger an :exc:`AttributeError`.
 
    .. versionchanged:: 3.4
       The ``__wrapped__`` attribute now always refers to the wrapped
       function, even if that function defined a ``__wrapped__`` attribute.
       (see :issue:`17482`)
+
+   .. versionchanged:: 3.12
+      The :attr:`~function.__type_params__` attribute is now copied by default.
 
 
 .. decorator:: wraps(wrapped, assigned=WRAPPER_ASSIGNMENTS, updated=WRAPPER_UPDATES)
@@ -723,9 +759,10 @@ have three read-only attributes:
    The keyword arguments that will be supplied when the :class:`partial` object is
    called.
 
-:class:`partial` objects are like :class:`function` objects in that they are
-callable, weak referencable, and can have attributes.  There are some important
-differences.  For instance, the :attr:`~definition.__name__` and :attr:`__doc__` attributes
+:class:`partial` objects are like :ref:`function objects <user-defined-funcs>`
+in that they are callable, weak referenceable, and can have attributes.
+There are some important differences.  For instance, the
+:attr:`~function.__name__` and :attr:`function.__doc__` attributes
 are not created automatically.  Also, :class:`partial` objects defined in
 classes behave like static methods and do not transform into bound methods
 during instance attribute look-up.

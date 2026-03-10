@@ -2,7 +2,6 @@ import collections
 import configparser
 import io
 import os
-import pathlib
 import textwrap
 import unittest
 import warnings
@@ -114,7 +113,7 @@ class BasicTestCase(CfgParserTestCaseClass):
 
         # The use of spaces in the section names serves as a
         # regression test for SourceForge bug #583248:
-        # http://www.python.org/sf/583248
+        # https://bugs.python.org/issue583248
 
         # API access
         eq(cf.get('Foo Bar', 'foo'), 'bar1')
@@ -544,7 +543,7 @@ boolean {0[0]} NO
                                 "[Foo]\n  wrong-indent\n")
             self.assertEqual(e.args, ('<???>',))
             # read_file on a real file
-            tricky = support.findfile("cfgparser.3")
+            tricky = support.findfile("cfgparser.3", subdir="configdata")
             if self.delimiters[0] == '=':
                 error = configparser.ParsingError
                 expected = (tricky,)
@@ -647,6 +646,21 @@ boolean {0[0]} NO
                                      "'opt' in section 'Bar' already exists")
             self.assertEqual(e.args, ("Bar", "opt", "<dict>", None))
 
+    def test_get_after_duplicate_option_error(self):
+        cf = self.newconfig()
+        ini = textwrap.dedent("""\
+            [Foo]
+            x{equals}1
+            y{equals}2
+            y{equals}3
+        """.format(equals=self.delimiters[0]))
+        if self.strict:
+            with self.assertRaises(configparser.DuplicateOptionError):
+                cf.read_string(ini)
+        else:
+            cf.read_string(ini)
+        self.assertEqual(cf.get('Foo', 'x'), '1')
+
     def test_write(self):
         config_string = (
             "[Long Line]\n"
@@ -718,7 +732,7 @@ boolean {0[0]} NO
     def test_read_returns_file_list(self):
         if self.delimiters[0] != '=':
             self.skipTest('incompatible format')
-        file1 = support.findfile("cfgparser.1")
+        file1 = support.findfile("cfgparser.1", subdir="configdata")
         # check when we pass a mix of readable and non-readable files:
         cf = self.newconfig()
         parsed_files = cf.read([file1, "nonexistent-file"], encoding="utf-8")
@@ -731,12 +745,12 @@ boolean {0[0]} NO
         self.assertEqual(cf.get("Foo Bar", "foo"), "newbar")
         # check when we pass only a Path object:
         cf = self.newconfig()
-        parsed_files = cf.read(pathlib.Path(file1), encoding="utf-8")
+        parsed_files = cf.read(os_helper.FakePath(file1), encoding="utf-8")
         self.assertEqual(parsed_files, [file1])
         self.assertEqual(cf.get("Foo Bar", "foo"), "newbar")
         # check when we passed both a filename and a Path object:
         cf = self.newconfig()
-        parsed_files = cf.read([pathlib.Path(file1), file1], encoding="utf-8")
+        parsed_files = cf.read([os_helper.FakePath(file1), file1], encoding="utf-8")
         self.assertEqual(parsed_files, [file1, file1])
         self.assertEqual(cf.get("Foo Bar", "foo"), "newbar")
         # check when we pass only missing files:
@@ -751,7 +765,7 @@ boolean {0[0]} NO
     def test_read_returns_file_list_with_bytestring_path(self):
         if self.delimiters[0] != '=':
             self.skipTest('incompatible format')
-        file1_bytestring = support.findfile("cfgparser.1").encode()
+        file1_bytestring = support.findfile("cfgparser.1", subdir="configdata").encode()
         # check when passing an existing bytestring path
         cf = self.newconfig()
         parsed_files = cf.read(file1_bytestring, encoding="utf-8")
@@ -932,7 +946,7 @@ class ConfigParserTestCase(BasicTestCase, unittest.TestCase):
                                  ('name', 'value')])
 
     def test_safe_interpolation(self):
-        # See http://www.python.org/sf/511737
+        # See https://bugs.python.org/issue511737
         cf = self.fromstring("[section]\n"
                              "option1{eq}xxx\n"
                              "option2{eq}%(option1)s/xxx\n"
@@ -1161,7 +1175,7 @@ class RawConfigParserTestSambaConf(CfgParserTestCaseClass, unittest.TestCase):
     empty_lines_in_values = False
 
     def test_reading(self):
-        smbconf = support.findfile("cfgparser.2")
+        smbconf = support.findfile("cfgparser.2", subdir="configdata")
         # check when we pass a mix of readable and non-readable files:
         cf = self.newconfig()
         parsed_files = cf.read([smbconf, "nonexistent-file"], encoding='utf-8')
@@ -1356,7 +1370,7 @@ class ConfigParserTestCaseTrickyFile(CfgParserTestCaseClass, unittest.TestCase):
     allow_no_value = True
 
     def test_cfgparser_dot_3(self):
-        tricky = support.findfile("cfgparser.3")
+        tricky = support.findfile("cfgparser.3", subdir="configdata")
         cf = self.newconfig()
         self.assertEqual(len(cf.read(tricky, encoding='utf-8')), 1)
         self.assertEqual(cf.sections(), ['strange',
@@ -1388,7 +1402,7 @@ class ConfigParserTestCaseTrickyFile(CfgParserTestCaseClass, unittest.TestCase):
         self.assertEqual(cf.get('more interpolation', 'lets'), 'go shopping')
 
     def test_unicode_failure(self):
-        tricky = support.findfile("cfgparser.3")
+        tricky = support.findfile("cfgparser.3", subdir="configdata")
         cf = self.newconfig()
         with self.assertRaises(UnicodeDecodeError):
             cf.read(tricky, encoding='ascii')
@@ -1489,7 +1503,7 @@ class CopyTestCase(BasicTestCase, unittest.TestCase):
 
 class FakeFile:
     def __init__(self):
-        file_path = support.findfile("cfgparser.1")
+        file_path = support.findfile("cfgparser.1", subdir="configdata")
         with open(file_path, encoding="utf-8") as f:
             self.lines = f.readlines()
             self.lines.reverse()
@@ -1510,7 +1524,7 @@ def readline_generator(f):
 
 class ReadFileTestCase(unittest.TestCase):
     def test_file(self):
-        file_paths = [support.findfile("cfgparser.1")]
+        file_paths = [support.findfile("cfgparser.1", subdir="configdata")]
         try:
             file_paths.append(file_paths[0].encode('utf8'))
         except UnicodeEncodeError:
@@ -1612,23 +1626,12 @@ class CoverageOneHundredTestCase(unittest.TestCase):
         self.assertEqual(error.section, 'section')
 
     def test_parsing_error(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             configparser.ParsingError()
-        self.assertEqual(str(cm.exception), "Required argument `source' not "
-                                            "given.")
-        with self.assertRaises(ValueError) as cm:
-            configparser.ParsingError(source='source', filename='filename')
-        self.assertEqual(str(cm.exception), "Cannot specify both `filename' "
-                                            "and `source'. Use `source'.")
-        error = configparser.ParsingError(filename='source')
+        error = configparser.ParsingError(source='source')
         self.assertEqual(error.source, 'source')
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always", DeprecationWarning)
-            self.assertEqual(error.filename, 'source')
-            error.filename = 'filename'
-            self.assertEqual(error.source, 'filename')
-        for warning in w:
-            self.assertTrue(warning.category is DeprecationWarning)
+        error = configparser.ParsingError('source')
+        self.assertEqual(error.source, 'source')
 
     def test_interpolation_validation(self):
         parser = configparser.ConfigParser()
@@ -1646,27 +1649,6 @@ class CoverageOneHundredTestCase(unittest.TestCase):
             parser['section']['invalid_reference']
         self.assertEqual(str(cm.exception), "bad interpolation variable "
                                             "reference '%(()'")
-
-    def test_readfp_deprecation(self):
-        sio = io.StringIO("""
-        [section]
-        option = value
-        """)
-        parser = configparser.ConfigParser()
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always", DeprecationWarning)
-            parser.readfp(sio, filename='StringIO')
-        for warning in w:
-            self.assertTrue(warning.category is DeprecationWarning)
-        self.assertEqual(len(parser), 2)
-        self.assertEqual(parser['section']['option'], 'value')
-
-    def test_safeconfigparser_deprecation(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always", DeprecationWarning)
-            parser = configparser.SafeConfigParser()
-        for warning in w:
-            self.assertTrue(warning.category is DeprecationWarning)
 
     def test_legacyinterpolation_deprecation(self):
         with warnings.catch_warnings(record=True) as w:
@@ -1841,7 +1823,7 @@ class ExceptionPicklingTestCase(unittest.TestCase):
             self.assertEqual(e1.source, e2.source)
             self.assertEqual(e1.errors, e2.errors)
             self.assertEqual(repr(e1), repr(e2))
-        e1 = configparser.ParsingError(filename='filename')
+        e1 = configparser.ParsingError('filename')
         e1.append(1, 'line1')
         e1.append(2, 'line2')
         e1.append(3, 'line3')

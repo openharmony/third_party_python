@@ -1,4 +1,4 @@
-This is Python version 3.11.13
+This is Python version 3.12.10
 ==============================
 
 .. image:: https://github.com/python/cpython/workflows/Tests/badge.svg
@@ -14,7 +14,7 @@ This is Python version 3.11.13
    :target: https://discuss.python.org/
 
 
-Copyright © 2001-2023 Python Software Foundation.  All rights reserved.
+Copyright © 2001-2024 Python Software Foundation.  All rights reserved.
 
 See the end of this file for further copyright and license information.
 
@@ -64,7 +64,7 @@ the executable is called ``python.exe``; elsewhere it's just ``python``.
 Building a complete Python installation requires the use of various
 additional third-party libraries, depending on your build platform and
 configure options.  Not all standard library modules are buildable or
-useable on all platforms.  Refer to the
+usable on all platforms.  Refer to the
 `Install dependencies <https://devguide.python.org/getting-started/setup-building.html#build-dependencies>`_
 section of the `Developer Guide`_ for current detailed information on
 dependencies for various Linux distributions and macOS.
@@ -133,7 +133,7 @@ What's New
 ----------
 
 We have a comprehensive overview of the changes in the `What's New in Python
-3.11 <https://docs.python.org/3.11/whatsnew/3.11.html>`_ document.  For a more
+3.12 <https://docs.python.org/3.12/whatsnew/3.12.html>`_ document.  For a more
 detailed change log, read `Misc/NEWS
 <https://github.com/python/cpython/tree/main/Misc/NEWS.d>`_, but a full
 accounting of changes can only be gleaned from the `commit history
@@ -146,7 +146,7 @@ entitled "Installing multiple versions".
 Documentation
 -------------
 
-`Documentation for Python 3.11 <https://docs.python.org/3.11/>`_ is online,
+`Documentation for Python 3.12 <https://docs.python.org/3.12/>`_ is online,
 updated daily.
 
 It can also be downloaded in many formats for faster access.  The documentation
@@ -156,15 +156,6 @@ formatting requirements.
 
 For information about building Python's documentation, refer to `Doc/README.rst
 <https://github.com/python/cpython/blob/main/Doc/README.rst>`_.
-
-
-Converting From Python 2.x to 3.x
----------------------------------
-
-Significant backward incompatible changes were made for the release of Python
-3.0, which may cause programs written for Python 2 to fail when run with Python
-3.  For more information about porting your code from Python 2 to Python 3, see
-the `Porting HOWTO <https://docs.python.org/3/howto/pyporting.html>`_.
 
 
 Testing
@@ -206,46 +197,22 @@ intend to install multiple versions using the same prefix you must decide which
 version (if any) is your "primary" version.  Install that version using ``make
 install``.  Install all other versions using ``make altinstall``.
 
-For example, if you want to install Python 2.7, 3.6, and 3.11 with 3.11 being the
-primary version, you would execute ``make install`` in your 3.11 build directory
+For example, if you want to install Python 2.7, 3.6, and 3.12 with 3.12 being the
+primary version, you would execute ``make install`` in your 3.12 build directory
 and ``make altinstall`` in the others.
-
-
-Issue Tracker and Mailing List
-------------------------------
-
-Bug reports are welcome!  You can use Github to `report bugs
-<https://github.com/python/cpython/issues>`_, and/or `submit pull requests
-<https://github.com/python/cpython/pulls>`_.
-
-You can also follow development discussion on the `python-dev mailing list
-<https://mail.python.org/mailman/listinfo/python-dev/>`_.
-
-
-Proposals for enhancement
--------------------------
-
-If you have a proposal to change Python, you may want to send an email to the
-`comp.lang.python`_ or `python-ideas`_ mailing lists for initial feedback.  A
-Python Enhancement Proposal (PEP) may be submitted if your idea gains ground.
-All current PEPs, as well as guidelines for submitting a new PEP, are listed at
-`peps.python.org <https://peps.python.org/>`_.
-
-.. _python-ideas: https://mail.python.org/mailman/listinfo/python-ideas/
-.. _comp.lang.python: https://mail.python.org/mailman/listinfo/python-list
 
 
 Release Schedule
 ----------------
 
-See :pep:`664` for Python 3.11 release details.
+See :pep:`693` for Python 3.12 release details.
 
 
 Copyright and License Information
 ---------------------------------
 
 
-Copyright © 2001-2023 Python Software Foundation.  All rights reserved.
+Copyright © 2001-2024 Python Software Foundation.  All rights reserved.
 
 Copyright © 2000 BeOpen.com.  All rights reserved.
 

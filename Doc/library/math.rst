@@ -1,5 +1,5 @@
-:mod:`math` --- Mathematical functions
-======================================
+:mod:`!math` --- Mathematical functions
+=======================================
 
 .. module:: math
    :synopsis: Mathematical functions (sin() etc.).
@@ -84,7 +84,8 @@ Number-theoretic and representation functions
 
 .. function:: fmod(x, y)
 
-   Return ``fmod(x, y)``, as defined by the platform C library. Note that the
+   Return the floating-point remainder of ``x / y``,
+   as defined by the platform C library function ``fmod(x, y)``. Note that the
    Python expression ``x % y`` may not return the same result.  The intent of the C
    standard is that ``fmod(x, y)`` be exactly (mathematically; to infinite
    precision) equal to ``x - n*y`` for some integer *n* such that the result has
@@ -107,13 +108,8 @@ Number-theoretic and representation functions
 
 .. function:: fsum(iterable)
 
-   Return an accurate floating point sum of values in the iterable.  Avoids
-   loss of precision by tracking multiple intermediate partial sums::
-
-        >>> sum([.1, .1, .1, .1, .1, .1, .1, .1, .1, .1])
-        0.9999999999999999
-        >>> fsum([.1, .1, .1, .1, .1, .1, .1, .1, .1, .1])
-        1.0
+   Return an accurate floating-point sum of values in the iterable.  Avoids
+   loss of precision by tracking multiple intermediate partial sums.
 
    The algorithm's accuracy depends on IEEE-754 arithmetic guarantees and the
    typical case where the rounding mode is half-even.  On some non-Windows
@@ -122,8 +118,8 @@ Number-theoretic and representation functions
    least significant bit.
 
    For further discussion and two alternative approaches, see the `ASPN cookbook
-   recipes for accurate floating point summation
-   <https://code.activestate.com/recipes/393090/>`_\.
+   recipes for accurate floating-point summation
+   <https://code.activestate.com/recipes/393090-binary-floating-point-summation-accurate-to-full-p/>`_\.
 
 
 .. function:: gcd(*integers)
@@ -147,19 +143,21 @@ Number-theoretic and representation functions
    ``False`` otherwise.
 
    Whether or not two values are considered close is determined according to
-   given absolute and relative tolerances.
+   given absolute and relative tolerances.  If no errors occur, the result will
+   be: ``abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)``.
 
    *rel_tol* is the relative tolerance -- it is the maximum allowed difference
    between *a* and *b*, relative to the larger absolute value of *a* or *b*.
    For example, to set a tolerance of 5%, pass ``rel_tol=0.05``.  The default
    tolerance is ``1e-09``, which assures that the two values are the same
-   within about 9 decimal digits.  *rel_tol* must be greater than zero.
+   within about 9 decimal digits.  *rel_tol* must be nonnegative and less
+   than ``1.0``.
 
-   *abs_tol* is the minimum absolute tolerance -- useful for comparisons near
-   zero. *abs_tol* must be at least zero.
-
-   If no errors occur, the result will be:
-   ``abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)``.
+   *abs_tol* is the absolute tolerance; it defaults to ``0.0`` and it must be
+   nonnegative.  When comparing ``x`` to ``0.0``, ``isclose(x, 0)`` is computed
+   as ``abs(x) <= rel_tol  * abs(x)``, which is ``False`` for any nonzero ``x`` and
+   *rel_tol* less than ``1.0``.  So add an appropriate positive *abs_tol* argument
+   to the call.
 
    The IEEE 754 special values of ``NaN``, ``inf``, and ``-inf`` will be
    handled according to IEEE rules.  Specifically, ``NaN`` is not considered
@@ -229,11 +227,11 @@ Number-theoretic and representation functions
    of *x* and are floats.
 
 
-.. function:: nextafter(x, y)
+.. function:: nextafter(x, y, steps=1)
 
-   Return the next floating-point value after *x* towards *y*.
+   Return the floating-point value *steps* steps after *x* towards *y*.
 
-   If *x* is equal to *y*, return *y*.
+   If *x* is equal to *y*, return *y*, unless *steps* is zero.
 
    Examples:
 
@@ -246,6 +244,9 @@ Number-theoretic and representation functions
 
    .. versionadded:: 3.9
 
+   .. versionchanged:: 3.12
+      Added the *steps* argument.
+
 .. function:: perm(n, k=None)
 
    Return the number of ways to choose *k* items from *n* items
@@ -254,7 +255,7 @@ Number-theoretic and representation functions
    Evaluates to ``n! / (n - k)!`` when ``k <= n`` and evaluates
    to zero when ``k > n``.
 
-   If *k* is not specified or is None, then *k* defaults to *n*
+   If *k* is not specified or is ``None``, then *k* defaults to *n*
    and the function returns ``n!``.
 
    Raises :exc:`TypeError` if either of the arguments are not integers.
@@ -290,10 +291,26 @@ Number-theoretic and representation functions
    If the result of the remainder operation is zero, that zero will have
    the same sign as *x*.
 
-   On platforms using IEEE 754 binary floating-point, the result of this
+   On platforms using IEEE 754 binary floating point, the result of this
    operation is always exactly representable: no rounding error is introduced.
 
    .. versionadded:: 3.7
+
+
+.. function:: sumprod(p, q)
+
+   Return the sum of products of values from two iterables *p* and *q*.
+
+   Raises :exc:`ValueError` if the inputs do not have the same length.
+
+   Roughly equivalent to::
+
+       sum(itertools.starmap(operator.mul, zip(p, q, strict=True)))
+
+   For float and mixed int/float inputs, the intermediate products
+   and sums are computed with extended precision.
+
+   .. versionadded:: 3.12
 
 
 .. function:: trunc(x)
@@ -371,7 +388,7 @@ Power and logarithmic functions
    logarithms.  For small floats *x*, the subtraction in ``exp(x) - 1``
    can result in a `significant loss of precision
    <https://en.wikipedia.org/wiki/Loss_of_significance>`_\; the :func:`expm1`
-   function provides a way to compute this quantity to full precision::
+   function provides a way to compute this quantity to full precision:
 
       >>> from math import exp, expm1
       >>> exp(1e-5) - 1  # gives result accurate to 11 places
@@ -534,7 +551,7 @@ Angular conversion
 Hyperbolic functions
 --------------------
 
-`Hyperbolic functions <https://en.wikipedia.org/wiki/Hyperbolic_function>`_
+`Hyperbolic functions <https://en.wikipedia.org/wiki/Hyperbolic_functions>`_
 are analogs of trigonometric functions that are based on hyperbolas
 instead of circles.
 
@@ -578,7 +595,7 @@ Special functions
 
    The :func:`erf` function can be used to compute traditional statistical
    functions such as the `cumulative standard normal distribution
-   <https://en.wikipedia.org/wiki/Normal_distribution#Cumulative_distribution_functions>`_::
+   <https://en.wikipedia.org/wiki/Cumulative_distribution_function>`_::
 
      def phi(x):
          'Cumulative distribution function for the standard normal distribution'
@@ -654,7 +671,7 @@ Constants
    not considered to equal to any other numeric value, including themselves. To check
    whether a number is a NaN, use the :func:`isnan` function to test
    for NaNs instead of ``is`` or ``==``.
-   Example::
+   Example:
 
       >>> import math
       >>> math.nan == math.nan
@@ -666,10 +683,10 @@ Constants
       >>> math.isnan(float('nan'))
       True
 
+   .. versionadded:: 3.5
+
    .. versionchanged:: 3.11
       It is now always available.
-
-   .. versionadded:: 3.5
 
 
 .. impl-detail::

@@ -35,7 +35,6 @@ except ImportError:
     from urllib2 import urlopen, HTTPError
 import re
 import shutil
-import string
 import subprocess
 import sys
 import tarfile
@@ -44,12 +43,14 @@ import tarfile
 log = logging.getLogger("multissl")
 
 OPENSSL_OLD_VERSIONS = [
+    "1.1.1w",
 ]
 
 OPENSSL_RECENT_VERSIONS = [
-    "1.1.1u",
-    "3.0.9",
-    "3.1.1",
+    "3.0.15",
+    "3.1.7",
+    "3.2.3",
+    "3.3.2",
 ]
 
 LIBRESSL_OLD_VERSIONS = [
@@ -360,7 +361,7 @@ class AbstractBuilder(object):
         env["LD_RUN_PATH"] = self.lib_dir
 
         log.info("Rebuilding Python modules")
-        cmd = [sys.executable, os.path.join(PYTHONROOT, "setup.py"), "build"]
+        cmd = ["make", "sharedmods", "checksharedmods"]
         self._subprocess_call(cmd, env=env)
         self.check_imports()
 
@@ -394,6 +395,7 @@ class AbstractBuilder(object):
 class BuildOpenSSL(AbstractBuilder):
     library = "OpenSSL"
     url_templates = (
+        "https://github.com/openssl/openssl/releases/download/openssl-{v}/openssl-{v}.tar.gz",
         "https://www.openssl.org/source/openssl-{v}.tar.gz",
         "https://www.openssl.org/source/old/{s}/openssl-{v}.tar.gz"
     )
@@ -436,6 +438,7 @@ class BuildOpenSSL(AbstractBuilder):
             parsed = parsed[:2]
         return ".".join(str(i) for i in parsed)
 
+
 class BuildLibreSSL(AbstractBuilder):
     library = "LibreSSL"
     url_templates = (
@@ -474,7 +477,7 @@ def main():
     start = datetime.now()
 
     if args.steps in {'modules', 'tests'}:
-        for name in ['setup.py', 'Modules/_ssl.c']:
+        for name in ['Makefile.pre.in', 'Modules/_ssl.c']:
             if not os.path.isfile(os.path.join(PYTHONROOT, name)):
                 parser.error(
                     "Must be executed from CPython build dir"

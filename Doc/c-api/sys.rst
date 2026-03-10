@@ -5,11 +5,13 @@
 Operating System Utilities
 ==========================
 
+
 .. c:function:: PyObject* PyOS_FSPath(PyObject *path)
 
    Return the file system representation for *path*. If the object is a
-   :class:`str` or :class:`bytes` object, then its reference count is
-   incremented. If the object implements the :class:`os.PathLike` interface,
+   :class:`str` or :class:`bytes` object, then a new
+   :term:`strong reference` is returned.
+   If the object implements the :class:`os.PathLike` interface,
    then :meth:`~os.PathLike.__fspath__` is returned as long as it is a
    :class:`str` or :class:`bytes` object. Otherwise :exc:`TypeError` is raised
    and ``NULL`` is returned.
@@ -21,9 +23,11 @@ Operating System Utilities
 
    Return true (nonzero) if the standard I/O file *fp* with name *filename* is
    deemed interactive.  This is the case for files for which ``isatty(fileno(fp))``
-   is true.  If the global flag :c:data:`Py_InteractiveFlag` is true, this function
+   is true.  If the :c:member:`PyConfig.interactive` is non-zero, this function
    also returns true if the *filename* pointer is ``NULL`` or if the name is equal to
    one of the strings ``'<stdin>'`` or ``'???'``.
+
+   This function must not be called before Python is initialized.
 
 
 .. c:function:: void PyOS_BeforeFork()
@@ -94,27 +98,30 @@ Operating System Utilities
 
 .. c:function:: int PyOS_CheckStack()
 
+   .. index:: single: USE_STACKCHECK (C macro)
+
    Return true when the interpreter runs out of stack space.  This is a reliable
-   check, but is only available when :const:`USE_STACKCHECK` is defined (currently
+   check, but is only available when :c:macro:`!USE_STACKCHECK` is defined (currently
    on certain versions of Windows using the Microsoft Visual C++ compiler).
-   :const:`USE_STACKCHECK` will be defined automatically; you should never
+   :c:macro:`!USE_STACKCHECK` will be defined automatically; you should never
    change the definition in your own code.
+
+
+.. c:type::  void (*PyOS_sighandler_t)(int)
 
 
 .. c:function:: PyOS_sighandler_t PyOS_getsig(int i)
 
    Return the current signal handler for signal *i*.  This is a thin wrapper around
-   either :c:func:`sigaction` or :c:func:`signal`.  Do not call those functions
-   directly! :c:type:`PyOS_sighandler_t` is a typedef alias for :c:expr:`void
-   (\*)(int)`.
+   either :c:func:`!sigaction` or :c:func:`!signal`.  Do not call those functions
+   directly!
 
 
 .. c:function:: PyOS_sighandler_t PyOS_setsig(int i, PyOS_sighandler_t h)
 
    Set the signal handler for signal *i* to be *h*; return the old signal handler.
-   This is a thin wrapper around either :c:func:`sigaction` or :c:func:`signal`.  Do
-   not call those functions directly!  :c:type:`PyOS_sighandler_t` is a typedef
-   alias for :c:expr:`void (\*)(int)`.
+   This is a thin wrapper around either :c:func:`!sigaction` or :c:func:`!signal`.  Do
+   not call those functions directly!
 
 .. c:function:: wchar_t* Py_DecodeLocale(const char* arg, size_t *size)
 
@@ -165,7 +172,7 @@ Operating System Utilities
 
    .. versionchanged:: 3.8
       The function now uses the UTF-8 encoding on Windows if
-      :c:data:`Py_LegacyWindowsFSEncodingFlag` is zero;
+      :c:member:`PyPreConfig.legacy_windows_fs_encoding` is zero;
 
 
 .. c:function:: char* Py_EncodeLocale(const wchar_t *text, size_t *error_pos)
@@ -207,7 +214,7 @@ Operating System Utilities
 
    .. versionchanged:: 3.8
       The function now uses the UTF-8 encoding on Windows if
-      :c:data:`Py_LegacyWindowsFSEncodingFlag` is zero.
+      :c:member:`PyPreConfig.legacy_windows_fs_encoding` is zero.
 
 
 .. _systemfunctions:
@@ -377,10 +384,8 @@ accessible to C code.  They all work with the current interpreter thread's
    silently abort the operation by raising an error subclassed from
    :class:`Exception` (other errors will not be silenced).
 
-   The hook function is of type :c:expr:`int (*)(const char *event, PyObject
-   *args, void *userData)`, where *args* is guaranteed to be a
-   :c:type:`PyTupleObject`. The hook function is always called with the GIL
-   held by the Python interpreter that raised the event.
+   The hook function is always called with the GIL held by the Python
+   interpreter that raised the event.
 
    See :pep:`578` for a detailed description of auditing.  Functions in the
    runtime and standard library that raise events are listed in the
@@ -389,11 +394,19 @@ accessible to C code.  They all work with the current interpreter thread's
 
    .. audit-event:: sys.addaudithook "" c.PySys_AddAuditHook
 
-      If the interpreter is initialized, this function raises a auditing event
+      If the interpreter is initialized, this function raises an auditing event
       ``sys.addaudithook`` with no arguments. If any existing hooks raise an
       exception derived from :class:`Exception`, the new hook will not be
       added and the exception is cleared. As a result, callers cannot assume
       that their hook has been added unless they control all existing hooks.
+
+   .. c:namespace:: NULL
+   .. c:type:: int (*Py_AuditHookFunction) (const char *event, PyObject *args, void *userData)
+
+      The type of the hook function.
+      *event* is the C string event argument passed to :c:func:`PySys_Audit`.
+      *args* is guaranteed to be a :c:type:`PyTupleObject`.
+      *userData* is the argument passed to PySys_AddAuditHook().
 
    .. versionadded:: 3.8
 
@@ -406,13 +419,13 @@ Process Control
 
 .. c:function:: void Py_FatalError(const char *message)
 
-   .. index:: single: abort()
+   .. index:: single: abort (C function)
 
    Print a fatal error message and kill the process.  No cleanup is performed.
    This function should only be invoked when a condition is detected that would
    make it dangerous to continue using the Python interpreter; e.g., when the
    object administration appears to be corrupted.  On Unix, the standard C library
-   function :c:func:`abort` is called which will attempt to produce a :file:`core`
+   function :c:func:`!abort` is called which will attempt to produce a :file:`core`
    file.
 
    The ``Py_FatalError()`` function is replaced with a macro which logs
@@ -426,8 +439,8 @@ Process Control
 .. c:function:: void Py_Exit(int status)
 
    .. index::
-      single: Py_FinalizeEx()
-      single: exit()
+      single: Py_FinalizeEx (C function)
+      single: exit (C function)
 
    Exit the current process.  This calls :c:func:`Py_FinalizeEx` and then calls the
    standard C library function ``exit(status)``.  If :c:func:`Py_FinalizeEx`
@@ -440,7 +453,7 @@ Process Control
 .. c:function:: int Py_AtExit(void (*func) ())
 
    .. index::
-      single: Py_FinalizeEx()
+      single: Py_FinalizeEx (C function)
       single: cleanup functions
 
    Register a cleanup function to be called by :c:func:`Py_FinalizeEx`.  The cleanup

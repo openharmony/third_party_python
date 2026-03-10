@@ -2,6 +2,12 @@
 preserve
 [clinic start generated code]*/
 
+#if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+#  include "pycore_gc.h"            // PyGC_Head
+#  include "pycore_runtime.h"       // _Py_ID()
+#endif
+
+
 PyDoc_STRVAR(signal_default_int_handler__doc__,
 "default_int_handler($module, signalnum, frame, /)\n"
 "--\n"
@@ -520,7 +526,7 @@ PyDoc_STRVAR(signal_sigtimedwait__doc__,
 "\n"
 "Like sigwaitinfo(), but with a timeout.\n"
 "\n"
-"The timeout is specified in seconds, with floating point numbers allowed.");
+"The timeout is specified in seconds, with floating-point numbers allowed.");
 
 #define SIGNAL_SIGTIMEDWAIT_METHODDEF    \
     {"sigtimedwait", _PyCFunction_CAST(signal_sigtimedwait), METH_FASTCALL, signal_sigtimedwait__doc__},
@@ -699,4 +705,4 @@ exit:
 #ifndef SIGNAL_PIDFD_SEND_SIGNAL_METHODDEF
     #define SIGNAL_PIDFD_SEND_SIGNAL_METHODDEF
 #endif /* !defined(SIGNAL_PIDFD_SEND_SIGNAL_METHODDEF) */
-/*[clinic end generated code: output=9b3f9f1ae2ac2b94 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=29cc8fb029d04c97 input=a9049054013a1b77]*/

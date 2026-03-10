@@ -5,7 +5,7 @@
 Parsing arguments and building values
 =====================================
 
-These functions are useful when creating your own extensions functions and
+These functions are useful when creating your own extension functions and
 methods.  Additional information and examples are available in
 :ref:`extending-index`.
 
@@ -152,48 +152,6 @@ There are three ways strings and buffers can be converted to C:
    attempting any conversion.  Raises :exc:`TypeError` if the object is not
    a :class:`bytearray` object. The C variable may also be declared as :c:expr:`PyObject*`.
 
-``u`` (:class:`str`) [const Py_UNICODE \*]
-   Convert a Python Unicode object to a C pointer to a NUL-terminated buffer of
-   Unicode characters.  You must pass the address of a :c:type:`Py_UNICODE`
-   pointer variable, which will be filled with the pointer to an existing
-   Unicode buffer.  Please note that the width of a :c:type:`Py_UNICODE`
-   character depends on compilation options (it is either 16 or 32 bits).
-   The Python string must not contain embedded null code points; if it does,
-   a :exc:`ValueError` exception is raised.
-
-   .. versionchanged:: 3.5
-      Previously, :exc:`TypeError` was raised when embedded null code points
-      were encountered in the Python string.
-
-   .. deprecated-removed:: 3.3 3.12
-      Part of the old-style :c:type:`Py_UNICODE` API; please migrate to using
-      :c:func:`PyUnicode_AsWideCharString`.
-
-``u#`` (:class:`str`) [const Py_UNICODE \*, :c:type:`Py_ssize_t`]
-   This variant on ``u`` stores into two C variables, the first one a pointer to a
-   Unicode data buffer, the second one its length.  This variant allows
-   null code points.
-
-   .. deprecated-removed:: 3.3 3.12
-      Part of the old-style :c:type:`Py_UNICODE` API; please migrate to using
-      :c:func:`PyUnicode_AsWideCharString`.
-
-``Z`` (:class:`str` or ``None``) [const Py_UNICODE \*]
-   Like ``u``, but the Python object may also be ``None``, in which case the
-   :c:type:`Py_UNICODE` pointer is set to ``NULL``.
-
-   .. deprecated-removed:: 3.3 3.12
-      Part of the old-style :c:type:`Py_UNICODE` API; please migrate to using
-      :c:func:`PyUnicode_AsWideCharString`.
-
-``Z#`` (:class:`str` or ``None``) [const Py_UNICODE \*, :c:type:`Py_ssize_t`]
-   Like ``u#``, but the Python object may also be ``None``, in which case the
-   :c:type:`Py_UNICODE` pointer is set to ``NULL``.
-
-   .. deprecated-removed:: 3.3 3.12
-      Part of the old-style :c:type:`Py_UNICODE` API; please migrate to using
-      :c:func:`PyUnicode_AsWideCharString`.
-
 ``U`` (:class:`str`) [PyObject \*]
    Requires that the Python object is a Unicode object, without attempting
    any conversion.  Raises :exc:`TypeError` if the object is not a Unicode
@@ -263,15 +221,32 @@ There are three ways strings and buffers can be converted to C:
    them. Instead, the implementation assumes that the byte string object uses the
    encoding passed in as parameter.
 
+.. versionchanged:: 3.12
+   ``u``, ``u#``, ``Z``, and ``Z#`` are removed because they used a legacy
+   ``Py_UNICODE*`` representation.
+
+
 Numbers
 -------
 
+These formats allow representing Python numbers or single characters as C numbers.
+Formats that require :class:`int`, :class:`float` or :class:`complex` can
+also use the corresponding special methods :meth:`~object.__index__`,
+:meth:`~object.__float__` or :meth:`~object.__complex__` to convert
+the Python object to the required type.
+
+For signed integer formats, :exc:`OverflowError` is raised if the value
+is out of range for the C type.
+For unsigned integer formats, no range checking is done --- the
+most significant bits are silently truncated when the receiving field is too
+small to receive the value.
+
 ``b`` (:class:`int`) [unsigned char]
-   Convert a nonnegative Python integer to an unsigned tiny int, stored in a C
+   Convert a nonnegative Python integer to an unsigned tiny integer, stored in a C
    :c:expr:`unsigned char`.
 
 ``B`` (:class:`int`) [unsigned char]
-   Convert a Python integer to a tiny int without overflow checking, stored in a C
+   Convert a Python integer to a tiny integer without overflow checking, stored in a C
    :c:expr:`unsigned char`.
 
 ``h`` (:class:`int`) [short int]
@@ -317,10 +292,10 @@ Numbers
    length 1, to a C :c:expr:`int`.
 
 ``f`` (:class:`float`) [float]
-   Convert a Python floating point number to a C :c:expr:`float`.
+   Convert a Python floating-point number to a C :c:expr:`float`.
 
 ``d`` (:class:`float`) [double]
-   Convert a Python floating point number to a C :c:expr:`double`.
+   Convert a Python floating-point number to a C :c:expr:`double`.
 
 ``D`` (:class:`complex`) [Py_complex]
    Convert a Python complex number to a C :c:type:`Py_complex` structure.
@@ -330,8 +305,10 @@ Other objects
 
 ``O`` (object) [PyObject \*]
    Store a Python object (without any conversion) in a C object pointer.  The C
-   program thus receives the actual object that was passed.  The object's reference
-   count is not increased.  The pointer stored is not ``NULL``.
+   program thus receives the actual object that was passed.  A new
+   :term:`strong reference` to the object is not created
+   (i.e. its reference count is not increased).
+   The pointer stored is not ``NULL``.
 
 ``O!`` (object) [*typeobject*, PyObject \*]
    Store a Python object in a C object pointer.  This is similar to ``O``, but
@@ -342,7 +319,7 @@ Other objects
 
 .. _o_ampersand:
 
-``O&`` (object) [*converter*, *anything*]
+``O&`` (object) [*converter*, *address*]
    Convert a Python object to a C variable through a *converter* function.  This
    takes two arguments: the first is a function, the second is the address of a C
    variable (of arbitrary type), converted to :c:expr:`void *`.  The *converter*
@@ -356,14 +333,20 @@ Other objects
    the conversion has failed.  When the conversion fails, the *converter* function
    should raise an exception and leave the content of *address* unmodified.
 
-   If the *converter* returns ``Py_CLEANUP_SUPPORTED``, it may get called a
+   .. c:macro:: Py_CLEANUP_SUPPORTED
+      :no-typesetting:
+
+   If the *converter* returns :c:macro:`!Py_CLEANUP_SUPPORTED`, it may get called a
    second time if the argument parsing eventually fails, giving the converter a
    chance to release any memory that it had already allocated. In this second
    call, the *object* parameter will be ``NULL``; *address* will have the same value
    as in the original call.
 
+   Examples of converters: :c:func:`PyUnicode_FSConverter` and
+   :c:func:`PyUnicode_FSDecoder`.
+
    .. versionchanged:: 3.1
-      ``Py_CLEANUP_SUPPORTED`` was added.
+      :c:macro:`!Py_CLEANUP_SUPPORTED` was added.
 
 ``p`` (:class:`bool`) [int]
    Tests the value passed in for truth (a boolean **p**\ redicate) and converts
@@ -378,12 +361,6 @@ Other objects
    The object must be a Python sequence whose length is the number of format units
    in *items*.  The C arguments must correspond to the individual format units in
    *items*.  Format units for sequences may be nested.
-
-It is possible to pass "long" integers (integers whose value exceeds the
-platform's :const:`LONG_MAX`) however no proper range checking is done --- the
-most significant bits are silently truncated when the receiving field is too
-small to receive the value (actually, the semantics are inherited from downcasts
-in C --- your mileage may vary).
 
 A few other characters have a meaning in a format string.  These may not occur
 inside nested parentheses.  They are:
@@ -415,7 +392,8 @@ inside nested parentheses.  They are:
    mutually exclude each other.
 
 Note that any Python object references which are provided to the caller are
-*borrowed* references; do not decrement their reference count!
+*borrowed* references; do not release them
+(i.e. do not decrement their reference count)!
 
 Additional arguments passed to these functions must be addresses of variables
 whose type is determined by the format string; these are used to store values
@@ -492,7 +470,7 @@ API Functions
 
    A simpler form of parameter retrieval which does not use a format string to
    specify the types of the arguments.  Functions which use this method to retrieve
-   their parameters should be declared as :const:`METH_VARARGS` in function or
+   their parameters should be declared as :c:macro:`METH_VARARGS` in function or
    method tables.  The tuple containing the actual parameters should be passed as
    *args*; it must actually be a tuple.  The length of the tuple must be at least
    *min* and no more than *max*; *min* and *max* may be equal.  Additional
@@ -506,7 +484,7 @@ API Functions
    will be set if there was a failure.
 
    This is an example of the use of this function, taken from the sources for the
-   :mod:`_weakref` helper module for weak references::
+   :mod:`!_weakref` helper module for weak references::
 
       static PyObject *
       weakref_ref(PyObject *self, PyObject *args)
@@ -584,7 +562,7 @@ Building values
       Same as ``s#``.
 
    ``u`` (:class:`str`) [const wchar_t \*]
-      Convert a null-terminated :c:expr:`wchar_t` buffer of Unicode (UTF-16 or UCS-4)
+      Convert a null-terminated :c:type:`wchar_t` buffer of Unicode (UTF-16 or UCS-4)
       data to a Python Unicode object.  If the Unicode buffer pointer is ``NULL``,
       ``None`` is returned.
 
@@ -641,17 +619,19 @@ Building values
       object of length 1.
 
    ``d`` (:class:`float`) [double]
-      Convert a C :c:expr:`double` to a Python floating point number.
+      Convert a C :c:expr:`double` to a Python floating-point number.
 
    ``f`` (:class:`float`) [float]
-      Convert a C :c:expr:`float` to a Python floating point number.
+      Convert a C :c:expr:`float` to a Python floating-point number.
 
    ``D`` (:class:`complex`) [Py_complex \*]
       Convert a C :c:type:`Py_complex` structure to a Python complex number.
 
    ``O`` (object) [PyObject \*]
-      Pass a Python object untouched (except for its reference count, which is
-      incremented by one).  If the object passed in is a ``NULL`` pointer, it is assumed
+      Pass a Python object untouched but create a new
+      :term:`strong reference` to it
+      (i.e. its reference count is incremented by one).
+      If the object passed in is a ``NULL`` pointer, it is assumed
       that this was caused because the call producing the argument found an error and
       set an exception. Therefore, :c:func:`Py_BuildValue` will return ``NULL`` but won't
       raise an exception.  If no exception has been raised yet, :exc:`SystemError` is
@@ -661,7 +641,7 @@ Building values
       Same as ``O``.
 
    ``N`` (object) [PyObject \*]
-      Same as ``O``, except it doesn't increment the reference count on the object.
+      Same as ``O``, except it doesn't create a new :term:`strong reference`.
       Useful when the object is created by a call to an object constructor in the
       argument list.
 

@@ -9,6 +9,19 @@
 
 #include "Python.h"
 
+
+// Used for clone_with_conv_f1 and clone_with_conv_v2
+typedef struct {
+    const char *name;
+} custom_t;
+
+static int
+custom_converter(PyObject *obj, custom_t *val)
+{
+    return 1;
+}
+
+
 #include "clinic/_testclinic.c.h"
 
 
@@ -1022,6 +1035,25 @@ vararg_with_default_impl(PyObject *module, PyObject *a, PyObject *args,
 
 
 /*[clinic input]
+vararg_with_default2
+
+    a: object
+    *args: object
+    b: object = None
+    c: object = None
+
+[clinic start generated code]*/
+
+static PyObject *
+vararg_with_default2_impl(PyObject *module, PyObject *a, PyObject *args,
+                          PyObject *b, PyObject *c)
+/*[clinic end generated code: output=a0fb7c37796e2129 input=59fb22f5f0a8925f]*/
+{
+    return pack_arguments_newref(4, a, args, b, c);
+}
+
+
+/*[clinic input]
 vararg_with_only_defaults
 
     *args: object
@@ -1117,6 +1149,104 @@ gh_99240_double_free_impl(PyObject *module, char *a, char *b)
 }
 
 
+/*[clinic input]
+_testclinic.clone_f1 as clone_f1
+   path: str
+[clinic start generated code]*/
+
+static PyObject *
+clone_f1_impl(PyObject *module, const char *path)
+/*[clinic end generated code: output=8c30b5620ba86715 input=9c614b7f025ebf70]*/
+{
+    Py_RETURN_NONE;
+}
+
+
+/*[clinic input]
+_testclinic.clone_f2 as clone_f2 = _testclinic.clone_f1
+[clinic start generated code]*/
+
+static PyObject *
+clone_f2_impl(PyObject *module, const char *path)
+/*[clinic end generated code: output=6aa1c39bec3f5d9b input=1aaaf47d6ed2324a]*/
+{
+    Py_RETURN_NONE;
+}
+
+
+/*[python input]
+class custom_t_converter(CConverter):
+    type = 'custom_t'
+    converter = 'custom_converter'
+
+    def pre_render(self):
+        self.c_default = f'''{{
+            .name = "{self.function.name}",
+        }}'''
+
+[python start generated code]*/
+/*[python end generated code: output=da39a3ee5e6b4b0d input=b2fb801e99a06bf6]*/
+
+
+/*[clinic input]
+_testclinic.clone_with_conv_f1 as clone_with_conv_f1
+    path: custom_t = None
+[clinic start generated code]*/
+
+static PyObject *
+clone_with_conv_f1_impl(PyObject *module, custom_t path)
+/*[clinic end generated code: output=f7e030ffd5439cb0 input=bc77bc80dec3f46d]*/
+{
+    return PyUnicode_FromString(path.name);
+}
+
+
+/*[clinic input]
+_testclinic.clone_with_conv_f2 as clone_with_conv_f2 = _testclinic.clone_with_conv_f1
+[clinic start generated code]*/
+
+static PyObject *
+clone_with_conv_f2_impl(PyObject *module, custom_t path)
+/*[clinic end generated code: output=9d7fdd6a75eecee4 input=cff459a205fa83bb]*/
+{
+    return PyUnicode_FromString(path.name);
+}
+
+
+/*[clinic input]
+class _testclinic.TestClass "PyObject *" "PyObject"
+[clinic start generated code]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=668a591c65bec947]*/
+
+/*[clinic input]
+_testclinic.TestClass.meth_method_no_params
+    cls: defining_class
+    /
+[clinic start generated code]*/
+
+static PyObject *
+_testclinic_TestClass_meth_method_no_params_impl(PyObject *self,
+                                                 PyTypeObject *cls)
+/*[clinic end generated code: output=c140f100080c2fc8 input=6bd34503d11c63c1]*/
+{
+    Py_RETURN_NONE;
+}
+
+static struct PyMethodDef test_class_methods[] = {
+    _TESTCLINIC_TESTCLASS_METH_METHOD_NO_PARAMS_METHODDEF
+    {NULL, NULL}
+};
+
+static PyTypeObject TestClass = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_testclinic.TestClass",
+    .tp_basicsize = sizeof(PyObject),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_new = PyType_GenericNew,
+    .tp_methods = test_class_methods,
+};
+
+
 static PyMethodDef tester_methods[] = {
     TEST_EMPTY_FUNCTION_METHODDEF
     OBJECTS_CONVERTER_METHODDEF
@@ -1163,11 +1293,16 @@ static PyMethodDef tester_methods[] = {
     VARARG_AND_POSONLY_METHODDEF
     VARARG_METHODDEF
     VARARG_WITH_DEFAULT_METHODDEF
+    VARARG_WITH_DEFAULT2_METHODDEF
     VARARG_WITH_ONLY_DEFAULTS_METHODDEF
     GH_32092_OOB_METHODDEF
     GH_32092_KW_PASS_METHODDEF
     GH_99233_REFCOUNT_METHODDEF
     GH_99240_DOUBLE_FREE_METHODDEF
+    CLONE_F1_METHODDEF
+    CLONE_F2_METHODDEF
+    CLONE_WITH_CONV_F1_METHODDEF
+    CLONE_WITH_CONV_F2_METHODDEF
     {NULL, NULL}
 };
 
@@ -1181,7 +1316,18 @@ static struct PyModuleDef _testclinic_module = {
 PyMODINIT_FUNC
 PyInit__testclinic(void)
 {
-    return PyModule_Create(&_testclinic_module);
+    PyObject *m = PyModule_Create(&_testclinic_module);
+    if (m == NULL) {
+        return NULL;
+    }
+    if (PyModule_AddType(m, &TestClass) < 0) {
+        goto error;
+    }
+    return m;
+
+error:
+    Py_DECREF(m);
+    return NULL;
 }
 
 #undef RETURN_PACKED_ARGS

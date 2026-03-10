@@ -11,6 +11,7 @@ Copyright (c) Corporation for National Research Initiatives.
 #include "Python.h"
 #include "pycore_call.h"          // _PyObject_CallNoArgs()
 #include "pycore_interp.h"        // PyInterpreterState.codec_search_path
+#include "pycore_pyerrors.h"       // _PyErr_FormatNote()
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
 #include "pycore_ucnhash.h"       // _PyUnicode_Name_CAPI
 #include <ctype.h>
@@ -143,7 +144,9 @@ PyObject *_PyCodec_Lookup(const char *encoding)
     if (v == NULL) {
         return NULL;
     }
-    PyUnicode_InternInPlace(&v);
+
+    /* Intern the string. We'll make it immortal later if lookup succeeds. */
+    _PyUnicode_InternMortal(interp, &v);
 
     /* First, try to lookup the name in the registry dictionary */
     PyObject *result = PyDict_GetItemWithError(interp->codec_search_cache, v);
@@ -196,6 +199,8 @@ PyObject *_PyCodec_Lookup(const char *encoding)
         goto onError;
     }
 
+    _PyUnicode_InternImmortal(interp, &v);
+
     /* Cache and return the result */
     if (PyDict_SetItem(interp->codec_search_cache, v, result) < 0) {
         Py_DECREF(result);
@@ -235,8 +240,7 @@ PyObject *args_tuple(PyObject *object,
     args = PyTuple_New(1 + (errors != NULL));
     if (args == NULL)
         return NULL;
-    Py_INCREF(object);
-    PyTuple_SET_ITEM(args,0,object);
+    PyTuple_SET_ITEM(args, 0, Py_NewRef(object));
     if (errors) {
         PyObject *v;
 
@@ -263,8 +267,7 @@ PyObject *codec_getitem(const char *encoding, int index)
         return NULL;
     v = PyTuple_GET_ITEM(codecs, index);
     Py_DECREF(codecs);
-    Py_INCREF(v);
-    return v;
+    return Py_NewRef(v);
 }
 
 /* Helper functions to create an incremental codec. */
@@ -384,22 +387,6 @@ PyObject *PyCodec_StreamWriter(const char *encoding,
     return codec_getstreamcodec(encoding, stream, errors, 3);
 }
 
-/* Helper that tries to ensure the reported exception chain indicates the
- * codec that was invoked to trigger the failure without changing the type
- * of the exception raised.
- */
-static void
-wrap_codec_error(const char *operation,
-                 const char *encoding)
-{
-    /* TrySetFromCause will replace the active exception with a suitably
-     * updated clone if it can, otherwise it will leave the original
-     * exception alone.
-     */
-    _PyErr_TrySetFromCause("%s with '%s' codec failed",
-                           operation, encoding);
-}
-
 /* Encode an object (e.g. a Unicode object) using the given encoding
    and return the resulting encoded object (usually a Python string).
 
@@ -420,7 +407,7 @@ _PyCodec_EncodeInternal(PyObject *object,
 
     result = PyObject_Call(encoder, args, NULL);
     if (result == NULL) {
-        wrap_codec_error("encoding", encoding);
+        _PyErr_FormatNote("%s with '%s' codec failed", "encoding", encoding);
         goto onError;
     }
 
@@ -430,8 +417,7 @@ _PyCodec_EncodeInternal(PyObject *object,
                         "encoder must return a tuple (object, integer)");
         goto onError;
     }
-    v = PyTuple_GET_ITEM(result,0);
-    Py_INCREF(v);
+    v = Py_NewRef(PyTuple_GET_ITEM(result,0));
     /* We don't check or use the second (integer) entry. */
 
     Py_DECREF(args);
@@ -466,7 +452,7 @@ _PyCodec_DecodeInternal(PyObject *object,
 
     result = PyObject_Call(decoder, args, NULL);
     if (result == NULL) {
-        wrap_codec_error("decoding", encoding);
+        _PyErr_FormatNote("%s with '%s' codec failed", "decoding", encoding);
         goto onError;
     }
     if (!PyTuple_Check(result) ||
@@ -475,8 +461,7 @@ _PyCodec_DecodeInternal(PyObject *object,
                         "decoder must return a tuple (object,integer)");
         goto onError;
     }
-    v = PyTuple_GET_ITEM(result,0);
-    Py_INCREF(v);
+    v = Py_NewRef(PyTuple_GET_ITEM(result,0));
     /* We don't check or use the second (integer) entry. */
 
     Py_DECREF(args);
@@ -571,8 +556,7 @@ PyObject *codec_getitem_checked(const char *encoding,
     if (codec == NULL)
         return NULL;
 
-    v = PyTuple_GET_ITEM(codec, index);
-    Py_INCREF(v);
+    v = Py_NewRef(PyTuple_GET_ITEM(codec, index));
     Py_DECREF(codec);
     return v;
 }

@@ -4,7 +4,7 @@
 Argparse Tutorial
 *****************
 
-:author: Tshepang Lekhonkhobe
+:author: Tshepang Mbambo
 
 .. currentmodule:: argparse
 
@@ -81,16 +81,16 @@ Following is a result of running the code:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py
-   $ python3 prog.py --help
+   $ python prog.py
+   $ python prog.py --help
    usage: prog.py [-h]
 
    options:
      -h, --help  show this help message and exit
-   $ python3 prog.py --verbose
+   $ python prog.py --verbose
    usage: prog.py [-h]
    prog.py: error: unrecognized arguments: --verbose
-   $ python3 prog.py foo
+   $ python prog.py foo
    usage: prog.py [-h]
    prog.py: error: unrecognized arguments: foo
 
@@ -123,10 +123,10 @@ And running the code:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py
+   $ python prog.py
    usage: prog.py [-h] echo
    prog.py: error: the following arguments are required: echo
-   $ python3 prog.py --help
+   $ python prog.py --help
    usage: prog.py [-h] echo
 
    positional arguments:
@@ -134,7 +134,7 @@ And running the code:
 
    options:
      -h, --help  show this help message and exit
-   $ python3 prog.py foo
+   $ python prog.py foo
    foo
 
 Here is what's happening:
@@ -168,7 +168,7 @@ And we get:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py -h
+   $ python prog.py -h
    usage: prog.py [-h] echo
 
    positional arguments:
@@ -189,7 +189,7 @@ Following is a result of running the code:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4
+   $ python prog.py 4
    Traceback (most recent call last):
      File "prog.py", line 5, in <module>
        print(args.square**2)
@@ -210,9 +210,9 @@ Following is a result of running the code:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4
+   $ python prog.py 4
    16
-   $ python3 prog.py four
+   $ python prog.py four
    usage: prog.py [-h] square
    prog.py: error: argument square: invalid int value: 'four'
 
@@ -237,17 +237,17 @@ And the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py --verbosity 1
+   $ python prog.py --verbosity 1
    verbosity turned on
-   $ python3 prog.py
-   $ python3 prog.py --help
+   $ python prog.py
+   $ python prog.py --help
    usage: prog.py [-h] [--verbosity VERBOSITY]
 
    options:
      -h, --help            show this help message and exit
      --verbosity VERBOSITY
                            increase output verbosity
-   $ python3 prog.py --verbosity
+   $ python prog.py --verbosity
    usage: prog.py [-h] [--verbosity VERBOSITY]
    prog.py: error: argument --verbosity: expected one argument
 
@@ -283,12 +283,12 @@ And the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py --verbose
+   $ python prog.py --verbose
    verbosity turned on
-   $ python3 prog.py --verbose 1
+   $ python prog.py --verbose 1
    usage: prog.py [-h] [--verbose]
    prog.py: error: unrecognized arguments: 1
-   $ python3 prog.py --help
+   $ python prog.py --help
    usage: prog.py [-h] [--verbose]
 
    options:
@@ -329,9 +329,9 @@ And here goes:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py -v
+   $ python prog.py -v
    verbosity turned on
-   $ python3 prog.py --help
+   $ python prog.py --help
    usage: prog.py [-h] [-v]
 
    options:
@@ -363,14 +363,14 @@ And now the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py
+   $ python prog.py
    usage: prog.py [-h] [-v] square
    prog.py: error: the following arguments are required: square
-   $ python3 prog.py 4
+   $ python prog.py 4
    16
-   $ python3 prog.py 4 --verbose
+   $ python prog.py 4 --verbose
    the square of 4 equals 16
-   $ python3 prog.py --verbose 4
+   $ python prog.py --verbose 4
    the square of 4 equals 16
 
 * We've brought back a positional argument, hence the complaint.
@@ -399,16 +399,16 @@ And the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4
+   $ python prog.py 4
    16
-   $ python3 prog.py 4 -v
+   $ python prog.py 4 -v
    usage: prog.py [-h] [-v VERBOSITY] square
    prog.py: error: argument -v/--verbosity: expected one argument
-   $ python3 prog.py 4 -v 1
+   $ python prog.py 4 -v 1
    4^2 == 16
-   $ python3 prog.py 4 -v 2
+   $ python prog.py 4 -v 2
    the square of 4 equals 16
-   $ python3 prog.py 4 -v 3
+   $ python prog.py 4 -v 3
    16
 
 These all look good except the last one, which exposes a bug in our program.
@@ -433,10 +433,10 @@ And the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4 -v 3
+   $ python prog.py 4 -v 3
    usage: prog.py [-h] [-v {0,1,2}] square
    prog.py: error: argument -v/--verbosity: invalid choice: 3 (choose from 0, 1, 2)
-   $ python3 prog.py 4 -h
+   $ python prog.py 4 -h
    usage: prog.py [-h] [-v {0,1,2}] square
 
    positional arguments:
@@ -475,18 +475,18 @@ to count the number of occurrences of specific options.
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4
+   $ python prog.py 4
    16
-   $ python3 prog.py 4 -v
+   $ python prog.py 4 -v
    4^2 == 16
-   $ python3 prog.py 4 -vv
+   $ python prog.py 4 -vv
    the square of 4 equals 16
-   $ python3 prog.py 4 --verbosity --verbosity
+   $ python prog.py 4 --verbosity --verbosity
    the square of 4 equals 16
-   $ python3 prog.py 4 -v 1
+   $ python prog.py 4 -v 1
    usage: prog.py [-h] [-v] square
    prog.py: error: unrecognized arguments: 1
-   $ python3 prog.py 4 -h
+   $ python prog.py 4 -h
    usage: prog.py [-h] [-v] square
 
    positional arguments:
@@ -495,7 +495,7 @@ to count the number of occurrences of specific options.
    options:
      -h, --help       show this help message and exit
      -v, --verbosity  increase output verbosity
-   $ python3 prog.py 4 -vvv
+   $ python prog.py 4 -vvv
    16
 
 * Yes, it's now more of a flag (similar to ``action="store_true"``) in the
@@ -542,11 +542,11 @@ And this is what it gives:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4 -vvv
+   $ python prog.py 4 -vvv
    the square of 4 equals 16
-   $ python3 prog.py 4 -vvvv
+   $ python prog.py 4 -vvvv
    the square of 4 equals 16
-   $ python3 prog.py 4
+   $ python prog.py 4
    Traceback (most recent call last):
      File "prog.py", line 11, in <module>
        if args.verbosity >= 2:
@@ -586,7 +586,7 @@ And:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4
+   $ python prog.py 4
    16
 
 You can go quite far just with what we've learned so far,
@@ -619,10 +619,10 @@ Output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py
+   $ python prog.py
    usage: prog.py [-h] [-v] x y
    prog.py: error: the following arguments are required: x, y
-   $ python3 prog.py -h
+   $ python prog.py -h
    usage: prog.py [-h] [-v] x y
 
    positional arguments:
@@ -632,7 +632,7 @@ Output:
    options:
      -h, --help       show this help message and exit
      -v, --verbosity
-   $ python3 prog.py 4 2 -v
+   $ python prog.py 4 2 -v
    4^2 == 16
 
 
@@ -657,13 +657,42 @@ Output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4 2
+   $ python prog.py 4 2
    16
-   $ python3 prog.py 4 2 -v
+   $ python prog.py 4 2 -v
    4^2 == 16
-   $ python3 prog.py 4 2 -vv
+   $ python prog.py 4 2 -vv
    Running 'prog.py'
    4^2 == 16
+
+
+.. _specifying-ambiguous-arguments:
+
+Specifying ambiguous arguments
+------------------------------
+
+When there is ambiguity in deciding whether an argument is positional or for an
+argument, ``--`` can be used to tell :meth:`~ArgumentParser.parse_args` that
+everything after that is a positional argument::
+
+   >>> parser = argparse.ArgumentParser(prog='PROG')
+   >>> parser.add_argument('-n', nargs='+')
+   >>> parser.add_argument('args', nargs='*')
+
+   >>> # ambiguous, so parse_args assumes it's an option
+   >>> parser.parse_args(['-f'])
+   usage: PROG [-h] [-n N [N ...]] [args ...]
+   PROG: error: unrecognized arguments: -f
+
+   >>> parser.parse_args(['--', '-f'])
+   Namespace(args=['-f'], n=None)
+
+   >>> # ambiguous, so the -n option greedily accepts arguments
+   >>> parser.parse_args(['-n', '1', '2', '3'])
+   Namespace(args=[], n=['1', '2', '3'])
+
+   >>> parser.parse_args(['-n', '1', '--', '2', '3'])
+   Namespace(args=['2', '3'], n=['1'])
 
 
 Conflicting options
@@ -700,16 +729,16 @@ demonstration. Anyways, here's the output:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py 4 2
+   $ python prog.py 4 2
    4^2 == 16
-   $ python3 prog.py 4 2 -q
+   $ python prog.py 4 2 -q
    16
-   $ python3 prog.py 4 2 -v
+   $ python prog.py 4 2 -v
    4 to the power 2 equals 16
-   $ python3 prog.py 4 2 -vq
+   $ python prog.py 4 2 -vq
    usage: prog.py [-h] [-v | -q] x y
    prog.py: error: argument -q/--quiet: not allowed with argument -v/--verbose
-   $ python3 prog.py 4 2 -v --quiet
+   $ python prog.py 4 2 -v --quiet
    usage: prog.py [-h] [-v | -q] x y
    prog.py: error: argument -q/--quiet: not allowed with argument -v/--verbose
 
@@ -744,7 +773,7 @@ but not both at the same time:
 
 .. code-block:: shell-session
 
-   $ python3 prog.py --help
+   $ python prog.py --help
    usage: prog.py [-h] [-v | -q] x y
 
    calculate X to the power of Y
@@ -758,6 +787,106 @@ but not both at the same time:
      -v, --verbose
      -q, --quiet
 
+
+How to translate the argparse output
+====================================
+
+The output of the :mod:`argparse` module such as its help text and error
+messages are all made translatable using the :mod:`gettext` module. This
+allows applications to easily localize messages produced by
+:mod:`argparse`. See also :ref:`i18n-howto`.
+
+For instance, in this :mod:`argparse` output:
+
+.. code-block:: shell-session
+
+   $ python prog.py --help
+   usage: prog.py [-h] [-v | -q] x y
+
+   calculate X to the power of Y
+
+   positional arguments:
+     x              the base
+     y              the exponent
+
+   options:
+     -h, --help     show this help message and exit
+     -v, --verbose
+     -q, --quiet
+
+The strings ``usage:``, ``positional arguments:``, ``options:`` and
+``show this help message and exit`` are all translatable.
+
+In order to translate these strings, they must first be extracted
+into a ``.po`` file. For example, using `Babel <https://babel.pocoo.org/>`__,
+run this command:
+
+.. code-block:: shell-session
+
+  $ pybabel extract -o messages.po /usr/lib/python3.12/argparse.py
+
+This command will extract all translatable strings from the :mod:`argparse`
+module and output them into a file named ``messages.po``. This command assumes
+that your Python installation is in ``/usr/lib``.
+
+You can find out the location of the :mod:`argparse` module on your system
+using this script::
+
+   import argparse
+   print(argparse.__file__)
+
+Once the messages in the ``.po`` file are translated and the translations are
+installed using :mod:`gettext`, :mod:`argparse` will be able to display the
+translated messages.
+
+To translate your own strings in the :mod:`argparse` output, use :mod:`gettext`.
+
+Custom type converters
+======================
+
+The :mod:`argparse` module allows you to specify custom type converters for
+your command-line arguments. This allows you to modify user input before it's
+stored in the :class:`argparse.Namespace`. This can be useful when you need to
+pre-process the input before it is used in your program.
+
+When using a custom type converter, you can use any callable that takes a
+single string argument (the argument value) and returns the converted value.
+However, if you need to handle more complex scenarios, you can use a custom
+action class with the **action** parameter instead.
+
+For example, let's say you want to handle arguments with different prefixes and
+process them accordingly::
+
+   import argparse
+
+   parser = argparse.ArgumentParser(prefix_chars='-+')
+
+   parser.add_argument('-a', metavar='<value>', action='append',
+                       type=lambda x: ('-', x))
+   parser.add_argument('+a', metavar='<value>', action='append',
+                       type=lambda x: ('+', x))
+
+   args = parser.parse_args()
+   print(args)
+
+Output:
+
+.. code-block:: shell-session
+
+   $ python prog.py -a value1 +a value2
+   Namespace(a=[('-', 'value1'), ('+', 'value2')])
+
+In this example, we:
+
+* Created a parser with custom prefix characters using the ``prefix_chars``
+  parameter.
+
+* Defined two arguments, ``-a`` and ``+a``, which used the ``type`` parameter to
+  create custom type converters to store the value in a tuple with the prefix.
+
+Without the custom type converters, the arguments would have treated the ``-a``
+and ``+a`` as the same argument, which would have been undesirable. By using custom
+type converters, we were able to differentiate between the two arguments.
 
 Conclusion
 ==========

@@ -11,8 +11,10 @@
 #include "Python.h"
 #include "pycore_call.h"          // _PyObject_CallNoArgs()
 #include "pycore_code.h"          // _PyCode_New()
+#include "pycore_long.h"          // _PyLong_DigitCount
 #include "pycore_hashtable.h"     // _Py_hashtable_t
 #include "marshal.h"              // Py_MARSHAL_VERSION
+#include "pycore_pystate.h"          // _PyInterpreterState_GET()
 
 /*[clinic input]
 module marshal
@@ -232,15 +234,15 @@ w_PyLong(const PyLongObject *ob, char flag, WFILE *p)
     digit d;
 
     W_TYPE(TYPE_LONG, p);
-    if (Py_SIZE(ob) == 0) {
+    if (_PyLong_IsZero(ob)) {
         w_long((long)0, p);
         return;
     }
 
     /* set l to number of base PyLong_MARSHAL_BASE digits */
-    n = Py_ABS(Py_SIZE(ob));
+    n = _PyLong_DigitCount(ob);
     l = (n-1) * PyLong_MARSHAL_RATIO;
-    d = ob->ob_digit[n-1];
+    d = ob->long_value.ob_digit[n-1];
     assert(d != 0); /* a PyLong is always normalized */
     do {
         d >>= PyLong_MARSHAL_SHIFT;
@@ -251,17 +253,17 @@ w_PyLong(const PyLongObject *ob, char flag, WFILE *p)
         p->error = WFERR_UNMARSHALLABLE;
         return;
     }
-    w_long((long)(Py_SIZE(ob) > 0 ? l : -l), p);
+    w_long((long)(_PyLong_IsNegative(ob) ? -l : l), p);
 
     for (i=0; i < n-1; i++) {
-        d = ob->ob_digit[i];
+        d = ob->long_value.ob_digit[i];
         for (j=0; j < PyLong_MARSHAL_RATIO; j++) {
             w_short(d & PyLong_MARSHAL_MASK, p);
             d >>= PyLong_MARSHAL_SHIFT;
         }
         assert (d == 0);
     }
-    d = ob->ob_digit[n-1];
+    d = ob->long_value.ob_digit[n-1];
     do {
         w_short(d & PyLong_MARSHAL_MASK, p);
         d >>= PyLong_MARSHAL_SHIFT;
@@ -326,8 +328,8 @@ w_ref(PyObject *v, char *flag, WFILE *p)
             goto err;
         }
         w = (int)s;
-        Py_INCREF(v);
-        if (_Py_hashtable_set(p->hashtable, v, (void *)(uintptr_t)w) < 0) {
+        if (_Py_hashtable_set(p->hashtable, Py_NewRef(v),
+                              (void *)(uintptr_t)w) < 0) {
             Py_DECREF(v);
             goto err;
         }
@@ -750,23 +752,28 @@ r_string(Py_ssize_t n, RFILE *p)
 static int
 r_byte(RFILE *p)
 {
-    int c = EOF;
-
     if (p->ptr != NULL) {
-        if (p->ptr < p->end)
-            c = (unsigned char) *p->ptr++;
-        return c;
+        if (p->ptr < p->end) {
+            return (unsigned char) *p->ptr++;
+        }
     }
-    if (!p->readable) {
+    else if (!p->readable) {
         assert(p->fp);
-        c = getc(p->fp);
+        int c = getc(p->fp);
+        if (c != EOF) {
+            return c;
+        }
     }
     else {
         const char *ptr = r_string(1, p);
-        if (ptr != NULL)
-            c = *(const unsigned char *) ptr;
+        if (ptr != NULL) {
+            return *(const unsigned char *) ptr;
+        }
+        return EOF;
     }
-    return c;
+    PyErr_SetString(PyExc_EOFError,
+                    "EOF read where not expected");
+    return EOF;
 }
 
 static int
@@ -827,10 +834,11 @@ r_PyLong(RFILE *p)
     digit d;
 
     n = r_long(p);
-    if (PyErr_Occurred())
-        return NULL;
     if (n == 0)
         return (PyObject *)_PyLong_New(0);
+    if (n == -1 && PyErr_Occurred()) {
+        return NULL;
+    }
     if (n < -SIZE32_MAX || n > SIZE32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                        "bad marshal data (long size out of range)");
@@ -843,30 +851,22 @@ r_PyLong(RFILE *p)
     if (ob == NULL)
         return NULL;
 
-    Py_SET_SIZE(ob, n > 0 ? size : -size);
+    _PyLong_SetSignAndDigitCount(ob, n < 0 ? -1 : 1, size);
 
     for (i = 0; i < size-1; i++) {
         d = 0;
         for (j=0; j < PyLong_MARSHAL_RATIO; j++) {
             md = r_short(p);
-            if (PyErr_Occurred()) {
-                Py_DECREF(ob);
-                return NULL;
-            }
             if (md < 0 || md > PyLong_MARSHAL_BASE)
                 goto bad_digit;
             d += (digit)md << j*PyLong_MARSHAL_SHIFT;
         }
-        ob->ob_digit[i] = d;
+        ob->long_value.ob_digit[i] = d;
     }
 
     d = 0;
     for (j=0; j < shorts_in_top_digit; j++) {
         md = r_short(p);
-        if (PyErr_Occurred()) {
-            Py_DECREF(ob);
-            return NULL;
-        }
         if (md < 0 || md > PyLong_MARSHAL_BASE)
             goto bad_digit;
         /* topmost marshal digit should be nonzero */
@@ -878,18 +878,17 @@ r_PyLong(RFILE *p)
         }
         d += (digit)md << j*PyLong_MARSHAL_SHIFT;
     }
-    if (PyErr_Occurred()) {
-        Py_DECREF(ob);
-        return NULL;
-    }
+    assert(!PyErr_Occurred());
     /* top digit should be nonzero, else the resulting PyLong won't be
        normalized */
-    ob->ob_digit[size-1] = d;
+    ob->long_value.ob_digit[size-1] = d;
     return (PyObject *)ob;
   bad_digit:
     Py_DECREF(ob);
-    PyErr_SetString(PyExc_ValueError,
-                    "bad marshal data (digit out of range in long)");
+    if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError,
+                        "bad marshal data (digit out of range in long)");
+    }
     return NULL;
 }
 
@@ -912,8 +911,6 @@ r_float_str(RFILE *p)
     const char *ptr;
     n = r_byte(p);
     if (n == EOF) {
-        PyErr_SetString(PyExc_EOFError,
-            "EOF read where object expected");
         return -1;
     }
     ptr = r_string(n, p);
@@ -955,8 +952,7 @@ r_ref_insert(PyObject *o, Py_ssize_t idx, int flag, RFILE *p)
 {
     if (o != NULL && flag) { /* currently only FLAG_REF is defined */
         PyObject *tmp = PyList_GET_ITEM(p->refs, idx);
-        Py_INCREF(o);
-        PyList_SET_ITEM(p->refs, idx, o);
+        PyList_SET_ITEM(p->refs, idx, Py_NewRef(o));
         Py_DECREF(tmp);
     }
     return o;
@@ -992,8 +988,10 @@ r_object(RFILE *p)
     PyObject *retval = NULL;
 
     if (code == EOF) {
-        PyErr_SetString(PyExc_EOFError,
-                        "EOF read where object expected");
+        if (PyErr_ExceptionMatches(PyExc_EOFError)) {
+            PyErr_SetString(PyExc_EOFError,
+                            "EOF read where object expected");
+        }
         return NULL;
     }
 
@@ -1019,33 +1017,31 @@ r_object(RFILE *p)
         break;
 
     case TYPE_NONE:
-        Py_INCREF(Py_None);
-        retval = Py_None;
+        retval = Py_NewRef(Py_None);
         break;
 
     case TYPE_STOPITER:
-        Py_INCREF(PyExc_StopIteration);
-        retval = PyExc_StopIteration;
+        retval = Py_NewRef(PyExc_StopIteration);
         break;
 
     case TYPE_ELLIPSIS:
-        Py_INCREF(Py_Ellipsis);
-        retval = Py_Ellipsis;
+        retval = Py_NewRef(Py_Ellipsis);
         break;
 
     case TYPE_FALSE:
-        Py_INCREF(Py_False);
-        retval = Py_False;
+        retval = Py_NewRef(Py_False);
         break;
 
     case TYPE_TRUE:
-        Py_INCREF(Py_True);
-        retval = Py_True;
+        retval = Py_NewRef(Py_True);
         break;
 
     case TYPE_INT:
         n = r_long(p);
-        retval = PyErr_Occurred() ? NULL : PyLong_FromLong(n);
+        if (n == -1 && PyErr_Occurred()) {
+            break;
+        }
+        retval = PyLong_FromLong(n);
         R_REF(retval);
         break;
 
@@ -1111,10 +1107,11 @@ r_object(RFILE *p)
         {
             const char *ptr;
             n = r_long(p);
-            if (PyErr_Occurred())
-                break;
             if (n < 0 || n > SIZE32_MAX) {
-                PyErr_SetString(PyExc_ValueError, "bad marshal data (bytes object size out of range)");
+                if (!PyErr_Occurred()) {
+                    PyErr_SetString(PyExc_ValueError,
+                        "bad marshal data (bytes object size out of range)");
+                }
                 break;
             }
             v = PyBytes_FromStringAndSize((char *)NULL, n);
@@ -1136,10 +1133,11 @@ r_object(RFILE *p)
         /* fall through */
     case TYPE_ASCII:
         n = r_long(p);
-        if (PyErr_Occurred())
-            break;
         if (n < 0 || n > SIZE32_MAX) {
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (string size out of range)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (string size out of range)");
+            }
             break;
         }
         goto _read_ascii;
@@ -1150,8 +1148,6 @@ r_object(RFILE *p)
     case TYPE_SHORT_ASCII:
         n = r_byte(p);
         if (n == EOF) {
-            PyErr_SetString(PyExc_EOFError,
-                "EOF read where object expected");
             break;
         }
     _read_ascii:
@@ -1163,8 +1159,12 @@ r_object(RFILE *p)
             v = PyUnicode_FromKindAndData(PyUnicode_1BYTE_KIND, ptr, n);
             if (v == NULL)
                 break;
-            if (is_interned)
-                PyUnicode_InternInPlace(&v);
+            if (is_interned) {
+                // marshal is meant to serialize .pyc files with code
+                // objects, and code-related strings are currently immortal.
+                PyInterpreterState *interp = _PyInterpreterState_GET();
+                _PyUnicode_InternImmortal(interp, &v);
+            }
             retval = v;
             R_REF(retval);
             break;
@@ -1178,10 +1178,11 @@ r_object(RFILE *p)
         const char *buffer;
 
         n = r_long(p);
-        if (PyErr_Occurred())
-            break;
         if (n < 0 || n > SIZE32_MAX) {
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (string size out of range)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (string size out of range)");
+            }
             break;
         }
         if (n != 0) {
@@ -1195,24 +1196,30 @@ r_object(RFILE *p)
         }
         if (v == NULL)
             break;
-        if (is_interned)
-            PyUnicode_InternInPlace(&v);
+        if (is_interned) {
+            // marshal is meant to serialize .pyc files with code
+            // objects, and code-related strings are currently immortal.
+            PyInterpreterState *interp = _PyInterpreterState_GET();
+            _PyUnicode_InternImmortal(interp, &v);
+        }
         retval = v;
         R_REF(retval);
         break;
         }
 
     case TYPE_SMALL_TUPLE:
-        n = (unsigned char) r_byte(p);
-        if (PyErr_Occurred())
+        n = r_byte(p);
+        if (n == EOF) {
             break;
+        }
         goto _read_tuple;
     case TYPE_TUPLE:
         n = r_long(p);
-        if (PyErr_Occurred())
-            break;
         if (n < 0 || n > SIZE32_MAX) {
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (tuple size out of range)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (tuple size out of range)");
+            }
             break;
         }
     _read_tuple:
@@ -1227,8 +1234,7 @@ r_object(RFILE *p)
                 if (!PyErr_Occurred())
                     PyErr_SetString(PyExc_TypeError,
                         "NULL object in marshal data for tuple");
-                Py_DECREF(v);
-                v = NULL;
+                Py_SETREF(v, NULL);
                 break;
             }
             PyTuple_SET_ITEM(v, i, v2);
@@ -1238,10 +1244,11 @@ r_object(RFILE *p)
 
     case TYPE_LIST:
         n = r_long(p);
-        if (PyErr_Occurred())
-            break;
         if (n < 0 || n > SIZE32_MAX) {
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (list size out of range)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (list size out of range)");
+            }
             break;
         }
         v = PyList_New(n);
@@ -1254,8 +1261,7 @@ r_object(RFILE *p)
                 if (!PyErr_Occurred())
                     PyErr_SetString(PyExc_TypeError,
                         "NULL object in marshal data for list");
-                Py_DECREF(v);
-                v = NULL;
+                Py_SETREF(v, NULL);
                 break;
             }
             PyList_SET_ITEM(v, i, v2);
@@ -1287,8 +1293,7 @@ r_object(RFILE *p)
             Py_DECREF(val);
         }
         if (PyErr_Occurred()) {
-            Py_DECREF(v);
-            v = NULL;
+            Py_SETREF(v, NULL);
         }
         retval = v;
         break;
@@ -1296,10 +1301,11 @@ r_object(RFILE *p)
     case TYPE_SET:
     case TYPE_FROZENSET:
         n = r_long(p);
-        if (PyErr_Occurred())
-            break;
         if (n < 0 || n > SIZE32_MAX) {
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (set size out of range)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (set size out of range)");
+            }
             break;
         }
 
@@ -1332,8 +1338,7 @@ r_object(RFILE *p)
                     if (!PyErr_Occurred())
                         PyErr_SetString(PyExc_TypeError,
                             "NULL object in marshal data for set");
-                    Py_DECREF(v);
-                    v = NULL;
+                    Py_SETREF(v, NULL);
                     break;
                 }
                 if (PySet_Add(v, v2) == -1) {
@@ -1377,20 +1382,20 @@ r_object(RFILE *p)
 
             /* XXX ignore long->int overflows for now */
             argcount = (int)r_long(p);
-            if (PyErr_Occurred())
+            if (argcount == -1 && PyErr_Occurred())
                 goto code_error;
             posonlyargcount = (int)r_long(p);
-            if (PyErr_Occurred()) {
+            if (posonlyargcount == -1 && PyErr_Occurred()) {
                 goto code_error;
             }
             kwonlyargcount = (int)r_long(p);
-            if (PyErr_Occurred())
+            if (kwonlyargcount == -1 && PyErr_Occurred())
                 goto code_error;
             stacksize = (int)r_long(p);
-            if (PyErr_Occurred())
+            if (stacksize == -1 && PyErr_Occurred())
                 goto code_error;
             flags = (int)r_long(p);
-            if (PyErr_Occurred())
+            if (flags == -1 && PyErr_Occurred())
                 goto code_error;
             code = r_object(p);
             if (code == NULL)
@@ -1463,6 +1468,10 @@ r_object(RFILE *p)
             v = r_ref_insert(v, idx, flag, p);
 
           code_error:
+            if (v == NULL && !PyErr_Occurred()) {
+                PyErr_SetString(PyExc_TypeError,
+                    "NULL object in marshal data for code object");
+            }
             Py_XDECREF(code);
             Py_XDECREF(consts);
             Py_XDECREF(names);
@@ -1480,9 +1489,10 @@ r_object(RFILE *p)
     case TYPE_REF:
         n = r_long(p);
         if (n < 0 || n >= PyList_GET_SIZE(p->refs)) {
-            if (n == -1 && PyErr_Occurred())
-                break;
-            PyErr_SetString(PyExc_ValueError, "bad marshal data (invalid reference)");
+            if (!PyErr_Occurred()) {
+                PyErr_SetString(PyExc_ValueError,
+                    "bad marshal data (invalid reference)");
+            }
             break;
         }
         v = PyList_GET_ITEM(p->refs, n);
@@ -1490,8 +1500,7 @@ r_object(RFILE *p)
             PyErr_SetString(PyExc_ValueError, "bad marshal data (invalid reference)");
             break;
         }
-        Py_INCREF(v);
-        retval = v;
+        retval = Py_NewRef(v);
         break;
 
     default:
@@ -1851,7 +1860,7 @@ machine architecture issues.\n\
 Not all Python object types are supported; in general, only objects\n\
 whose value is independent from a particular invocation of Python can be\n\
 written and read by this module. The following types are supported:\n\
-None, integers, floating point numbers, strings, bytes, bytearrays,\n\
+None, integers, floating-point numbers, strings, bytes, bytearrays,\n\
 tuples, lists, sets, dictionaries, and code objects, where it\n\
 should be understood that tuples, lists and dictionaries are only\n\
 supported as long as the values contained therein are themselves\n\
@@ -1862,7 +1871,7 @@ Variables:\n\
 \n\
 version -- indicates the format that the module uses. Version 0 is the\n\
     historical format, version 1 shares interned strings and version 2\n\
-    uses a binary format for floating point numbers.\n\
+    uses a binary format for floating-point numbers.\n\
     Version 3 shares common object references (New in version 3.4).\n\
 \n\
 Functions:\n\
@@ -1884,6 +1893,7 @@ marshal_module_exec(PyObject *mod)
 
 static PyModuleDef_Slot marshalmodule_slots[] = {
     {Py_mod_exec, marshal_module_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
     {0, NULL}
 };
 

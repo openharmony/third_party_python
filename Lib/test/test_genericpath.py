@@ -7,7 +7,6 @@ import os
 import sys
 import unittest
 import warnings
-from test import support
 from test.support import is_emscripten
 from test.support import os_helper
 from test.support import warnings_helper
@@ -136,6 +135,10 @@ class GenericTest:
         self.assertIs(self.pathmodule.exists(filename), False)
         self.assertIs(self.pathmodule.exists(bfilename), False)
 
+        if self.pathmodule is not genericpath:
+            self.assertIs(self.pathmodule.lexists(filename), False)
+            self.assertIs(self.pathmodule.lexists(bfilename), False)
+
         create_file(filename)
 
         self.assertIs(self.pathmodule.exists(filename), True)
@@ -154,6 +157,11 @@ class GenericTest:
             self.assertIs(self.pathmodule.lexists(bfilename + b'\xff'), False)
             self.assertIs(self.pathmodule.lexists(filename + '\x00'), False)
             self.assertIs(self.pathmodule.lexists(bfilename + b'\x00'), False)
+
+        # Keyword arguments are accepted
+        self.assertIs(self.pathmodule.exists(path=filename), True)
+        if self.pathmodule is not genericpath:
+            self.assertIs(self.pathmodule.lexists(path=filename), True)
 
     @unittest.skipUnless(hasattr(os, "pipe"), "requires os.pipe()")
     @unittest.skipIf(is_emscripten, "Emscripten pipe fds have no stat")
@@ -434,19 +442,6 @@ class CommonTest(GenericTest):
             check(os.fsencode('$bar%s bar' % nonascii),
                   os.fsencode('$bar%s bar' % nonascii))
             check(b'$spam}bar', os.fsencode('%s}bar' % nonascii))
-
-    @support.requires_resource('cpu')
-    def test_expandvars_large(self):
-        expandvars = self.pathmodule.expandvars
-        with os_helper.EnvironmentVarGuard() as env:
-            env.clear()
-            env["A"] = "B"
-            n = 100_000
-            self.assertEqual(expandvars('$A'*n), 'B'*n)
-            self.assertEqual(expandvars('${A}'*n), 'B'*n)
-            self.assertEqual(expandvars('$A!'*n), 'B!'*n)
-            self.assertEqual(expandvars('${A}A'*n), 'BA'*n)
-            self.assertEqual(expandvars('${'*10*n), '${'*10*n)
 
     def test_abspath(self):
         self.assertIn("foo", self.pathmodule.abspath("foo"))

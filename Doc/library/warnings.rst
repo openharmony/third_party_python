@@ -1,5 +1,5 @@
-:mod:`warnings` --- Warning control
-===================================
+:mod:`!warnings` --- Warning control
+====================================
 
 .. module:: warnings
    :synopsis: Issue warning messages and control their disposition.
@@ -176,6 +176,19 @@ class, to turn a warning into an error we simply raise ``category(message)``.
 
 If a warning is reported and doesn't match any registered filter then the
 "default" action is applied (hence its name).
+
+
+
+.. _repeated-warning-suppression-criteria:
+
+Repeated Warning Suppression Criteria
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The filters that suppress repeated warnings apply the following criteria to determine if a warning is considered a repeat:
+
+- ``"default"``: A warning is considered a repeat only if the (*message*, *category*, *module*, *lineno*) are all the same.
+- ``"module"``: A warning is considered a repeat if the (*message*, *category*, *module*) are the same, ignoring the line number.
+- ``"once"``: A warning is considered a repeat if the (*message*, *category*) are the same, ignoring the module and line number.
 
 
 .. _describing-warning-filters:
@@ -396,7 +409,7 @@ Available Functions
 -------------------
 
 
-.. function:: warn(message, category=None, stacklevel=1, source=None)
+.. function:: warn(message, category=None, stacklevel=1, source=None, *, skip_file_prefixes=())
 
    Issue a warning, or maybe ignore it or raise an exception.  The *category*
    argument, if given, must be a :ref:`warning category class <warning-categories>`; it
@@ -407,18 +420,48 @@ Available Functions
    :ref:`warnings filter <warning-filter>`.  The *stacklevel* argument can be used by wrapper
    functions written in Python, like this::
 
-      def deprecation(message):
+      def deprecated_api(message):
           warnings.warn(message, DeprecationWarning, stacklevel=2)
 
-   This makes the warning refer to :func:`deprecation`'s caller, rather than to the
-   source of :func:`deprecation` itself (since the latter would defeat the purpose
-   of the warning message).
+   This makes the warning refer to ``deprecated_api``'s caller, rather than to
+   the source of ``deprecated_api`` itself (since the latter would defeat the
+   purpose of the warning message).
+
+   The *skip_file_prefixes* keyword argument can be used to indicate which
+   stack frames are ignored when counting stack levels. This can be useful when
+   you want the warning to always appear at call sites outside of a package
+   when a constant *stacklevel* does not fit all call paths or is otherwise
+   challenging to maintain. If supplied, it must be a tuple of strings. When
+   prefixes are supplied, stacklevel is implicitly overridden to be ``max(2,
+   stacklevel)``. To cause a warning to be attributed to the caller from
+   outside of the current package you might write::
+
+      # example/lower.py
+      _warn_skips = (os.path.dirname(__file__),)
+
+      def one_way(r_luxury_yacht=None, t_wobbler_mangrove=None):
+          if r_luxury_yacht:
+              warnings.warn("Please migrate to t_wobbler_mangrove=.",
+                            skip_file_prefixes=_warn_skips)
+
+      # example/higher.py
+      from . import lower
+
+      def another_way(**kw):
+          lower.one_way(**kw)
+
+   This makes the warning refer to both the ``example.lower.one_way()`` and
+   ``package.higher.another_way()`` call sites only from calling code living
+   outside of ``example`` package.
 
    *source*, if supplied, is the destroyed object which emitted a
    :exc:`ResourceWarning`.
 
    .. versionchanged:: 3.6
       Added *source* parameter.
+
+   .. versionchanged:: 3.12
+      Added *skip_file_prefixes*.
 
 
 .. function:: warn_explicit(message, category, filename, lineno, module=None, registry=None, module_globals=None, source=None)
@@ -514,6 +557,9 @@ Available Context Managers
     If the *action* argument is not ``None``, the remaining arguments are
     passed to :func:`simplefilter` as if it were called immediately on
     entering the context.
+
+    See :ref:`warning-filter` for the meaning of the *category* and *lineno*
+    parameters.
 
     .. note::
 

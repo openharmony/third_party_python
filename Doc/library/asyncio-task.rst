@@ -158,7 +158,7 @@ other coroutines::
         # Nothing happens if we just call "nested()".
         # A coroutine object is created but not awaited,
         # so it *won't run at all*.
-        nested()
+        nested()  # will raise a "RuntimeWarning".
 
         # Let's do it differently now and await it:
         print(await nested())  # will print "42".
@@ -256,8 +256,9 @@ Creating Tasks
 
    .. note::
 
-      :meth:`asyncio.TaskGroup.create_task` is a newer alternative
-      that allows for convenient waiting for a group of related tasks.
+      :meth:`asyncio.TaskGroup.create_task` is a new alternative
+      leveraging structural concurrency; it allows for waiting
+      for a group of related tasks with strong safety guarantees.
 
    .. important::
 
@@ -340,7 +341,7 @@ Example::
         async with asyncio.TaskGroup() as tg:
             task1 = tg.create_task(some_coro(...))
             task2 = tg.create_task(another_coro(...))
-        print("Both tasks have completed now.")
+        print(f"Both tasks have completed now: {task1.result()}, {task2.result()}")
 
 The ``async with`` statement will wait for all tasks in the group to finish.
 While waiting, new tasks may still be added to the group
@@ -385,10 +386,58 @@ The same special case is made for
 :exc:`KeyboardInterrupt` and :exc:`SystemExit` as in the previous paragraph.
 
 
+Terminating a Task Group
+------------------------
+
+While terminating a task group is not natively supported by the standard
+library, termination can be achieved by adding an exception-raising task
+to the task group and ignoring the raised exception:
+
+.. code-block:: python
+
+   import asyncio
+   from asyncio import TaskGroup
+
+   class TerminateTaskGroup(Exception):
+       """Exception raised to terminate a task group."""
+
+   async def force_terminate_task_group():
+       """Used to force termination of a task group."""
+       raise TerminateTaskGroup()
+
+   async def job(task_id, sleep_time):
+       print(f'Task {task_id}: start')
+       await asyncio.sleep(sleep_time)
+       print(f'Task {task_id}: done')
+
+   async def main():
+       try:
+           async with TaskGroup() as group:
+               # spawn some tasks
+               group.create_task(job(1, 0.5))
+               group.create_task(job(2, 1.5))
+               # sleep for 1 second
+               await asyncio.sleep(1)
+               # add an exception-raising task to force the group to terminate
+               group.create_task(force_terminate_task_group())
+       except* TerminateTaskGroup:
+           pass
+
+   asyncio.run(main())
+
+Expected output:
+
+.. code-block:: text
+
+   Task 1: start
+   Task 2: start
+   Task 1: done
+
 Sleeping
 ========
 
-.. coroutinefunction:: sleep(delay, result=None)
+.. function:: sleep(delay, result=None)
+   :async:
 
    Block for *delay* seconds.
 
@@ -459,8 +508,12 @@ Running Tasks Concurrently
    Tasks/Futures to be cancelled.
 
    .. note::
-      A more modern way to create and run tasks concurrently and
-      wait for their completion is :class:`asyncio.TaskGroup`.
+      A new alternative to create and run tasks concurrently and
+      wait for their completion is :class:`asyncio.TaskGroup`. *TaskGroup*
+      provides stronger safety guarantees than *gather* for scheduling a nesting of subtasks:
+      if a task (or a subtask, a task scheduled by a task)
+      raises an exception, *TaskGroup* will, while *gather* will not,
+      cancel the remaining scheduled tasks).
 
    .. _asyncio_example_gather:
 
@@ -502,7 +555,7 @@ Running Tasks Concurrently
       #     [2, 6, 24]
 
    .. note::
-      If *return_exceptions* is False, cancelling gather() after it
+      If *return_exceptions* is false, cancelling gather() after it
       has been marked done won't cancel any submitted awaitables.
       For instance, gather can be marked done after propagating an
       exception to the caller, therefore, calling ``gather.cancel()``
@@ -520,6 +573,51 @@ Running Tasks Concurrently
       Deprecation warning is emitted if no positional arguments are provided
       or not all positional arguments are Future-like objects
       and there is no running event loop.
+
+
+.. _eager-task-factory:
+
+Eager Task Factory
+==================
+
+.. function:: eager_task_factory(loop, coro, *, name=None, context=None)
+
+    A task factory for eager task execution.
+
+    When using this factory (via :meth:`loop.set_task_factory(asyncio.eager_task_factory) <loop.set_task_factory>`),
+    coroutines begin execution synchronously during :class:`Task` construction.
+    Tasks are only scheduled on the event loop if they block.
+    This can be a performance improvement as the overhead of loop scheduling
+    is avoided for coroutines that complete synchronously.
+
+    A common example where this is beneficial is coroutines which employ
+    caching or memoization to avoid actual I/O when possible.
+
+    .. note::
+
+        Immediate execution of the coroutine is a semantic change.
+        If the coroutine returns or raises, the task is never scheduled
+        to the event loop. If the coroutine execution blocks, the task is
+        scheduled to the event loop. This change may introduce behavior
+        changes to existing applications. For example,
+        the application's task execution order is likely to change.
+
+    .. versionadded:: 3.12
+
+.. function:: create_eager_task_factory(custom_task_constructor)
+
+    Create an eager task factory, similar to :func:`eager_task_factory`,
+    using the provided *custom_task_constructor* when creating a new task instead
+    of the default :class:`Task`.
+
+    *custom_task_constructor* must be a *callable* with the signature matching
+    the signature of :class:`Task.__init__ <Task>`.
+    The callable must return a :class:`asyncio.Task`-compatible object.
+
+    This function returns a *callable* intended to be used as a task factory of an
+    event loop via :meth:`loop.set_task_factory(factory) <loop.set_task_factory>`).
+
+    .. versionadded:: 3.12
 
 
 Shielding From Cancellation
@@ -578,9 +676,9 @@ Shielding From Cancellation
 Timeouts
 ========
 
-.. coroutinefunction:: timeout(delay)
+.. function:: timeout(delay)
 
-    An :ref:`asynchronous context manager <async-context-managers>`
+    Return an :ref:`asynchronous context manager <async-context-managers>`
     that can be used to limit the amount of time spent waiting on
     something.
 
@@ -601,16 +699,16 @@ Timeouts
     If ``long_running_task`` takes more than 10 seconds to complete,
     the context manager will cancel the current task and handle
     the resulting :exc:`asyncio.CancelledError` internally, transforming it
-    into an :exc:`asyncio.TimeoutError` which can be caught and handled.
+    into a :exc:`TimeoutError` which can be caught and handled.
 
     .. note::
 
       The :func:`asyncio.timeout` context manager is what transforms
-      the :exc:`asyncio.CancelledError` into an :exc:`asyncio.TimeoutError`,
-      which means the :exc:`asyncio.TimeoutError` can only be caught
+      the :exc:`asyncio.CancelledError` into a :exc:`TimeoutError`,
+      which means the :exc:`TimeoutError` can only be caught
       *outside* of the context manager.
 
-    Example of catching :exc:`asyncio.TimeoutError`::
+    Example of catching :exc:`TimeoutError`::
 
         async def main():
             try:
@@ -671,7 +769,7 @@ Timeouts
 
     .. versionadded:: 3.11
 
-.. coroutinefunction:: timeout_at(when)
+.. function:: timeout_at(when)
 
    Similar to :func:`asyncio.timeout`, except *when* is the absolute time
    to stop waiting, or ``None``.
@@ -691,7 +789,8 @@ Timeouts
 
    .. versionadded:: 3.11
 
-.. coroutinefunction:: wait_for(aw, timeout)
+.. function:: wait_for(aw, timeout)
+   :async:
 
    Wait for the *aw* :ref:`awaitable <asyncio-awaitables>`
    to complete with a timeout.
@@ -713,9 +812,6 @@ Timeouts
    happens during cancellation, it is propagated.
 
    If the wait is cancelled, the future *aw* is also cancelled.
-
-   .. versionchanged:: 3.10
-      Removed the *loop* parameter.
 
    .. _asyncio_example_waitfor:
 
@@ -747,17 +843,21 @@ Timeouts
    .. versionchanged:: 3.10
       Removed the *loop* parameter.
 
+   .. versionchanged:: 3.11
+      Raises :exc:`TimeoutError` instead of :exc:`asyncio.TimeoutError`.
+
 
 Waiting Primitives
 ==================
 
-.. coroutinefunction:: wait(aws, *, timeout=None, return_when=ALL_COMPLETED)
+.. function:: wait(aws, *, timeout=None, return_when=ALL_COMPLETED)
+   :async:
 
    Run :class:`~asyncio.Future` and :class:`~asyncio.Task` instances in the *aws*
    iterable concurrently and block until the condition specified
    by *return_when*.
 
-   The *aws* iterable must not be empty and generators yielding tasks are not accepted.
+   The *aws* iterable must not be empty.
 
    Returns two sets of Tasks/Futures: ``(done, pending)``.
 
@@ -775,23 +875,22 @@ Waiting Primitives
    *return_when* indicates when this function should return.  It must
    be one of the following constants:
 
-   .. tabularcolumns:: |l|L|
+   .. list-table::
+      :header-rows: 1
 
-   +-----------------------------+----------------------------------------+
-   | Constant                    | Description                            |
-   +=============================+========================================+
-   | :const:`FIRST_COMPLETED`    | The function will return when any      |
-   |                             | future finishes or is cancelled.       |
-   +-----------------------------+----------------------------------------+
-   | :const:`FIRST_EXCEPTION`    | The function will return when any      |
-   |                             | future finishes by raising an          |
-   |                             | exception.  If no future raises an     |
-   |                             | exception then it is equivalent to     |
-   |                             | :const:`ALL_COMPLETED`.                |
-   +-----------------------------+----------------------------------------+
-   | :const:`ALL_COMPLETED`      | The function will return when all      |
-   |                             | futures finish or are cancelled.       |
-   +-----------------------------+----------------------------------------+
+      * - Constant
+        - Description
+
+      * - .. data:: FIRST_COMPLETED
+        - The function will return when any future finishes or is cancelled.
+
+      * - .. data:: FIRST_EXCEPTION
+        - The function will return when any future finishes by raising an
+          exception. If no future raises an exception
+          then it is equivalent to :const:`ALL_COMPLETED`.
+
+      * - .. data:: ALL_COMPLETED
+        - The function will return when all futures finish or are cancelled.
 
    Unlike :func:`~asyncio.wait_for`, ``wait()`` does not cancel the
    futures when a timeout occurs.
@@ -802,11 +901,14 @@ Waiting Primitives
    .. versionchanged:: 3.11
       Passing coroutine objects to ``wait()`` directly is forbidden.
 
+   .. versionchanged:: 3.12
+      Added support for generators yielding tasks.
+
+
 .. function:: as_completed(aws, *, timeout=None)
 
    Run :ref:`awaitable objects <asyncio-awaitables>` in the *aws*
-   iterable concurrently. Generators yielding tasks are not accepted
-   as *aws* iterable. Return an iterator of coroutines.
+   iterable concurrently.  Return an iterator of coroutines.
    Each coroutine returned can be awaited to get the earliest next
    result from the iterable of the remaining awaitables.
 
@@ -826,11 +928,15 @@ Waiting Primitives
       Deprecation warning is emitted if not all awaitable objects in the *aws*
       iterable are Future-like objects and there is no running event loop.
 
+   .. versionchanged:: 3.12
+      Added support for generators yielding tasks.
+
 
 Running in Threads
 ==================
 
-.. coroutinefunction:: to_thread(func, /, *args, **kwargs)
+.. function:: to_thread(func, /, *args, **kwargs)
+   :async:
 
    Asynchronously run function *func* in a separate thread.
 
@@ -967,7 +1073,7 @@ Introspection
 Task Object
 ===========
 
-.. class:: Task(coro, *, loop=None, name=None, context=None)
+.. class:: Task(coro, *, loop=None, name=None, context=None, eager_start=False)
 
    A :class:`Future-like <Future>` object that runs a Python
    :ref:`coroutine <coroutine>`.  Not thread-safe.
@@ -1007,6 +1113,13 @@ Task Object
    If no *context* is provided, the Task copies the current context
    and later runs its coroutine in the copied context.
 
+   An optional keyword-only *eager_start* argument allows eagerly starting
+   the execution of the :class:`asyncio.Task` at task creation time.
+   If set to ``True`` and the event loop is running, the task will start
+   executing the coroutine immediately, until the first time the coroutine
+   blocks. If the coroutine returns or raises without blocking, the task
+   will be finished eagerly and will skip scheduling to the event loop.
+
    .. versionchanged:: 3.7
       Added support for the :mod:`contextvars` module.
 
@@ -1019,6 +1132,9 @@ Task Object
 
    .. versionchanged:: 3.11
       Added the *context* parameter.
+
+   .. versionchanged:: 3.12
+      Added the *eager_start* parameter.
 
    .. method:: done()
 
@@ -1039,7 +1155,7 @@ Task Object
       a :exc:`CancelledError` exception.
 
       If the Task's result isn't yet available, this method raises
-      a :exc:`InvalidStateError` exception.
+      an :exc:`InvalidStateError` exception.
 
    .. method:: exception()
 
@@ -1110,7 +1226,23 @@ Task Object
 
       Return the coroutine object wrapped by the :class:`Task`.
 
+      .. note::
+
+         This will return ``None`` for Tasks which have already
+         completed eagerly. See the :ref:`Eager Task Factory <eager-task-factory>`.
+
       .. versionadded:: 3.8
+
+      .. versionchanged:: 3.12
+
+         Newly added eager task execution means result may be ``None``.
+
+   .. method:: get_context()
+
+      Return the :class:`contextvars.Context` object
+      associated with the task.
+
+      .. versionadded:: 3.12
 
    .. method:: get_name()
 
@@ -1239,7 +1371,7 @@ Task Object
       with :meth:`uncancel`.  :class:`TaskGroup` context managers use
       :func:`uncancel` in a similar fashion.
 
-      If end-user code is, for some reason, suppresing cancellation by
+      If end-user code is, for some reason, suppressing cancellation by
       catching :exc:`CancelledError`, it needs to call this method to remove
       the cancellation state.
 

@@ -13,7 +13,9 @@
 #include "pycore_fileutils.h"     // _Py_BEGIN_SUPPRESS_IPH
 #include "pycore_pystate.h"   // _PyThreadState_GET()
 #ifdef MS_WINDOWS
+#  ifndef WIN32_LEAN_AND_MEAN
 #  define WIN32_LEAN_AND_MEAN
+#  endif
 #  include "windows.h"
 #endif /* MS_WINDOWS */
 
@@ -43,7 +45,10 @@ my_fgets(PyThreadState* tstate, char *buf, int len, FILE *fp)
 #endif
 
     while (1) {
-        if (PyOS_InputHook != NULL) {
+        if (PyOS_InputHook != NULL &&
+            // GH-104668: See PyOS_ReadlineFunctionPointer's comment below...
+            _Py_IsMainInterpreter(tstate->interp))
+        {
             (void)(PyOS_InputHook)();
         }
 
@@ -108,7 +113,7 @@ my_fgets(PyThreadState* tstate, char *buf, int len, FILE *fp)
     /* NOTREACHED */
 }
 
-#ifdef MS_WINDOWS
+#ifdef HAVE_WINDOWS_CONSOLE_IO
 /* Readline implementation using ReadConsoleW */
 
 extern char _get_console_type(HANDLE handle);
@@ -129,7 +134,10 @@ _PyOS_WindowsConsoleReadline(PyThreadState *tstate, HANDLE hStdIn)
     wbuf = wbuf_local;
     wbuflen = sizeof(wbuf_local) / sizeof(wbuf_local[0]) - 1;
     while (1) {
-        if (PyOS_InputHook != NULL) {
+        if (PyOS_InputHook != NULL &&
+            // GH-104668: See PyOS_ReadlineFunctionPointer's comment below...
+            _Py_IsMainInterpreter(tstate->interp))
+        {
             (void)(PyOS_InputHook)();
         }
         if (!ReadConsoleW(hStdIn, &wbuf[total_read], wbuflen - total_read, &n_read, NULL)) {
@@ -233,7 +241,7 @@ exit:
     return buf;
 }
 
-#endif
+#endif /* HAVE_WINDOWS_CONSOLE_IO */
 
 
 /* Readline implementation using fgets() */
@@ -246,8 +254,9 @@ PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
     PyThreadState *tstate = _PyOS_ReadlineTState;
     assert(tstate != NULL);
 
-#ifdef MS_WINDOWS
-    if (!Py_LegacyWindowsStdioFlag && sys_stdin == stdin) {
+#ifdef HAVE_WINDOWS_CONSOLE_IO
+    const PyConfig *config = _PyInterpreterState_GetConfig(tstate->interp);
+    if (!config->legacy_windows_stdio && sys_stdin == stdin) {
         HANDLE hStdIn, hStdErr;
 
         hStdIn = _Py_get_osfhandle_noraise(fileno(sys_stdin));
@@ -377,25 +386,44 @@ PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
         }
     }
 
-    _PyOS_ReadlineTState = tstate;
     Py_BEGIN_ALLOW_THREADS
+
+    // GH-123321: We need to acquire the lock before setting
+    // _PyOS_ReadlineTState and after the release of the GIL, otherwise
+    // the variable may be nullified by a different thread or a deadlock
+    // may occur if the GIL is taken in any sub-function.
     PyThread_acquire_lock(_PyOS_ReadlineLock, 1);
+    _PyOS_ReadlineTState = tstate;
 
     /* This is needed to handle the unlikely case that the
      * interpreter is in interactive mode *and* stdin/out are not
      * a tty.  This can happen, for example if python is run like
      * this: python -i < test1.py
      */
-    if (!isatty (fileno (sys_stdin)) || !isatty (fileno (sys_stdout)))
-        rv = PyOS_StdioReadline (sys_stdin, sys_stdout, prompt);
-    else
-        rv = (*PyOS_ReadlineFunctionPointer)(sys_stdin, sys_stdout,
-                                             prompt);
-    Py_END_ALLOW_THREADS
+    if (!isatty(fileno(sys_stdin)) || !isatty(fileno(sys_stdout)) ||
+        // GH-104668: Don't call global callbacks like PyOS_InputHook or
+        // PyOS_ReadlineFunctionPointer from subinterpreters, since it seems
+        // like there's no good way for users (like readline and tkinter) to
+        // avoid using global state to manage them. Plus, we generally don't
+        // want to cause trouble for libraries that don't know/care about
+        // subinterpreter support. If libraries really need better APIs that
+        // work per-interpreter and have ways to access module state, we can
+        // certainly add them later (but for now we'll cross our fingers and
+        // hope that nobody actually cares):
+        !_Py_IsMainInterpreter(tstate->interp))
+    {
+        rv = PyOS_StdioReadline(sys_stdin, sys_stdout, prompt);
+    }
+    else {
+        rv = (*PyOS_ReadlineFunctionPointer)(sys_stdin, sys_stdout, prompt);
+    }
 
+    // gh-123321: Must set the variable and then release the lock before
+    // taking the GIL. Otherwise a deadlock or segfault may occur.
+    _PyOS_ReadlineTState = NULL;
     PyThread_release_lock(_PyOS_ReadlineLock);
 
-    _PyOS_ReadlineTState = NULL;
+    Py_END_ALLOW_THREADS
 
     if (rv == NULL)
         return NULL;

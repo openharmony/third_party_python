@@ -1,7 +1,6 @@
 #ifndef Py_BUILD_CORE_MODULE
 #  define Py_BUILD_CORE_MODULE
 #endif
-#define NEEDS_PY_IDENTIFIER
 
 /* Always enable assertion (even in release mode) */
 #undef NDEBUG
@@ -10,7 +9,6 @@
 #include "pycore_initconfig.h"    // _PyConfig_InitCompatConfig()
 #include "pycore_runtime.h"       // _PyRuntime
 #include "pycore_import.h"        // _PyImport_FrozenBootstrap
-#include <Python.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>               // putenv()
@@ -165,14 +163,22 @@ PyInit_embedded_ext(void)
 static int test_repeated_init_exec(void)
 {
     if (main_argc < 3) {
-        fprintf(stderr, "usage: %s test_repeated_init_exec CODE\n", PROGRAM);
+        fprintf(stderr,
+                "usage: %s test_repeated_init_exec CODE ...\n", PROGRAM);
         exit(1);
     }
     const char *code = main_argv[2];
+    int loops = main_argc > 3
+        ? main_argc - 2
+        : INIT_LOOPS;
 
-    for (int i=1; i <= INIT_LOOPS; i++) {
-        fprintf(stderr, "--- Loop #%d ---\n", i);
+    for (int i=0; i < loops; i++) {
+        fprintf(stderr, "--- Loop #%d ---\n", i+1);
         fflush(stderr);
+
+        if (main_argc > 3) {
+            code = main_argv[i+2];
+        }
 
         _testembed_Py_InitializeFromConfig();
         int err = PyRun_SimpleString(code);
@@ -704,7 +710,8 @@ static int test_init_from_config(void)
 
     config.safe_path = 1;
 
-    config._isolated_interpreter = 1;
+    putenv("PYTHONINTMAXSTRDIGITS=6666");
+    config.int_max_str_digits = 31337;
 
     init_from_config_clear(&config);
 
@@ -771,6 +778,7 @@ static void set_most_env_vars(void)
     putenv("PYTHONIOENCODING=iso8859-1:replace");
     putenv("PYTHONPLATLIBDIR=env_platlibdir");
     putenv("PYTHONSAFEPATH=1");
+    putenv("PYTHONINTMAXSTRDIGITS=4567");
 }
 
 
@@ -1889,7 +1897,14 @@ static int test_unicode_id_init(void)
 {
     // bpo-42882: Test that _PyUnicode_FromId() works
     // when Python is initialized multiples times.
-    _Py_IDENTIFIER(test_unicode_id_init);
+
+    // This is equivalent to `_Py_IDENTIFIER(test_unicode_id_init)`
+    // but since `_Py_IDENTIFIER` is disabled when `Py_BUILD_CORE`
+    // is defined, it is manually expanded here.
+    static _Py_Identifier PyId_test_unicode_id_init = {
+        .string = "test_unicode_id_init",
+        .index = -1,
+    };
 
     // Initialize Python once without using the identifier
     _testembed_Py_InitializeFromConfig();
@@ -1904,18 +1919,29 @@ static int test_unicode_id_init(void)
 
         str1 = _PyUnicode_FromId(&PyId_test_unicode_id_init);
         assert(str1 != NULL);
-        assert(Py_REFCNT(str1) == 1);
+        assert(_Py_IsImmortal(str1));
 
         str2 = PyUnicode_FromString("test_unicode_id_init");
         assert(str2 != NULL);
 
         assert(PyUnicode_Compare(str1, str2) == 0);
 
-        // str1 is a borrowed reference
         Py_DECREF(str2);
 
         Py_Finalize();
     }
+    return 0;
+}
+
+
+static int test_init_main_interpreter_settings(void)
+{
+    _testembed_Py_Initialize();
+    (void) PyRun_SimpleStringFlags(
+        "import _testinternalcapi, json; "
+        "print(json.dumps(_testinternalcapi.get_interp_settings(0)))",
+        0);
+    Py_Finalize();
     return 0;
 }
 
@@ -2107,6 +2133,7 @@ static struct TestCase TestCases[] = {
     {"test_run_main_loop", test_run_main_loop},
     {"test_get_argc_argv", test_get_argc_argv},
     {"test_init_use_frozen_modules", test_init_use_frozen_modules},
+    {"test_init_main_interpreter_settings", test_init_main_interpreter_settings},
 
     // Audit
     {"test_open_code_hook", test_open_code_hook},
