@@ -137,7 +137,7 @@ class DarwinPythonBuilder(PythonBuilder):
         # 定义源文件路径
         _external_libs = [self._deps_dir / 'ssl' / 'lib' / 'libssl.dylib', self._deps_dir / 'ssl' / 'lib' / 'libcrypto.dylib']
         # 定义目标目录
-        target_dir = self._install_dir / 'lib' / 'python3.11' / 'lib'
+        target_dir = self._install_dir / 'lib' / 'python3.12' / 'lib'
         # 创建目标目录（如果不存在）
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -152,10 +152,10 @@ class DarwinPythonBuilder(PythonBuilder):
     def _dylib_rpath_setting(self) -> None:
         self._logger.info("Darwin dylib rpath setting...")
         prefix = str(self._deps_dir / 'ssl' / 'lib')
-        python_exec = self._install_dir / 'bin' / 'python3.11'
-        python_dylib = self._install_dir / 'lib' / 'libpython3.11.dylib'
-        dylib_dir = self._install_dir / 'lib' / 'python3.11' / 'lib'
-        _ssl_module_so = self._install_dir / 'lib' / 'python3.11' / 'lib-dynload' / '_ssl.cpython-311-darwin.so'
+        python_exec = self._install_dir / 'bin' / 'python3.12'
+        python_dylib = self._install_dir / 'lib' / 'libpython3.12.dylib'
+        dylib_dir = self._install_dir / 'lib' / 'python3.12' / 'lib'
+        _ssl_module_so = self._install_dir / 'lib' / 'python3.12' / 'lib-dynload' / '_ssl.cpython-312-darwin.so'
         
         try:
             run_command(["install_name_tool", "-id", f"@rpath/{python_exec.name}", f"{python_exec}"])
