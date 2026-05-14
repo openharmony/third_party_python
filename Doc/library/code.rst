@@ -1,5 +1,5 @@
-:mod:`code` --- Interpreter base classes
-========================================
+:mod:`!code` --- Interpreter base classes
+=========================================
 
 .. module:: code
    :synopsis: Facilities to implement read-eval-print loops.
@@ -36,7 +36,7 @@ build applications which provide an interactive interpreter prompt.
    instance of :class:`InteractiveConsole` and sets *readfunc* to be used as
    the :meth:`InteractiveConsole.raw_input` method, if provided.  If *local* is
    provided, it is passed to the :class:`InteractiveConsole` constructor for
-   use as the default namespace for the interpreter loop.  The :meth:`interact`
+   use as the default namespace for the interpreter loop.  The :meth:`~InteractiveConsole.interact`
    method of the instance is then run with *banner* and *exitmsg* passed as the
    banner and exit message to use, if provided.  The console object is discarded
    after use.
@@ -163,12 +163,12 @@ interpreter objects as well as the following additions.
 
    Push a line of source text to the interpreter. The line should not have a
    trailing newline; it may have internal newlines.  The line is appended to a
-   buffer and the interpreter's :meth:`runsource` method is called with the
+   buffer and the interpreter's :meth:`~InteractiveInterpreter.runsource` method is called with the
    concatenated contents of the buffer as source.  If this indicates that the
    command was executed or invalid, the buffer is reset; otherwise, the command is
    incomplete, and the buffer is left as it was after the line was appended.  The
    return value is ``True`` if more input is required, ``False`` if the line was
-   dealt with in some way (this is the same as :meth:`runsource`).
+   dealt with in some way (this is the same as :meth:`!runsource`).
 
 
 .. method:: InteractiveConsole.resetbuffer()

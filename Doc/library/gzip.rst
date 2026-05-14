@@ -1,5 +1,5 @@
-:mod:`gzip` --- Support for :program:`gzip` files
-=================================================
+:mod:`!gzip` --- Support for :program:`gzip` files
+==================================================
 
 .. module:: gzip
    :synopsis: Interfaces for gzip compression and decompression using file objects.
@@ -61,7 +61,7 @@ The module defines the following items:
 
 .. exception:: BadGzipFile
 
-   An exception raised for invalid gzip files.  It inherits :exc:`OSError`.
+   An exception raised for invalid gzip files.  It inherits from :exc:`OSError`.
    :exc:`EOFError` and :exc:`zlib.error` can also be raised for invalid gzip
    files.
 
@@ -70,7 +70,7 @@ The module defines the following items:
 .. class:: GzipFile(filename=None, mode=None, compresslevel=9, fileobj=None, mtime=None)
 
    Constructor for the :class:`GzipFile` class, which simulates most of the
-   methods of a :term:`file object`, with the exception of the :meth:`truncate`
+   methods of a :term:`file object`, with the exception of the :meth:`~io.IOBase.truncate`
    method.  At least one of *fileobj* and *filename* must be given a non-trivial
    value.
 
@@ -105,7 +105,7 @@ The module defines the following items:
    should only be provided in compression mode.  If omitted or ``None``, the
    current time is used.  See the :attr:`mtime` attribute for more details.
 
-   Calling a :class:`GzipFile` object's :meth:`close` method does not close
+   Calling a :class:`GzipFile` object's :meth:`!close` method does not close
    *fileobj*, since you might wish to append more material after the compressed
    data.  This also allows you to pass an :class:`io.BytesIO` object opened for
    writing as *fileobj*, and retrieve the resulting memory buffer using the
@@ -113,7 +113,7 @@ The module defines the following items:
 
    :class:`GzipFile` supports the :class:`io.BufferedIOBase` interface,
    including iteration and the :keyword:`with` statement.  Only the
-   :meth:`truncate` method isn't implemented.
+   :meth:`~io.IOBase.truncate` method isn't implemented.
 
    :class:`GzipFile` also provides the following method and attribute:
 
@@ -171,6 +171,10 @@ The module defines the following items:
    .. versionchanged:: 3.6
       Accepts a :term:`path-like object`.
 
+   .. versionchanged:: 3.12
+      Remove the ``filename`` attribute, use the :attr:`~GzipFile.name`
+      attribute instead.
+
    .. deprecated:: 3.9
       Opening :class:`GzipFile` for writing without specifying the *mode*
       argument is deprecated.
@@ -190,7 +194,9 @@ The module defines the following items:
    .. versionchanged:: 3.11
       Speed is improved by compressing all data at once instead of in a
       streamed fashion. Calls with *mtime* set to ``0`` are delegated to
-      :func:`zlib.compress` for better speed.
+      :func:`zlib.compress` for better speed. In this situation the
+      output may contain a gzip header "OS" byte value other than 255
+      "unknown" as supplied by the underlying zlib implementation.
 
 .. function:: decompress(data)
 
@@ -246,6 +252,8 @@ Example of how to GZIP compress a binary string::
 
 .. program:: gzip
 
+.. _gzip-cli:
+
 Command Line Interface
 ----------------------
 
@@ -262,23 +270,22 @@ Once executed the :mod:`gzip` module keeps the input file(s).
 Command line options
 ^^^^^^^^^^^^^^^^^^^^
 
-.. cmdoption:: file
+.. option:: file
 
-   If *file* is not specified, read from :attr:`sys.stdin`.
+   If *file* is not specified, read from :data:`sys.stdin`.
 
-.. cmdoption:: --fast
+.. option:: --fast
 
    Indicates the fastest compression method (less compression).
 
-.. cmdoption:: --best
+.. option:: --best
 
    Indicates the slowest compression method (best compression).
 
-.. cmdoption:: -d, --decompress
+.. option:: -d, --decompress
 
    Decompress the given file.
 
-.. cmdoption:: -h, --help
+.. option:: -h, --help
 
    Show the help message.
-

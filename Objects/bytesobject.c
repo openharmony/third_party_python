@@ -53,8 +53,7 @@ static inline PyObject* bytes_get_empty(void)
 // Return a strong reference to the empty bytes string singleton.
 static inline PyObject* bytes_new_empty(void)
 {
-    Py_INCREF(EMPTY);
-    return (PyObject *)EMPTY;
+    return Py_NewRef(EMPTY);
 }
 
 
@@ -126,8 +125,7 @@ PyBytes_FromStringAndSize(const char *str, Py_ssize_t size)
     }
     if (size == 1 && str != NULL) {
         op = CHARACTER(*str & 255);
-        Py_INCREF(op);
-        return (PyObject *)op;
+        return Py_NewRef(op);
     }
     if (size == 0) {
         return bytes_new_empty();
@@ -162,8 +160,7 @@ PyBytes_FromString(const char *str)
     }
     else if (size == 1) {
         op = CHARACTER(*str & 255);
-        Py_INCREF(op);
-        return (PyObject *)op;
+        return Py_NewRef(op);
     }
 
     /* Inline PyObject_NewVar */
@@ -377,11 +374,7 @@ PyBytes_FromFormat(const char *format, ...)
     PyObject* ret;
     va_list vargs;
 
-#ifdef HAVE_STDARG_PROTOTYPES
     va_start(vargs, format);
-#else
-    va_start(vargs);
-#endif
     ret = PyBytes_FromFormatV(format, vargs);
     va_end(vargs);
     return ret;
@@ -530,14 +523,12 @@ format_obj(PyObject *v, const char **pbuf, Py_ssize_t *plen)
     if (PyBytes_Check(v)) {
         *pbuf = PyBytes_AS_STRING(v);
         *plen = PyBytes_GET_SIZE(v);
-        Py_INCREF(v);
-        return v;
+        return Py_NewRef(v);
     }
     if (PyByteArray_Check(v)) {
         *pbuf = PyByteArray_AS_STRING(v);
         *plen = PyByteArray_GET_SIZE(v);
-        Py_INCREF(v);
-        return v;
+        return Py_NewRef(v);
     }
     /* does it support __bytes__? */
     func = _PyObject_LookupSpecial(v, &_Py_ID(__bytes__));
@@ -1057,11 +1048,10 @@ _PyBytes_FormatEx(const char *format, Py_ssize_t format_len,
 }
 
 /* Unescape a backslash-escaped string. */
-PyObject *_PyBytes_DecodeEscape2(const char *s,
+PyObject *_PyBytes_DecodeEscape(const char *s,
                                 Py_ssize_t len,
                                 const char *errors,
-                                int *first_invalid_escape_char,
-                                const char **first_invalid_escape_ptr)
+                                const char **first_invalid_escape)
 {
     int c;
     char *p;
@@ -1075,8 +1065,7 @@ PyObject *_PyBytes_DecodeEscape2(const char *s,
         return NULL;
     writer.overallocate = 1;
 
-    *first_invalid_escape_char = -1;
-    *first_invalid_escape_ptr = NULL;
+    *first_invalid_escape = NULL;
 
     end = s + len;
     while (s < end) {
@@ -1114,10 +1103,9 @@ PyObject *_PyBytes_DecodeEscape2(const char *s,
                     c = (c<<3) + *s++ - '0';
             }
             if (c > 0377) {
-                if (*first_invalid_escape_char == -1) {
-                    *first_invalid_escape_char = c;
-                    /* Back up 3 chars, since we've already incremented s. */
-                    *first_invalid_escape_ptr = s - 3;
+                if (*first_invalid_escape == NULL) {
+                    *first_invalid_escape = s-3; /* Back up 3 chars, since we've
+                                                    already incremented s. */
                 }
             }
             *p++ = c;
@@ -1158,10 +1146,9 @@ PyObject *_PyBytes_DecodeEscape2(const char *s,
             break;
 
         default:
-            if (*first_invalid_escape_char == -1) {
-                *first_invalid_escape_char = (unsigned char)s[-1];
-                /* Back up one char, since we've already incremented s. */
-                *first_invalid_escape_ptr = s - 1;
+            if (*first_invalid_escape == NULL) {
+                *first_invalid_escape = s-1; /* Back up one char, since we've
+                                                already incremented s. */
             }
             *p++ = '\\';
             s--;
@@ -1175,39 +1162,23 @@ PyObject *_PyBytes_DecodeEscape2(const char *s,
     return NULL;
 }
 
-// Export for binary compatibility.
-PyObject *_PyBytes_DecodeEscape(const char *s,
-                                Py_ssize_t len,
-                                const char *errors,
-                                const char **first_invalid_escape)
-{
-    int first_invalid_escape_char;
-    return _PyBytes_DecodeEscape2(
-            s, len, errors,
-            &first_invalid_escape_char,
-            first_invalid_escape);
-}
-
 PyObject *PyBytes_DecodeEscape(const char *s,
                                 Py_ssize_t len,
                                 const char *errors,
                                 Py_ssize_t Py_UNUSED(unicode),
                                 const char *Py_UNUSED(recode_encoding))
 {
-    int first_invalid_escape_char;
-    const char *first_invalid_escape_ptr;
-    PyObject *result = _PyBytes_DecodeEscape2(s, len, errors,
-                                             &first_invalid_escape_char,
-                                             &first_invalid_escape_ptr);
+    const char* first_invalid_escape;
+    PyObject *result = _PyBytes_DecodeEscape(s, len, errors,
+                                             &first_invalid_escape);
     if (result == NULL)
         return NULL;
-    if (first_invalid_escape_char != -1) {
-        if (first_invalid_escape_char > 0xff) {
-            char buf[12] = "";
-            snprintf(buf, sizeof buf, "%o", first_invalid_escape_char);
+    if (first_invalid_escape != NULL) {
+        unsigned char c = *first_invalid_escape;
+        if ('4' <= c && c <= '7') {
             if (PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
-                                 "invalid octal escape sequence '\\%s'",
-                                 buf) < 0)
+                                 "invalid octal escape sequence '\\%.3s'",
+                                 first_invalid_escape) < 0)
             {
                 Py_DECREF(result);
                 return NULL;
@@ -1216,7 +1187,7 @@ PyObject *PyBytes_DecodeEscape(const char *s,
         else {
             if (PyErr_WarnFormat(PyExc_DeprecationWarning, 1,
                                  "invalid escape sequence '\\%c'",
-                                 first_invalid_escape_char) < 0)
+                                 c) < 0)
             {
                 Py_DECREF(result);
                 return NULL;
@@ -1303,8 +1274,25 @@ _PyBytes_Find(const char *haystack, Py_ssize_t len_haystack,
               const char *needle, Py_ssize_t len_needle,
               Py_ssize_t offset)
 {
-    return stringlib_find(haystack, len_haystack,
-                          needle, len_needle, offset);
+    assert(len_haystack >= 0);
+    assert(len_needle >= 0);
+    // Extra checks because stringlib_find accesses haystack[len_haystack].
+    if (len_needle == 0) {
+        return offset;
+    }
+    if (len_needle > len_haystack) {
+        return -1;
+    }
+    assert(len_haystack >= 1);
+    Py_ssize_t res = stringlib_find(haystack, len_haystack - 1,
+                                    needle, len_needle, offset);
+    if (res == -1) {
+        Py_ssize_t last_align = len_haystack - len_needle;
+        if (memcmp(haystack + last_align, needle, len_needle) == 0) {
+            return offset + last_align;
+        }
+    }
+    return res;
 }
 
 Py_ssize_t
@@ -1433,13 +1421,11 @@ bytes_concat(PyObject *a, PyObject *b)
 
     /* Optimize end cases */
     if (va.len == 0 && PyBytes_CheckExact(b)) {
-        result = b;
-        Py_INCREF(result);
+        result = Py_NewRef(b);
         goto done;
     }
     if (vb.len == 0 && PyBytes_CheckExact(a)) {
-        result = a;
-        Py_INCREF(result);
+        result = Py_NewRef(a);
         goto done;
     }
 
@@ -1480,8 +1466,7 @@ bytes_repeat(PyBytesObject *a, Py_ssize_t n)
     }
     size = Py_SIZE(a) * n;
     if (size == Py_SIZE(a) && PyBytes_CheckExact(a)) {
-        Py_INCREF(a);
-        return (PyObject *)a;
+        return Py_NewRef(a);
     }
     nbytes = (size_t)size;
     if (nbytes + PyBytesObject_SIZE <= nbytes) {
@@ -1647,8 +1632,7 @@ bytes_subscript(PyBytesObject* self, PyObject* item)
         else if (start == 0 && step == 1 &&
                  slicelength == PyBytes_GET_SIZE(self) &&
                  PyBytes_CheckExact(self)) {
-            Py_INCREF(self);
-            return (PyObject *)self;
+            return Py_NewRef(self);
         }
         else if (step == 1) {
             return PyBytes_FromStringAndSize(
@@ -1718,8 +1702,7 @@ bytes___bytes___impl(PyBytesObject *self)
 /*[clinic end generated code: output=63a306a9bc0caac5 input=34ec5ddba98bd6bb]*/
 {
     if (PyBytes_CheckExact(self)) {
-        Py_INCREF(self);
-        return (PyObject *)self;
+        return Py_NewRef(self);
     }
     else {
         return PyBytes_FromStringAndSize(self->ob_sval, Py_SIZE(self));
@@ -1944,8 +1927,7 @@ do_xstrip(PyBytesObject *self, int striptype, PyObject *sepobj)
     PyBuffer_Release(&vsep);
 
     if (i == 0 && j == len && PyBytes_CheckExact(self)) {
-        Py_INCREF(self);
-        return (PyObject*)self;
+        return Py_NewRef(self);
     }
     else
         return PyBytes_FromStringAndSize(s+i, j-i);
@@ -1974,8 +1956,7 @@ do_strip(PyBytesObject *self, int striptype)
     }
 
     if (i == 0 && j == len && PyBytes_CheckExact(self)) {
-        Py_INCREF(self);
-        return (PyObject*)self;
+        return Py_NewRef(self);
     }
     else
         return PyBytes_FromStringAndSize(s+i, j-i);
@@ -2143,9 +2124,7 @@ bytes_translate_impl(PyBytesObject *self, PyObject *table,
                 changed = 1;
         }
         if (!changed && PyBytes_CheckExact(input_obj)) {
-            Py_INCREF(input_obj);
-            Py_DECREF(result);
-            result = input_obj;
+            Py_SETREF(result, Py_NewRef(input_obj));
         }
         PyBuffer_Release(&del_table_view);
         PyBuffer_Release(&table_view);
@@ -2174,8 +2153,7 @@ bytes_translate_impl(PyBytesObject *self, PyObject *table,
     }
     if (!changed && PyBytes_CheckExact(input_obj)) {
         Py_DECREF(result);
-        Py_INCREF(input_obj);
-        return input_obj;
+        return Py_NewRef(input_obj);
     }
     /* Fix the size of the resulting byte string */
     if (inlen > 0)
@@ -2267,8 +2245,7 @@ bytes_removeprefix_impl(PyBytesObject *self, Py_buffer *prefix)
     }
 
     if (PyBytes_CheckExact(self)) {
-        Py_INCREF(self);
-        return (PyObject *)self;
+        return Py_NewRef(self);
     }
 
     return PyBytes_FromStringAndSize(self_start, self_len);
@@ -2306,8 +2283,7 @@ bytes_removesuffix_impl(PyBytesObject *self, Py_buffer *suffix)
     }
 
     if (PyBytes_CheckExact(self)) {
-        Py_INCREF(self);
-        return (PyObject *)self;
+        return Py_NewRef(self);
     }
 
     return PyBytes_FromStringAndSize(self_start, self_len);
@@ -2353,7 +2329,7 @@ bytes_decode_impl(PyBytesObject *self, const char *encoding,
 /*[clinic input]
 bytes.splitlines
 
-    keepends: bool(accept={int}) = False
+    keepends: bool = False
 
 Return a list of the lines in the bytes, breaking at line boundaries.
 
@@ -2363,7 +2339,7 @@ true.
 
 static PyObject *
 bytes_splitlines_impl(PyBytesObject *self, int keepends)
-/*[clinic end generated code: output=3484149a5d880ffb input=a8b32eb01ff5a5ed]*/
+/*[clinic end generated code: output=3484149a5d880ffb input=5d7b898af2fe55c0]*/
 {
     return stringlib_splitlines(
         (PyObject*) self, PyBytes_AS_STRING(self),
@@ -2414,7 +2390,7 @@ _PyBytes_FromHex(PyObject *string, int use_bytearray)
 
     if (!PyUnicode_IS_ASCII(string)) {
         const void *data = PyUnicode_DATA(string);
-        unsigned int kind = PyUnicode_KIND(string);
+        int kind = PyUnicode_KIND(string);
         Py_ssize_t i;
 
         /* search for the first non-ASCII character */
@@ -2866,8 +2842,7 @@ PyBytes_FromObject(PyObject *x)
     }
 
     if (PyBytes_CheckExact(x)) {
-        Py_INCREF(x);
-        return x;
+        return Py_NewRef(x);
     }
 
     /* Use the modern buffer interface */
@@ -3098,21 +3073,20 @@ _PyBytes_Resize(PyObject **pv, Py_ssize_t newsize)
         Py_DECREF(v);
         return 0;
     }
-    /* XXX UNREF/NEWREF interface should be more symmetrical */
-#ifdef Py_REF_DEBUG
-    _Py_RefTotal--;
-#endif
 #ifdef Py_TRACE_REFS
     _Py_ForgetReference(v);
 #endif
     *pv = (PyObject *)
         PyObject_Realloc(v, PyBytesObject_SIZE + newsize);
     if (*pv == NULL) {
+#ifdef Py_REF_DEBUG
+        _Py_DecRefTotal(_PyInterpreterState_GET());
+#endif
         PyObject_Free(v);
         PyErr_NoMemory();
         return -1;
     }
-    _Py_NewReference(*pv);
+    _Py_NewReferenceNoTotal(*pv);
     sv = (PyBytesObject *) *pv;
     Py_SET_SIZE(sv, newsize);
     sv->ob_sval[newsize] = '\0';
@@ -3126,25 +3100,6 @@ error:
     Py_DECREF(v);
     PyErr_BadInternalCall();
     return -1;
-}
-
-
-PyStatus
-_PyBytes_InitTypes(PyInterpreterState *interp)
-{
-    if (!_Py_IsMainInterpreter(interp)) {
-        return _PyStatus_OK();
-    }
-
-    if (PyType_Ready(&PyBytes_Type) < 0) {
-        return _PyStatus_ERR("Can't initialize bytes type");
-    }
-
-    if (PyType_Ready(&PyBytesIter_Type) < 0) {
-        return _PyStatus_ERR("Can't initialize bytes iterator type");
-    }
-
-    return _PyStatus_OK();
 }
 
 
@@ -3296,8 +3251,7 @@ bytes_iter(PyObject *seq)
     if (it == NULL)
         return NULL;
     it->it_index = 0;
-    Py_INCREF(seq);
-    it->it_seq = (PyBytesObject *)seq;
+    it->it_seq = (PyBytesObject *)Py_NewRef(seq);
     _PyObject_GC_TRACK(it);
     return (PyObject *)it;
 }

@@ -1,5 +1,5 @@
-:mod:`mmap` --- Memory-mapped file support
-==========================================
+:mod:`!mmap` --- Memory-mapped file support
+===========================================
 
 .. module:: mmap
    :synopsis: Interface to memory-mapped files for Unix and Windows.
@@ -19,7 +19,7 @@ the current file position, and :meth:`seek` through the file to different positi
 A memory-mapped file is created by the :class:`~mmap.mmap` constructor, which is
 different on Unix and on Windows.  In either case you must provide a file
 descriptor for a file opened for update. If you wish to map an existing Python
-file object, use its :meth:`fileno` method to obtain the correct value for the
+file object, use its :meth:`~io.IOBase.fileno` method to obtain the correct value for the
 *fileno* parameter.  Otherwise, you can open the file using the
 :func:`os.open` function, which returns a file descriptor directly (the file
 still needs to be closed when done).
@@ -62,8 +62,8 @@ To map anonymous memory, -1 should be passed as the fileno along with the length
    the same file.  If you specify the name of an existing tag, that tag is
    opened, otherwise a new tag of this name is created.  If this parameter is
    omitted or ``None``, the mapping is created without a name.  Avoiding the
-   use of the tag parameter will assist in keeping your code portable between
-   Unix and Windows.
+   use of the *tagname* parameter will assist in keeping your code portable
+   between Unix and Windows.
 
    *offset* may be specified as a non-negative integer offset. mmap references
    will be relative to the offset from the beginning of the file. *offset*
@@ -370,11 +370,19 @@ MAP_* Constants
           MAP_ANONYMOUS
           MAP_POPULATE
           MAP_STACK
+          MAP_ALIGNED_SUPER
+          MAP_CONCEAL
 
-    These are the various flags that can be passed to :meth:`mmap.mmap`. Note that some options might not be present on some systems.
+    These are the various flags that can be passed to :meth:`mmap.mmap`.  :data:`MAP_ALIGNED_SUPER`
+    is only available at FreeBSD and :data:`MAP_CONCEAL` is only available at OpenBSD.  Note
+    that some options might not be present on some systems.
 
     .. versionchanged:: 3.10
-       Added MAP_POPULATE constant.
+       Added :data:`MAP_POPULATE` constant.
 
     .. versionadded:: 3.11
-       Added MAP_STACK constant.
+       Added :data:`MAP_STACK` constant.
+
+    .. versionadded:: 3.12
+       Added :data:`MAP_ALIGNED_SUPER` constant.
+       Added :data:`MAP_CONCEAL` constant.

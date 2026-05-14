@@ -24,14 +24,13 @@ import genericpath
 from genericpath import *
 
 
-__all__ = ["normcase","isabs","join","splitdrive","split","splitext",
+__all__ = ["normcase","isabs","join","splitdrive","splitroot","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
            "getatime","getctime", "islink","exists","lexists","isdir","isfile",
            "ismount", "expanduser","expandvars","normpath","abspath",
            "curdir","pardir","sep","pathsep","defpath","altsep",
            "extsep","devnull","realpath","supports_unicode_filenames","relpath",
-           "samefile", "sameopenfile", "samestat", "commonpath",
-           "ALLOW_MISSING"]
+           "samefile", "sameopenfile", "samestat", "commonpath", "isjunction"]
 
 def _get_bothseps(path):
     if isinstance(path, bytes):
@@ -118,19 +117,21 @@ def join(path, *paths):
     try:
         if not paths:
             path[:0] + sep  #23780: Ensure compatible data type even if p is null.
-        result_drive, result_path = splitdrive(path)
+        result_drive, result_root, result_path = splitroot(path)
         for p in map(os.fspath, paths):
-            p_drive, p_path = splitdrive(p)
-            if p_path and p_path[0] in seps:
+            p_drive, p_root, p_path = splitroot(p)
+            if p_root:
                 # Second path is absolute
                 if p_drive or not result_drive:
                     result_drive = p_drive
+                result_root = p_root
                 result_path = p_path
                 continue
             elif p_drive and p_drive != result_drive:
                 if p_drive.lower() != result_drive.lower():
                     # Different drives => ignore the first path entirely
                     result_drive = p_drive
+                    result_root = p_root
                     result_path = p_path
                     continue
                 # Same drive in different case
@@ -140,10 +141,10 @@ def join(path, *paths):
                 result_path = result_path + sep
             result_path = result_path + p_path
         ## add separator between UNC and non-absolute path
-        if (result_path and result_path[0] not in seps and
-            result_drive and result_drive[-1:] != colon):
+        if (result_path and not result_root and
+            result_drive and result_drive[-1:] not in colon + seps):
             return result_drive + sep + result_path
-        return result_drive + result_path
+        return result_drive + result_root + result_path
     except (TypeError, AttributeError, BytesWarning):
         genericpath._check_arg_types('join', path, *paths)
         raise
@@ -171,34 +172,60 @@ def splitdrive(p):
     Paths cannot contain both a drive letter and a UNC path.
 
     """
+    drive, root, tail = splitroot(p)
+    return drive, root + tail
+
+
+def splitroot(p):
+    """Split a pathname into drive, root and tail. The drive is defined
+    exactly as in splitdrive(). On Windows, the root may be a single path
+    separator or an empty string. The tail contains anything after the root.
+    For example:
+
+        splitroot('//server/share/') == ('//server/share', '/', '')
+        splitroot('C:/Users/Barney') == ('C:', '/', 'Users/Barney')
+        splitroot('C:///spam///ham') == ('C:', '/', '//spam///ham')
+        splitroot('Windows/notepad') == ('', '', 'Windows/notepad')
+    """
     p = os.fspath(p)
-    if len(p) >= 2:
-        if isinstance(p, bytes):
-            sep = b'\\'
-            altsep = b'/'
-            colon = b':'
-            unc_prefix = b'\\\\?\\UNC\\'
-        else:
-            sep = '\\'
-            altsep = '/'
-            colon = ':'
-            unc_prefix = '\\\\?\\UNC\\'
-        normp = p.replace(altsep, sep)
-        if normp[0:2] == sep * 2:
+    if isinstance(p, bytes):
+        sep = b'\\'
+        altsep = b'/'
+        colon = b':'
+        unc_prefix = b'\\\\?\\UNC\\'
+        empty = b''
+    else:
+        sep = '\\'
+        altsep = '/'
+        colon = ':'
+        unc_prefix = '\\\\?\\UNC\\'
+        empty = ''
+    normp = p.replace(altsep, sep)
+    if normp[:1] == sep:
+        if normp[1:2] == sep:
             # UNC drives, e.g. \\server\share or \\?\UNC\server\share
             # Device drives, e.g. \\.\device or \\?\device
             start = 8 if normp[:8].upper() == unc_prefix else 2
             index = normp.find(sep, start)
             if index == -1:
-                return p, p[:0]
+                return p, empty, empty
             index2 = normp.find(sep, index + 1)
             if index2 == -1:
-                return p, p[:0]
-            return p[:index2], p[index2:]
-        if normp[1:2] == colon:
-            # Drive-letter drives, e.g. X:
-            return p[:2], p[2:]
-    return p[:0], p
+                return p, empty, empty
+            return p[:index2], p[index2:index2 + 1], p[index2 + 1:]
+        else:
+            # Relative path with root, e.g. \Windows
+            return empty, p[:1], p[1:]
+    elif normp[1:2] == colon:
+        if normp[2:3] == sep:
+            # Absolute drive-letter path, e.g. X:\Windows
+            return p[:2], p[2:3], p[3:]
+        else:
+            # Relative path with drive, e.g. X:Windows
+            return p[:2], empty, p[2:]
+    else:
+        # Relative path, e.g. Windows
+        return empty, empty, p
 
 
 # Split a path in head (everything up to the last '/') and tail (the
@@ -213,15 +240,13 @@ def split(p):
     Either part may be empty."""
     p = os.fspath(p)
     seps = _get_bothseps(p)
-    d, p = splitdrive(p)
+    d, r, p = splitroot(p)
     # set i to index beyond p's last slash
     i = len(p)
     while i and p[i-1] not in seps:
         i -= 1
     head, tail = p[:i], p[i:]  # now tail has no slashes
-    # remove trailing slashes from head, unless it's all slashes
-    head = head.rstrip(seps) or head
-    return d + head, tail
+    return d + r + head.rstrip(seps), tail
 
 
 # Split a path in root and extension.
@@ -251,18 +276,23 @@ def dirname(p):
     """Returns the directory component of a pathname"""
     return split(p)[0]
 
-# Is a path a symbolic link?
-# This will always return false on systems where os.lstat doesn't exist.
 
-def islink(path):
-    """Test whether a path is a symbolic link.
-    This will always return false for Windows prior to 6.0.
-    """
-    try:
-        st = os.lstat(path)
-    except (OSError, ValueError, AttributeError):
+# Is a path a junction?
+
+if hasattr(os.stat_result, 'st_reparse_tag'):
+    def isjunction(path):
+        """Test whether a path is a junction"""
+        try:
+            st = os.lstat(path)
+        except (OSError, ValueError, AttributeError):
+            return False
+        return bool(st.st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT)
+else:
+    def isjunction(path):
+        """Test whether a path is a junction"""
+        os.fspath(path)
         return False
-    return stat.S_ISLNK(st.st_mode)
+
 
 # Being true for dangling symbolic links is also useful.
 
@@ -294,10 +324,10 @@ def ismount(path):
     path = os.fspath(path)
     seps = _get_bothseps(path)
     path = abspath(path)
-    root, rest = splitdrive(path)
-    if root and root[0] in seps:
-        return (not rest) or (rest in seps)
-    if rest and rest in seps:
+    drive, root, rest = splitroot(path)
+    if drive and drive[0] in seps:
+        return not rest
+    if root and not rest:
         return True
 
     if _getvolumepathname:
@@ -378,23 +408,17 @@ def expanduser(path):
 # XXX With COMMAND.COM you can use any characters in a variable name,
 # XXX except '^|<>='.
 
-_varpattern = r"'[^']*'?|%(%|[^%]*%?)|\$(\$|[-\w]+|\{[^}]*\}?)"
-_varsub = None
-_varsubb = None
-
 def expandvars(path):
     """Expand shell variables of the forms $var, ${var} and %var%.
 
     Unknown variables are left unchanged."""
     path = os.fspath(path)
-    global _varsub, _varsubb
     if isinstance(path, bytes):
         if b'$' not in path and b'%' not in path:
             return path
-        if not _varsubb:
-            import re
-            _varsubb = re.compile(_varpattern.encode(), re.ASCII).sub
-        sub = _varsubb
+        import string
+        varchars = bytes(string.ascii_letters + string.digits + '_-', 'ascii')
+        quote = b'\''
         percent = b'%'
         brace = b'{'
         rbrace = b'}'
@@ -403,50 +427,101 @@ def expandvars(path):
     else:
         if '$' not in path and '%' not in path:
             return path
-        if not _varsub:
-            import re
-            _varsub = re.compile(_varpattern, re.ASCII).sub
-        sub = _varsub
+        import string
+        varchars = string.ascii_letters + string.digits + '_-'
+        quote = '\''
         percent = '%'
         brace = '{'
         rbrace = '}'
         dollar = '$'
         environ = os.environ
-
-    def repl(m):
-        lastindex = m.lastindex
-        if lastindex is None:
-            return m[0]
-        name = m[lastindex]
-        if lastindex == 1:
-            if name == percent:
-                return name
-            if not name.endswith(percent):
-                return m[0]
-            name = name[:-1]
-        else:
-            if name == dollar:
-                return name
-            if name.startswith(brace):
-                if not name.endswith(rbrace):
-                    return m[0]
-                name = name[1:-1]
-
-        try:
-            if environ is None:
-                return os.fsencode(os.environ[os.fsdecode(name)])
+    res = path[:0]
+    index = 0
+    pathlen = len(path)
+    while index < pathlen:
+        c = path[index:index+1]
+        if c == quote:   # no expansion within single quotes
+            path = path[index + 1:]
+            pathlen = len(path)
+            try:
+                index = path.index(c)
+                res += c + path[:index + 1]
+            except ValueError:
+                res += c + path
+                index = pathlen - 1
+        elif c == percent:  # variable or '%'
+            if path[index + 1:index + 2] == percent:
+                res += c
+                index += 1
             else:
-                return environ[name]
-        except KeyError:
-            return m[0]
+                path = path[index+1:]
+                pathlen = len(path)
+                try:
+                    index = path.index(percent)
+                except ValueError:
+                    res += percent + path
+                    index = pathlen - 1
+                else:
+                    var = path[:index]
+                    try:
+                        if environ is None:
+                            value = os.fsencode(os.environ[os.fsdecode(var)])
+                        else:
+                            value = environ[var]
+                    except KeyError:
+                        value = percent + var + percent
+                    res += value
+        elif c == dollar:  # variable or '$$'
+            if path[index + 1:index + 2] == dollar:
+                res += c
+                index += 1
+            elif path[index + 1:index + 2] == brace:
+                path = path[index+2:]
+                pathlen = len(path)
+                try:
+                    index = path.index(rbrace)
+                except ValueError:
+                    res += dollar + brace + path
+                    index = pathlen - 1
+                else:
+                    var = path[:index]
+                    try:
+                        if environ is None:
+                            value = os.fsencode(os.environ[os.fsdecode(var)])
+                        else:
+                            value = environ[var]
+                    except KeyError:
+                        value = dollar + brace + var + rbrace
+                    res += value
+            else:
+                var = path[:0]
+                index += 1
+                c = path[index:index + 1]
+                while c and c in varchars:
+                    var += c
+                    index += 1
+                    c = path[index:index + 1]
+                try:
+                    if environ is None:
+                        value = os.fsencode(os.environ[os.fsdecode(var)])
+                    else:
+                        value = environ[var]
+                except KeyError:
+                    value = dollar + var
+                res += value
+                if c:
+                    index -= 1
+        else:
+            res += c
+        index += 1
+    return res
 
-    return sub(repl, path)
 
 # Normalize a path, e.g. A//B, A/./B and A/foo/../B all become A\B.
 # Previously, this function also truncated pathnames to 8+3 format,
 # but as this module is called "ntpath", that's obviously wrong!
 try:
-    from nt import _path_normpath
+    from nt import _path_normpath as normpath
 
 except ImportError:
     def normpath(path):
@@ -463,13 +538,8 @@ except ImportError:
             curdir = '.'
             pardir = '..'
         path = path.replace(altsep, sep)
-        prefix, path = splitdrive(path)
-
-        # collapse initial backslashes
-        if path.startswith(sep):
-            prefix += sep
-            path = path.lstrip(sep)
-
+        drive, root, path = splitroot(path)
+        prefix = drive + root
         comps = path.split(sep)
         i = 0
         while i < len(comps):
@@ -479,7 +549,7 @@ except ImportError:
                 if i > 0 and comps[i-1] != pardir:
                     del comps[i-1:i+1]
                     i -= 1
-                elif i == 0 and prefix.endswith(sep):
+                elif i == 0 and root:
                     del comps[i]
                 else:
                     i += 1
@@ -490,37 +560,22 @@ except ImportError:
             comps.append(curdir)
         return prefix + sep.join(comps)
 
-else:
-    def normpath(path):
-        """Normalize path, eliminating double slashes, etc."""
-        path = os.fspath(path)
-        if isinstance(path, bytes):
-            return os.fsencode(_path_normpath(os.fsdecode(path))) or b"."
-        return _path_normpath(path) or "."
-
-
-def _abspath_fallback(path):
-    """Return the absolute version of a path as a fallback function in case
-    `nt._getfullpathname` is not available or raises OSError. See bpo-31047 for
-    more.
-
-    """
-
-    path = os.fspath(path)
-    if not isabs(path):
-        if isinstance(path, bytes):
-            cwd = os.getcwdb()
-        else:
-            cwd = os.getcwd()
-        path = join(cwd, path)
-    return normpath(path)
 
 # Return an absolute path.
 try:
     from nt import _getfullpathname
 
 except ImportError: # not running on Windows - mock up something sensible
-    abspath = _abspath_fallback
+    def abspath(path):
+        """Return the absolute version of a path."""
+        path = os.fspath(path)
+        if not isabs(path):
+            if isinstance(path, bytes):
+                cwd = os.getcwdb()
+            else:
+                cwd = os.getcwd()
+            path = join(cwd, path)
+        return normpath(path)
 
 else:  # use native Windows method on Windows
     def abspath(path):
@@ -528,16 +583,35 @@ else:  # use native Windows method on Windows
         try:
             return _getfullpathname(normpath(path))
         except (OSError, ValueError):
-            return _abspath_fallback(path)
+            # See gh-75230, handle outside for cleaner traceback
+            pass
+        path = os.fspath(path)
+        if not isabs(path):
+            if isinstance(path, bytes):
+                sep = b'\\'
+                getcwd = os.getcwdb
+            else:
+                sep = '\\'
+                getcwd = os.getcwd
+            drive, root, path = splitroot(path)
+            # Either drive or root can be nonempty, but not both.
+            if drive or root:
+                try:
+                    path = join(_getfullpathname(drive + root), path)
+                except (OSError, ValueError):
+                    # Drive "\0:" cannot exist; use the root directory.
+                    path = drive + sep + path
+            else:
+                path = join(getcwd(), path)
+        return normpath(path)
 
 try:
     from nt import _getfinalpathname, readlink as _nt_readlink
 except ImportError:
     # realpath is a no-op on systems without _getfinalpathname support.
-    def realpath(path, *, strict=False):
-        return abspath(path)
+    realpath = abspath
 else:
-    def _readlink_deep(path, ignored_error=OSError):
+    def _readlink_deep(path):
         # These error codes indicate that we should stop reading links and
         # return the path we currently have.
         # 1: ERROR_INVALID_FUNCTION
@@ -570,7 +644,7 @@ else:
                         path = old_path
                         break
                     path = normpath(join(dirname(old_path), path))
-            except ignored_error as ex:
+            except OSError as ex:
                 if ex.winerror in allowed_winerror:
                     break
                 raise
@@ -579,7 +653,7 @@ else:
                 break
         return path
 
-    def _getfinalpathname_nonstrict(path, ignored_error=OSError):
+    def _getfinalpathname_nonstrict(path):
         # These error codes indicate that we should stop resolving the path
         # and return the value we currently have.
         # 1: ERROR_INVALID_FUNCTION
@@ -606,18 +680,17 @@ else:
             try:
                 path = _getfinalpathname(path)
                 return join(path, tail) if tail else path
-            except ignored_error as ex:
+            except OSError as ex:
                 if ex.winerror not in allowed_winerror:
                     raise
                 try:
                     # The OS could not resolve this path fully, so we attempt
                     # to follow the link ourselves. If we succeed, join the tail
                     # and return.
-                    new_path = _readlink_deep(path,
-                                              ignored_error=ignored_error)
+                    new_path = _readlink_deep(path)
                     if new_path != path:
                         return join(new_path, tail) if tail else new_path
-                except ignored_error:
+                except OSError:
                     # If we fail to readlink(), let's keep traversing
                     pass
                 path, name = split(path)
@@ -648,15 +721,6 @@ else:
             if normcase(path) == normcase(devnull):
                 return '\\\\.\\NUL'
         had_prefix = path.startswith(prefix)
-
-        if strict is ALLOW_MISSING:
-            ignored_error = FileNotFoundError
-            strict = True
-        elif strict:
-            ignored_error = ()
-        else:
-            ignored_error = OSError
-
         if not had_prefix and not isabs(path):
             path = join(cwd, path)
         try:
@@ -664,16 +728,17 @@ else:
             initial_winerror = 0
         except ValueError as ex:
             # gh-106242: Raised for embedded null characters
-            # In strict modes, we convert into an OSError.
+            # In strict mode, we convert into an OSError.
             # Non-strict mode returns the path as-is, since we've already
             # made it absolute.
             if strict:
                 raise OSError(str(ex)) from None
             path = normpath(path)
-        except ignored_error as ex:
+        except OSError as ex:
+            if strict:
+                raise
             initial_winerror = ex.winerror
-            path = _getfinalpathname_nonstrict(path,
-                                               ignored_error=ignored_error)
+            path = _getfinalpathname_nonstrict(path)
         # The path returned by _getfinalpathname will always start with \\?\ -
         # strip off that prefix unless it was already provided on the original
         # path.
@@ -700,9 +765,8 @@ else:
         return path
 
 
-# Win9x family and earlier have no Unicode filename support.
-supports_unicode_filenames = (hasattr(sys, "getwindowsversion") and
-                              sys.getwindowsversion()[3] >= 2)
+# All supported version have Unicode filename support.
+supports_unicode_filenames = True
 
 def relpath(path, start=None):
     """Return a relative version of a path"""
@@ -726,8 +790,8 @@ def relpath(path, start=None):
     try:
         start_abs = abspath(normpath(start))
         path_abs = abspath(normpath(path))
-        start_drive, start_rest = splitdrive(start_abs)
-        path_drive, path_rest = splitdrive(path_abs)
+        start_drive, _, start_rest = splitroot(start_abs)
+        path_drive, _, path_rest = splitroot(path_abs)
         if normcase(start_drive) != normcase(path_drive):
             raise ValueError("path is on mount %r, start on mount %r" % (
                 path_drive, start_drive))
@@ -777,21 +841,19 @@ def commonpath(paths):
         curdir = '.'
 
     try:
-        drivesplits = [splitdrive(p.replace(altsep, sep).lower()) for p in paths]
-        split_paths = [p.split(sep) for d, p in drivesplits]
+        drivesplits = [splitroot(p.replace(altsep, sep).lower()) for p in paths]
+        split_paths = [p.split(sep) for d, r, p in drivesplits]
 
-        try:
-            isabs, = set(p[:1] == sep for d, p in drivesplits)
-        except ValueError:
-            raise ValueError("Can't mix absolute and relative paths") from None
+        if len({r for d, r, p in drivesplits}) != 1:
+            raise ValueError("Can't mix absolute and relative paths")
 
         # Check that all drive letters or UNC paths match. The check is made only
         # now otherwise type errors for mixing strings and bytes would not be
         # caught.
-        if len(set(d for d, p in drivesplits)) != 1:
+        if len({d for d, r, p in drivesplits}) != 1:
             raise ValueError("Paths don't have the same drive")
 
-        drive, path = splitdrive(paths[0].replace(altsep, sep))
+        drive, root, path = splitroot(paths[0].replace(altsep, sep))
         common = path.split(sep)
         common = [c for c in common if c and c != curdir]
 
@@ -805,19 +867,36 @@ def commonpath(paths):
         else:
             common = common[:len(s1)]
 
-        prefix = drive + sep if isabs else drive
-        return prefix + sep.join(common)
+        return drive + root + sep.join(common)
     except (TypeError, AttributeError):
         genericpath._check_arg_types('commonpath', *paths)
         raise
 
 
 try:
-    # The genericpath.isdir implementation uses os.stat and checks the mode
-    # attribute to tell whether or not the path is a directory.
-    # This is overkill on Windows - just pass the path to GetFileAttributes
-    # and check the attribute from there.
-    from nt import _isdir as isdir
+    # The isdir(), isfile(), islink() and exists() implementations in
+    # genericpath use os.stat(). This is overkill on Windows. Use simpler
+    # builtin functions if they are available.
+    from nt import _path_isdir as isdir
+    from nt import _path_isfile as isfile
+    from nt import _path_islink as islink
+    from nt import _path_exists as exists
 except ImportError:
-    # Use genericpath.isdir as imported above.
+    # Use genericpath.* as imported above
     pass
+
+
+try:
+    from nt import _path_isdevdrive
+except ImportError:
+    def isdevdrive(path):
+        """Determines whether the specified path is on a Windows Dev Drive."""
+        # Never a Dev Drive
+        return False
+else:
+    def isdevdrive(path):
+        """Determines whether the specified path is on a Windows Dev Drive."""
+        try:
+            return _path_isdevdrive(abspath(path))
+        except OSError:
+            return False

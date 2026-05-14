@@ -1,5 +1,5 @@
-:mod:`sqlite3` --- DB-API 2.0 interface for SQLite databases
-============================================================
+:mod:`!sqlite3` --- DB-API 2.0 interface for SQLite databases
+=============================================================
 
 .. module:: sqlite3
    :synopsis: A DB-API 2.0 implementation using SQLite 3.x.
@@ -16,6 +16,8 @@
    src = sqlite3.connect(":memory:", isolation_level=None)
    dst = sqlite3.connect("tutorial.db", isolation_level=None)
    src.backup(dst)
+   src.close()
+   dst.close()
    del src, dst
 
 .. _sqlite3-intro:
@@ -125,7 +127,7 @@ and call :meth:`res.fetchone() <Cursor.fetchone>` to fetch the resulting row:
 We can see that the table has been created,
 as the query returns a :class:`tuple` containing the table's name.
 If we query ``sqlite_master`` for a non-existent table ``spam``,
-:meth:`!res.fetchone()` will return ``None``:
+:meth:`!res.fetchone` will return ``None``:
 
 .. doctest::
 
@@ -220,6 +222,7 @@ creating a new cursor, then querying the database:
    >>> title, year = res.fetchone()
    >>> print(f'The highest scoring Monty Python movie is {title!r}, released in {year}')
    The highest scoring Monty Python movie is 'Monty Python and the Holy Grail', released in 1975
+   >>> new_con.close()
 
 You've now created an SQLite database using the :mod:`!sqlite3` module,
 inserted data and retrieved values from it in multiple ways.
@@ -235,11 +238,11 @@ inserted data and retrieved values from it in multiple ways.
 
    * :ref:`sqlite3-howtos` for further reading:
 
-      * :ref:`sqlite3-placeholders`
-      * :ref:`sqlite3-adapters`
-      * :ref:`sqlite3-converters`
-      * :ref:`sqlite3-connection-context-manager`
-      * :ref:`sqlite3-howto-row-factory`
+     * :ref:`sqlite3-placeholders`
+     * :ref:`sqlite3-adapters`
+     * :ref:`sqlite3-converters`
+     * :ref:`sqlite3-connection-context-manager`
+     * :ref:`sqlite3-howto-row-factory`
 
    * :ref:`sqlite3-explanation` for in-depth background on transaction control.
 
@@ -259,14 +262,16 @@ Module functions
 .. function:: connect(database, timeout=5.0, detect_types=0, \
                       isolation_level="DEFERRED", check_same_thread=True, \
                       factory=sqlite3.Connection, cached_statements=128, \
-                      uri=False)
+                      uri=False, *, \
+                      autocommit=sqlite3.LEGACY_TRANSACTION_CONTROL)
 
    Open a connection to an SQLite database.
 
    :param database:
        The path to the database file to be opened.
-       Pass ``":memory:"`` to open a connection to a database that is
-       in RAM instead of on disk.
+       You can pass ``":memory:"`` to create an `SQLite database existing only
+       in memory <https://sqlite.org/inmemorydb.html>`_, and open a connection
+       to it.
    :type database: :term:`path-like object`
 
    :param float timeout:
@@ -285,17 +290,16 @@ Module functions
        :const:`PARSE_DECLTYPES` and :const:`PARSE_COLNAMES`
        to enable this.
        Column names takes precedence over declared types if both flags are set.
-       Types cannot be detected for generated fields (for example ``max(data)``),
-       even when the *detect_types* parameter is set; :class:`str` will be
-       returned instead.
        By default (``0``), type detection is disabled.
 
    :param isolation_level:
-       The :attr:`~Connection.isolation_level` of the connection,
-       controlling whether and how transactions are implicitly opened.
+       Control legacy transaction handling behaviour.
+       See :attr:`Connection.isolation_level` and
+       :ref:`sqlite3-transaction-control-isolation-level` for more information.
        Can be ``"DEFERRED"`` (default), ``"EXCLUSIVE"`` or ``"IMMEDIATE"``;
        or ``None`` to disable opening transactions implicitly.
-       See :ref:`sqlite3-controlling-transactions` for more.
+       Has no effect unless :attr:`Connection.autocommit` is set to
+       :const:`~sqlite3.LEGACY_TRANSACTION_CONTROL` (the default).
    :type isolation_level: str | None
 
    :param bool check_same_thread:
@@ -325,19 +329,31 @@ Module functions
        The query string allows passing parameters to SQLite,
        enabling various :ref:`sqlite3-uri-tricks`.
 
+   :param autocommit:
+       Control :pep:`249` transaction handling behaviour.
+       See :attr:`Connection.autocommit` and
+       :ref:`sqlite3-transaction-control-autocommit` for more information.
+       *autocommit* currently defaults to
+       :const:`~sqlite3.LEGACY_TRANSACTION_CONTROL`.
+       The default will change to ``False`` in a future Python release.
+   :type autocommit: bool
+
    :rtype: ~sqlite3.Connection
 
    .. audit-event:: sqlite3.connect database sqlite3.connect
    .. audit-event:: sqlite3.connect/handle connection_handle sqlite3.connect
 
-   .. versionadded:: 3.4
-      The *uri* parameter.
+   .. versionchanged:: 3.4
+      Added the *uri* parameter.
 
    .. versionchanged:: 3.7
       *database* can now also be a :term:`path-like object`, not only a string.
 
-   .. versionadded:: 3.10
-      The ``sqlite3.connect/handle`` auditing event.
+   .. versionchanged:: 3.10
+      Added the ``sqlite3.connect/handle`` auditing event.
+
+   .. versionchanged:: 3.12
+      Added the *autocommit* parameter.
 
 .. function:: complete_statement(statement)
 
@@ -360,6 +376,9 @@ Module functions
    to determine if the entered text seems to form a complete SQL statement,
    or if additional input is needed before calling :meth:`~Cursor.execute`.
 
+   See :func:`!runsource` in :source:`Lib/sqlite3/__main__.py`
+   for real-world use.
+
 .. function:: enable_callback_tracebacks(flag, /)
 
    Enable or disable callback tracebacks.
@@ -369,40 +388,23 @@ Module functions
    will get tracebacks from callbacks on :data:`sys.stderr`. Use ``False``
    to disable the feature again.
 
-   Register an :func:`unraisable hook handler <sys.unraisablehook>` for an
-   improved debug experience:
+   .. note::
 
-   .. testsetup:: sqlite3.trace
-
-      import sqlite3
-
-   .. doctest:: sqlite3.trace
-
-      >>> sqlite3.enable_callback_tracebacks(True)
-      >>> con = sqlite3.connect(":memory:")
-      >>> def evil_trace(stmt):
-      ...     5/0
-      >>> con.set_trace_callback(evil_trace)
-      >>> def debug(unraisable):
-      ...     print(f"{unraisable.exc_value!r} in callback {unraisable.object.__name__}")
-      ...     print(f"Error message: {unraisable.err_msg}")
-      >>> import sys
-      >>> sys.unraisablehook = debug
-      >>> cur = con.execute("SELECT 1")
-      ZeroDivisionError('division by zero') in callback evil_trace
-      Error message: None
+      Errors in user-defined function callbacks are logged as unraisable exceptions.
+      Use an :func:`unraisable hook handler <sys.unraisablehook>` for
+      introspection of the failed callback.
 
 .. function:: register_adapter(type, adapter, /)
 
-   Register an *adapter* callable to adapt the Python type *type* into an
-   SQLite type.
+   Register an *adapter* :term:`callable` to adapt the Python type *type*
+   into an SQLite type.
    The adapter is called with a Python object of type *type* as its sole
    argument, and must return a value of a
    :ref:`type that SQLite natively understands <sqlite3-types>`.
 
 .. function:: register_converter(typename, converter, /)
 
-   Register the *converter* callable to convert SQLite objects of type
+   Register the *converter* :term:`callable` to convert SQLite objects of type
    *typename* into a Python object of a specific type.
    The converter is invoked for all SQLite values of type *typename*;
    it is passed a :class:`bytes` object and should return an object of the
@@ -419,20 +421,11 @@ Module functions
 Module constants
 ^^^^^^^^^^^^^^^^
 
-.. data:: PARSE_COLNAMES
+.. data:: LEGACY_TRANSACTION_CONTROL
 
-   Pass this flag value to the *detect_types* parameter of
-   :func:`connect` to look up a converter function by
-   using the type name, parsed from the query column name,
-   as the converter dictionary key.
-   The type name must be wrapped in square brackets (``[]``).
-
-   .. code-block:: sql
-
-      SELECT p as "p [point]" FROM test;  ! will look up converter "point"
-
-   This flag may be combined with :const:`PARSE_DECLTYPES` using the ``|``
-   (bitwise or) operator.
+   Set :attr:`~Connection.autocommit` to this constant to select
+   old style (pre-Python 3.12) transaction control behaviour.
+   See :ref:`sqlite3-transaction-control-isolation-level` for more information.
 
 .. data:: PARSE_DECLTYPES
 
@@ -455,11 +448,32 @@ Module constants
    This flag may be combined with :const:`PARSE_COLNAMES` using the ``|``
    (bitwise or) operator.
 
+   .. note::
+
+      Generated fields (for example ``MAX(p)``) are returned as :class:`str`.
+      Use :const:`!PARSE_COLNAMES` to enforce types for such queries.
+
+.. data:: PARSE_COLNAMES
+
+   Pass this flag value to the *detect_types* parameter of
+   :func:`connect` to look up a converter function by
+   using the type name, parsed from the query column name,
+   as the converter dictionary key.
+   The query column name must be wrapped in double quotes (``"``)
+   and the type name must be wrapped in square brackets (``[]``).
+
+   .. code-block:: sql
+
+      SELECT MAX(p) as "p [point]" FROM test;  ! will look up converter "point"
+
+   This flag may be combined with :const:`PARSE_DECLTYPES` using the ``|``
+   (bitwise or) operator.
+
 .. data:: SQLITE_OK
           SQLITE_DENY
           SQLITE_IGNORE
 
-   Flags that should be returned by the *authorizer_callback* callable
+   Flags that should be returned by the *authorizer_callback* :term:`callable`
    passed to :meth:`Connection.set_authorizer`, to indicate whether:
 
    * Access is allowed (:const:`!SQLITE_OK`),
@@ -497,32 +511,31 @@ Module constants
    the default `threading mode <https://sqlite.org/threadsafe.html>`_ the
    underlying SQLite library is compiled with. The SQLite threading modes are:
 
-     1. **Single-thread**: In this mode, all mutexes are disabled and SQLite is
-        unsafe to use in more than a single thread at once.
-     2. **Multi-thread**: In this mode, SQLite can be safely used by multiple
-        threads provided that no single database connection is used
-        simultaneously in two or more threads.
-     3. **Serialized**: In serialized mode, SQLite can be safely used by
-        multiple threads with no restriction.
+   1. **Single-thread**: In this mode, all mutexes are disabled and SQLite is
+      unsafe to use in more than a single thread at once.
+   2. **Multi-thread**: In this mode, SQLite can be safely used by multiple
+      threads provided that no single database connection is used
+      simultaneously in two or more threads.
+   3. **Serialized**: In serialized mode, SQLite can be safely used by
+      multiple threads with no restriction.
 
    The mappings from SQLite threading modes to DB-API 2.0 threadsafety levels
    are as follows:
 
-   +------------------+-----------------+----------------------+-------------------------------+
-   | SQLite threading | `threadsafety`_ | `SQLITE_THREADSAFE`_ | DB-API 2.0 meaning            |
-   | mode             |                 |                      |                               |
-   +==================+=================+======================+===============================+
-   | single-thread    | 0               | 0                    | Threads may not share the     |
-   |                  |                 |                      | module                        |
-   +------------------+-----------------+----------------------+-------------------------------+
-   | multi-thread     | 1               | 2                    | Threads may share the module, |
-   |                  |                 |                      | but not connections           |
-   +------------------+-----------------+----------------------+-------------------------------+
-   | serialized       | 3               | 1                    | Threads may share the module, |
-   |                  |                 |                      | connections and cursors       |
-   +------------------+-----------------+----------------------+-------------------------------+
+   +------------------+----------------------+----------------------+-------------------------------+
+   | SQLite threading | :pep:`threadsafety   | `SQLITE_THREADSAFE`_ | DB-API 2.0 meaning            |
+   | mode             | <0249#threadsafety>` |                      |                               |
+   +==================+======================+======================+===============================+
+   | single-thread    | 0                    | 0                    | Threads may not share the     |
+   |                  |                      |                      | module                        |
+   +------------------+----------------------+----------------------+-------------------------------+
+   | multi-thread     | 1                    | 2                    | Threads may share the module, |
+   |                  |                      |                      | but not connections           |
+   +------------------+----------------------+----------------------+-------------------------------+
+   | serialized       | 3                    | 1                    | Threads may share the module, |
+   |                  |                      |                      | connections and cursors       |
+   +------------------+----------------------+----------------------+-------------------------------+
 
-   .. _threadsafety: https://peps.python.org/pep-0249/#threadsafety
    .. _SQLITE_THREADSAFE: https://sqlite.org/compile.html#threadsafe
 
    .. versionchanged:: 3.11
@@ -533,10 +546,52 @@ Module constants
    Version number of this module as a :class:`string <str>`.
    This is not the version of the SQLite library.
 
+   .. deprecated-removed:: 3.12 3.14
+      This constant used to reflect the version number of the ``pysqlite``
+      package, a third-party library which used to upstream changes to
+      :mod:`!sqlite3`. Today, it carries no meaning or practical value.
+
 .. data:: version_info
 
    Version number of this module as a :class:`tuple` of :class:`integers <int>`.
    This is not the version of the SQLite library.
+
+   .. deprecated-removed:: 3.12 3.14
+      This constant used to reflect the version number of the ``pysqlite``
+      package, a third-party library which used to upstream changes to
+      :mod:`!sqlite3`. Today, it carries no meaning or practical value.
+
+.. _sqlite3-dbconfig-constants:
+
+.. data:: SQLITE_DBCONFIG_DEFENSIVE
+          SQLITE_DBCONFIG_DQS_DDL
+          SQLITE_DBCONFIG_DQS_DML
+          SQLITE_DBCONFIG_ENABLE_FKEY
+          SQLITE_DBCONFIG_ENABLE_FTS3_TOKENIZER
+          SQLITE_DBCONFIG_ENABLE_LOAD_EXTENSION
+          SQLITE_DBCONFIG_ENABLE_QPSG
+          SQLITE_DBCONFIG_ENABLE_TRIGGER
+          SQLITE_DBCONFIG_ENABLE_VIEW
+          SQLITE_DBCONFIG_LEGACY_ALTER_TABLE
+          SQLITE_DBCONFIG_LEGACY_FILE_FORMAT
+          SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE
+          SQLITE_DBCONFIG_RESET_DATABASE
+          SQLITE_DBCONFIG_TRIGGER_EQP
+          SQLITE_DBCONFIG_TRUSTED_SCHEMA
+          SQLITE_DBCONFIG_WRITABLE_SCHEMA
+
+   These constants are used for the :meth:`Connection.setconfig`
+   and :meth:`~Connection.getconfig` methods.
+
+   The availability of these constants varies depending on the version of SQLite
+   Python was compiled with.
+
+   .. versionadded:: 3.12
+
+   .. seealso::
+
+     https://www.sqlite.org/c3ref/c_dbconfig_defensive.html
+        SQLite docs: Database Connection Configuration Options
 
 
 .. _sqlite3-connection-objects:
@@ -562,8 +617,8 @@ Connection objects
 
       Create and return a :class:`Cursor` object.
       The cursor method accepts a single optional parameter *factory*. If
-      supplied, this must be a callable returning an instance of :class:`Cursor`
-      or its subclasses.
+      supplied, this must be a :term:`callable` returning
+      an instance of :class:`Cursor` or its subclasses.
 
    .. method:: blobopen(table, column, row, /, *, readonly=False, name="main")
 
@@ -603,18 +658,27 @@ Connection objects
    .. method:: commit()
 
       Commit any pending transaction to the database.
-      If there is no open transaction, this method is a no-op.
+      If :attr:`autocommit` is ``True``, or there is no open transaction,
+      this method does nothing.
+      If :attr:`!autocommit` is ``False``, a new transaction is implicitly
+      opened if a pending transaction was committed by this method.
 
    .. method:: rollback()
 
       Roll back to the start of any pending transaction.
-      If there is no open transaction, this method is a no-op.
+      If :attr:`autocommit` is ``True``, or there is no open transaction,
+      this method does nothing.
+      If :attr:`!autocommit` is ``False``, a new transaction is implicitly
+      opened if a pending transaction was rolled back by this method.
 
    .. method:: close()
 
       Close the database connection.
-      Any pending transaction is not committed implicitly;
-      make sure to :meth:`commit` before closing
+      If :attr:`autocommit` is ``False``,
+      any pending transaction is implicitly rolled back.
+      If :attr:`!autocommit` is ``True`` or :data:`LEGACY_TRANSACTION_CONTROL`,
+      no implicit transaction control is executed.
+      Make sure to :meth:`commit` before closing
       to avoid losing pending changes.
 
    .. method:: execute(sql, parameters=(), /)
@@ -647,7 +711,7 @@ Connection objects
           If ``-1``, it may take any number of arguments.
 
       :param func:
-          A callable that is called when the SQL function is invoked.
+          A :term:`callable` that is called when the SQL function is invoked.
           The callable must return :ref:`a type natively supported by SQLite
           <sqlite3-types>`.
           Set to ``None`` to remove an existing SQL function.
@@ -661,8 +725,8 @@ Connection objects
       :raises NotSupportedError:
           If *deterministic* is used with SQLite versions older than 3.8.3.
 
-      .. versionadded:: 3.8
-         The *deterministic* parameter.
+      .. versionchanged:: 3.8
+         Added the *deterministic* parameter.
 
       Example:
 
@@ -676,9 +740,10 @@ Connection objects
          >>> for row in con.execute("SELECT md5(?)", (b"foo",)):
          ...     print(row)
          ('acbd18db4cc2f85cedef654fccc4a4d8',)
+         >>> con.close()
 
 
-   .. method:: create_aggregate(name, /, n_arg, aggregate_class)
+   .. method:: create_aggregate(name, n_arg, aggregate_class)
 
       Create or remove a user-defined SQL aggregate function.
 
@@ -812,13 +877,14 @@ Connection objects
              FROM test ORDER BY x
          """)
          print(cur.fetchall())
+         con.close()
 
       .. testoutput::
          :hide:
 
          [('a', 9), ('b', 12), ('c', 16), ('d', 12), ('e', 9)]
 
-   .. method:: create_collation(name, callable)
+   .. method:: create_collation(name, callable, /)
 
       Create a collation named *name* using the collating function *callable*.
       *callable* is passed two :class:`string <str>` arguments,
@@ -872,9 +938,10 @@ Connection objects
 
    .. method:: set_authorizer(authorizer_callback)
 
-      Register callable *authorizer_callback* to be invoked for each attempt to
-      access a column of a table in the database. The callback should return
-      one of :const:`SQLITE_OK`, :const:`SQLITE_DENY`, or :const:`SQLITE_IGNORE`
+      Register :term:`callable` *authorizer_callback* to be invoked
+      for each attempt to access a column of a table in the database.
+      The callback should return one of :const:`SQLITE_OK`,
+      :const:`SQLITE_DENY`, or :const:`SQLITE_IGNORE`
       to signal how access to the column should be handled
       by the underlying SQLite library.
 
@@ -897,7 +964,7 @@ Connection objects
 
    .. method:: set_progress_handler(progress_handler, n)
 
-      Register callable *progress_handler* to be invoked for every *n*
+      Register :term:`callable` *progress_handler* to be invoked for every *n*
       instructions of the SQLite virtual machine. This is useful if you want to
       get called from SQLite during long-running operations, for example to update
       a GUI.
@@ -906,14 +973,14 @@ Connection objects
       method with ``None`` for *progress_handler*.
 
       Returning a non-zero value from the handler function will terminate the
-      currently executing query and cause it to raise an :exc:`OperationalError`
+      currently executing query and cause it to raise a :exc:`DatabaseError`
       exception.
 
 
    .. method:: set_trace_callback(trace_callback)
 
-      Register callable *trace_callback* to be invoked for each SQL statement
-      that is actually executed by the SQLite backend.
+      Register :term:`callable` *trace_callback* to be invoked
+      for each SQL statement that is actually executed by the SQLite backend.
 
       The only argument passed to the callback is the statement (as
       :class:`str`) that is being executed. The return value of the callback is
@@ -959,13 +1026,10 @@ Connection objects
       .. versionchanged:: 3.10
          Added the ``sqlite3.enable_load_extension`` auditing event.
 
-      .. testsetup:: sqlite3.loadext
+      .. We cannot doctest the load extension API, since there is no convenient
+         way to skip it.
 
-         import sqlite3
-         con = sqlite3.connect(":memory:")
-
-      .. testcode:: sqlite3.loadext
-         :skipif: True  # not testable at the moment
+      .. code-block::
 
          con.enable_load_extension(True)
 
@@ -989,19 +1053,24 @@ Connection objects
          for row in con.execute("SELECT rowid, name, ingredients FROM recipe WHERE name MATCH 'pie'"):
              print(row)
 
-         con.close()
+   .. method:: load_extension(path, /, *, entrypoint=None)
 
-      .. testoutput:: sqlite3.loadext
-         :hide:
-
-         (2, 'broccoli pie', 'broccoli cheese onions flour')
-         (3, 'pumpkin pie', 'pumpkin sugar flour butter')
-
-   .. method:: load_extension(path, /)
-
-      Load an SQLite extension from a shared library located at *path*.
+      Load an SQLite extension from a shared library.
       Enable extension loading with :meth:`enable_load_extension` before
       calling this method.
+
+      :param str path:
+
+         The path to the SQLite extension.
+
+      :param entrypoint:
+
+         Entry point name.
+         If ``None`` (the default),
+         SQLite will come up with an entry point name of its own;
+         see the SQLite docs `Loading an Extension`_ for details.
+
+      :type entrypoint: str | None
 
       .. audit-event:: sqlite3.load_extension connection,path sqlite3.Connection.load_extension
 
@@ -1009,6 +1078,11 @@ Connection objects
 
       .. versionchanged:: 3.10
          Added the ``sqlite3.load_extension`` auditing event.
+
+      .. versionchanged:: 3.12
+         Added the *entrypoint* parameter.
+
+   .. _Loading an Extension: https://www.sqlite.org/loadext.html#loading_an_extension
 
    .. method:: iterdump
 
@@ -1026,6 +1100,10 @@ Connection objects
              for line in con.iterdump():
                  f.write('%s\n' % line)
          con.close()
+
+      .. seealso::
+
+         :ref:`sqlite3-howto-encoding`
 
 
    .. method:: backup(target, *, pages=-1, progress=None, name="main", sleep=0.250)
@@ -1045,8 +1123,8 @@ Connection objects
           Defaults to ``-1``.
 
       :param progress:
-          If set to a callable, it is invoked with three integer arguments for
-          every backup iteration:
+          If set to a :term:`callable`,
+          it is invoked with three integer arguments for every backup iteration:
           the *status* of the last iteration,
           the *remaining* number of pages still to be copied,
           and the *total* number of pages.
@@ -1090,8 +1168,14 @@ Connection objects
          src = sqlite3.connect('example.db')
          dst = sqlite3.connect(':memory:')
          src.backup(dst)
+         dst.close()
+         src.close()
 
       .. versionadded:: 3.7
+
+      .. seealso::
+
+         :ref:`sqlite3-howto-encoding`
 
    .. method:: getlimit(category, /)
 
@@ -1152,10 +1236,38 @@ Connection objects
          >>> con.getlimit(sqlite3.SQLITE_LIMIT_ATTACHED)
          1
 
+      .. testcleanup:: sqlite3.limits
+
+         con.close()
+
       .. versionadded:: 3.11
 
    .. _SQLite limit category: https://www.sqlite.org/c3ref/c_limit_attached.html
 
+
+   .. method:: getconfig(op, /)
+
+      Query a boolean connection configuration option.
+
+      :param int op:
+         A :ref:`SQLITE_DBCONFIG code <sqlite3-dbconfig-constants>`.
+
+      :rtype: bool
+
+      .. versionadded:: 3.12
+
+   .. method:: setconfig(op, enable=True, /)
+
+      Set a boolean connection configuration option.
+
+      :param int op:
+         A :ref:`SQLITE_DBCONFIG code <sqlite3-dbconfig-constants>`.
+
+      :param bool enable:
+         ``True`` if the configuration option should be enabled (default);
+         ``False`` if it should be disabled.
+
+      .. versionadded:: 3.12
 
    .. method:: serialize(*, name="main")
 
@@ -1211,6 +1323,38 @@ Connection objects
 
       .. versionadded:: 3.11
 
+   .. attribute:: autocommit
+
+      This attribute controls :pep:`249`-compliant transaction behaviour.
+      :attr:`!autocommit` has three allowed values:
+
+      * ``False``: Select :pep:`249`-compliant transaction behaviour,
+        implying that :mod:`!sqlite3` ensures a transaction is always open.
+        Use :meth:`commit` and :meth:`rollback` to close transactions.
+
+        This is the recommended value of :attr:`!autocommit`.
+
+      * ``True``: Use SQLite's `autocommit mode`_.
+        :meth:`commit` and :meth:`rollback` have no effect in this mode.
+
+      * :data:`LEGACY_TRANSACTION_CONTROL`:
+        Pre-Python 3.12 (non-:pep:`249`-compliant) transaction control.
+        See :attr:`isolation_level` for more details.
+
+        This is currently the default value of :attr:`!autocommit`.
+
+      Changing :attr:`!autocommit` to ``False`` will open a new transaction,
+      and changing it to ``True`` will commit any pending transaction.
+
+      See :ref:`sqlite3-transaction-control-autocommit` for more details.
+
+      .. note::
+
+         The :attr:`isolation_level` attribute has no effect unless
+         :attr:`autocommit` is :data:`LEGACY_TRANSACTION_CONTROL`.
+
+      .. versionadded:: 3.12
+
    .. attribute:: in_transaction
 
       This read-only attribute corresponds to the low-level SQLite
@@ -1223,16 +1367,23 @@ Connection objects
 
    .. attribute:: isolation_level
 
-      This attribute controls the :ref:`transaction handling
-      <sqlite3-controlling-transactions>` performed by :mod:`!sqlite3`.
+      Controls the :ref:`legacy transaction handling mode
+      <sqlite3-transaction-control-isolation-level>` of :mod:`!sqlite3`.
       If set to ``None``, transactions are never implicitly opened.
       If set to one of ``"DEFERRED"``, ``"IMMEDIATE"``, or ``"EXCLUSIVE"``,
       corresponding to the underlying `SQLite transaction behaviour`_,
-      implicit :ref:`transaction management
-      <sqlite3-controlling-transactions>` is performed.
+      :ref:`implicit transaction management
+      <sqlite3-transaction-control-isolation-level>` is performed.
 
       If not overridden by the *isolation_level* parameter of :func:`connect`,
       the default is ``""``, which is an alias for ``"DEFERRED"``.
+
+      .. note::
+
+         Using :attr:`autocommit` to control transaction handling is
+         recommended over using :attr:`!isolation_level`.
+         :attr:`!isolation_level` has no effect unless :attr:`autocommit` is
+         set to :data:`LEGACY_TRANSACTION_CONTROL` (the default).
 
    .. attribute:: row_factory
 
@@ -1247,43 +1398,12 @@ Connection objects
 
    .. attribute:: text_factory
 
-      A callable that accepts a :class:`bytes` parameter and returns a text
-      representation of it.
+      A :term:`callable` that accepts a :class:`bytes` parameter
+      and returns a text representation of it.
       The callable is invoked for SQLite values with the ``TEXT`` data type.
       By default, this attribute is set to :class:`str`.
-      If you want to return ``bytes`` instead, set *text_factory* to ``bytes``.
 
-      Example:
-
-      .. testcode::
-
-         con = sqlite3.connect(":memory:")
-         cur = con.cursor()
-
-         AUSTRIA = "Österreich"
-
-         # by default, rows are returned as str
-         cur.execute("SELECT ?", (AUSTRIA,))
-         row = cur.fetchone()
-         assert row[0] == AUSTRIA
-
-         # but we can make sqlite3 always return bytestrings ...
-         con.text_factory = bytes
-         cur.execute("SELECT ?", (AUSTRIA,))
-         row = cur.fetchone()
-         assert type(row[0]) is bytes
-         # the bytestrings will be encoded in UTF-8, unless you stored garbage in the
-         # database ...
-         assert row[0] == AUSTRIA.encode("utf-8")
-
-         # we can also implement a custom text_factory ...
-         # here we implement one that appends "foo" to all strings
-         con.text_factory = lambda x: x.decode("utf-8") + "foo"
-         cur.execute("SELECT ?", ("bar",))
-         row = cur.fetchone()
-         assert row[0] == "barfoo"
-
-         con.close()
+      See :ref:`sqlite3-howto-encoding` for more details.
 
    .. attribute:: total_changes
 
@@ -1335,7 +1455,7 @@ Cursor objects
 
    .. method:: execute(sql, parameters=(), /)
 
-      Execute SQL a single SQL statement,
+      Execute a single SQL statement,
       optionally binding Python values using
       :ref:`placeholders <sqlite3-placeholders>`.
 
@@ -1352,10 +1472,20 @@ Cursor objects
       :raises ProgrammingError:
          If *sql* contains more than one SQL statement.
 
-      If :attr:`~Connection.isolation_level` is not ``None``,
+      If :attr:`~Connection.autocommit` is
+      :data:`LEGACY_TRANSACTION_CONTROL`,
+      :attr:`~Connection.isolation_level` is not ``None``,
       *sql* is an ``INSERT``, ``UPDATE``, ``DELETE``, or ``REPLACE`` statement,
       and there is no open transaction,
       a transaction is implicitly opened before executing *sql*.
+
+      .. deprecated-removed:: 3.12 3.14
+
+         :exc:`DeprecationWarning` is emitted if
+         :ref:`named placeholders <sqlite3-placeholders>` are used
+         and *parameters* is a sequence instead of a :class:`dict`.
+         Starting with Python 3.14, :exc:`ProgrammingError` will
+         be raised instead.
 
       Use :meth:`executescript` to execute multiple SQL statements.
 
@@ -1378,7 +1508,7 @@ Cursor objects
 
       :raises ProgrammingError:
          If *sql* contains more than one SQL statement,
-         or is not a DML statment.
+         or is not a DML statement.
 
       Example:
 
@@ -1391,6 +1521,10 @@ Cursor objects
          # cur is an sqlite3.Cursor object
          cur.executemany("INSERT INTO data VALUES(?)", rows)
 
+      .. testcleanup:: sqlite3.cursor
+
+         con.close()
+
       .. note::
 
          Any resulting rows are discarded,
@@ -1398,10 +1532,21 @@ Cursor objects
 
       .. _RETURNING clauses: https://www.sqlite.org/lang_returning.html
 
+      .. deprecated-removed:: 3.12 3.14
+
+         :exc:`DeprecationWarning` is emitted if
+         :ref:`named placeholders <sqlite3-placeholders>` are used
+         and the items in *parameters* are sequences
+         instead of :class:`dict`\s.
+         Starting with Python 3.14, :exc:`ProgrammingError` will
+         be raised instead.
+
    .. method:: executescript(sql_script, /)
 
       Execute the SQL statements in *sql_script*.
-      If there is a pending transaction,
+      If the :attr:`~Connection.autocommit` is
+      :data:`LEGACY_TRANSACTION_CONTROL`
+      and there is a pending transaction,
       an implicit ``COMMIT`` statement is executed first.
       No other implicit transaction control is performed;
       any transaction control must be added to *sql_script*.
@@ -1420,7 +1565,6 @@ Cursor objects
              CREATE TABLE publisher(name, address);
              COMMIT;
          """)
-
 
    .. method:: fetchone()
 
@@ -1486,6 +1630,7 @@ Cursor objects
          >>> cur = con.cursor()
          >>> cur.connection == con
          True
+         >>> con.close()
 
    .. attribute:: description
 
@@ -1575,9 +1720,9 @@ Row objects
 Blob objects
 ^^^^^^^^^^^^
 
-.. versionadded:: 3.11
-
 .. class:: Blob
+
+   .. versionadded:: 3.11
 
    A :class:`Blob` instance is a :term:`file-like object`
    that can read and write data in an SQLite :abbr:`BLOB (Binary Large OBject)`.
@@ -1606,6 +1751,7 @@ Blob objects
           greeting = blob.read()
 
       print(greeting)  # outputs "b'Hello, world!'"
+      con.close()
 
    .. testoutput::
       :hide:
@@ -1641,9 +1787,9 @@ Blob objects
    .. method:: seek(offset, origin=os.SEEK_SET, /)
 
       Set the current access position of the blob to *offset*.  The *origin*
-      argument defaults to :data:`os.SEEK_SET` (absolute blob positioning).
-      Other values for *origin* are :data:`os.SEEK_CUR` (seek relative to the
-      current position) and :data:`os.SEEK_END` (seek relative to the blob’s
+      argument defaults to :const:`os.SEEK_SET` (absolute blob positioning).
+      Other values for *origin* are :const:`os.SEEK_CUR` (seek relative to the
+      current position) and :const:`os.SEEK_END` (seek relative to the blob’s
       end).
 
 
@@ -1801,27 +1947,26 @@ Python types via :ref:`converters <sqlite3-converters>`.
 
 .. _sqlite3-default-converters:
 
-Default adapters and converters
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Default adapters and converters (deprecated)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-There are default adapters for the date and datetime types in the datetime
-module. They will be sent as ISO dates/ISO timestamps to SQLite.
+.. note::
 
-The default converters are registered under the name "date" for
-:class:`datetime.date` and under the name "timestamp" for
-:class:`datetime.datetime`.
+   The default adapters and converters are deprecated as of Python 3.12.
+   Instead, use the :ref:`sqlite3-adapter-converter-recipes`
+   and tailor them to your needs.
 
-This way, you can use date/timestamps from Python without any additional
-fiddling in most cases. The format of the adapters is also compatible with the
-experimental SQLite date/time functions.
+The deprecated default adapters and converters consist of:
 
-The following example demonstrates this.
-
-.. literalinclude:: ../includes/sqlite3/pysqlite_datetime.py
-
-If a timestamp stored in SQLite has a fractional part longer than 6
-numbers, its value will be truncated to microsecond precision by the
-timestamp converter.
+* An adapter for :class:`datetime.date` objects to :class:`strings <str>` in
+  `ISO 8601`_ format.
+* An adapter for :class:`datetime.datetime` objects to strings in
+  ISO 8601 format.
+* A converter for :ref:`declared <sqlite3-converters>` "date" types to
+  :class:`datetime.date` objects.
+* A converter for declared "timestamp" types to
+  :class:`datetime.datetime` objects.
+  Fractional parts will be truncated to 6 digits (microsecond precision).
 
 .. note::
 
@@ -1829,6 +1974,37 @@ timestamp converter.
    always returns a naive :class:`datetime.datetime` object. To preserve UTC
    offsets in timestamps, either leave converters disabled, or register an
    offset-aware converter with :func:`register_converter`.
+
+.. deprecated:: 3.12
+
+.. _ISO 8601: https://en.wikipedia.org/wiki/ISO_8601
+
+
+.. _sqlite3-cli:
+
+Command-line interface
+^^^^^^^^^^^^^^^^^^^^^^
+
+The :mod:`!sqlite3` module can be invoked as a script,
+using the interpreter's :option:`-m` switch,
+in order to provide a simple SQLite shell.
+The argument signature is as follows::
+
+   python -m sqlite3 [-h] [-v] [filename] [sql]
+
+Type ``.quit`` or CTRL-D to exit the shell.
+
+.. program:: python -m sqlite3 [-h] [-v] [filename] [sql]
+
+.. option:: -h, --help
+
+   Print CLI help.
+
+.. option:: -v, --version
+
+   Print underlying SQLite library version.
+
+.. versionadded:: 3.12
 
 
 .. _sqlite3-howtos:
@@ -1864,7 +2040,7 @@ question marks (qmark style) or named placeholders (named style).
 For the qmark style, *parameters* must be a
 :term:`sequence` whose length must match the number of placeholders,
 or a :exc:`ProgrammingError` is raised.
-For the named style, *parameters* should be
+For the named style, *parameters* must be
 an instance of a :class:`dict` (or a subclass),
 which must contain keys for all named parameters;
 any extra items are ignored.
@@ -1888,6 +2064,7 @@ Here's an example of both styles:
    params = (1972,)
    cur.execute("SELECT * FROM lang WHERE first_appeared = ?", params)
    print(cur.fetchall())
+   con.close()
 
 .. testoutput::
    :hide:
@@ -1946,6 +2123,7 @@ The object passed to *protocol* will be of type :class:`PrepareProtocol`.
 
    cur.execute("SELECT ?", (Point(4.0, -3.2),))
    print(cur.fetchone()[0])
+   con.close()
 
 .. testoutput::
    :hide:
@@ -1976,6 +2154,7 @@ This function can then be registered using :func:`register_adapter`.
 
    cur.execute("SELECT ?", (Point(1.0, 2.5),))
    print(cur.fetchone()[0])
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2060,6 +2239,8 @@ The following example illustrates the implicit and explicit approaches:
    cur.execute("INSERT INTO test(p) VALUES(?)", (p,))
    cur.execute('SELECT p AS "p [point]" FROM test')
    print("with column names:", cur.fetchone()[0])
+   cur.close()
+   con.close()
 
 .. testoutput::
    :hide:
@@ -2124,7 +2305,7 @@ This section shows recipes for common adapters and converters.
    assert convert_datetime(b"2019-05-18T15:17:08.123456") == dt
 
    # Using current time as fromtimestamp() returns local date/time.
-   # Droping microseconds as adapt_datetime_epoch truncates fractional second part.
+   # Dropping microseconds as adapt_datetime_epoch truncates fractional second part.
    now = datetime.datetime.now().replace(microsecond=0)
    current_timestamp = int(now.timestamp())
 
@@ -2188,14 +2369,17 @@ the transaction is committed.
 If this commit fails,
 or if the body of the ``with`` statement raises an uncaught exception,
 the transaction is rolled back.
+If :attr:`~Connection.autocommit` is ``False``,
+a new transaction is implicitly opened after committing or rolling back.
 
 If there is no open transaction upon leaving the body of the ``with`` statement,
-the context manager is a no-op.
+or if :attr:`~Connection.autocommit` is ``True``,
+the context manager does nothing.
 
 .. note::
-
    The context manager neither implicitly opens a new transaction
-   nor closes the connection.
+   nor closes the connection. If you need a closing context manager, consider
+   using :meth:`contextlib.closing`.
 
 .. testcode::
 
@@ -2239,6 +2423,7 @@ Some useful URI tricks include:
    >>> con.execute("CREATE TABLE readonly(data)")
    Traceback (most recent call last):
    OperationalError: attempt to write a readonly database
+   >>> con.close()
 
 * Do not implicitly create a new database file if it does not already exist;
   will raise :exc:`~sqlite3.OperationalError` if unable to create a new file:
@@ -2263,6 +2448,8 @@ Some useful URI tricks include:
    res = con2.execute("SELECT data FROM shared")
    assert res.fetchone() == (28,)
 
+   con1.close()
+   con2.close()
 
 More information about this feature, including a list of parameters,
 can be found in the `SQLite URI documentation`_.
@@ -2309,6 +2496,14 @@ Queries now return :class:`!Row` objects:
    'Earth'
    >>> row["RADIUS"]  # Column names are case-insensitive.
    6378
+   >>> con.close()
+
+.. note::
+
+    The ``FROM`` clause can be omitted in the ``SELECT`` statement, as in the
+    above example. In such cases, SQLite returns a single row with columns
+    defined by expressions, e.g. literals, with the given aliases
+    ``expr AS alias``.
 
 You can create a custom :attr:`~Cursor.row_factory`
 that returns each row as a :class:`dict`, with column names mapped to values:
@@ -2328,6 +2523,7 @@ Using it, queries now return a :class:`!dict` instead of a :class:`!tuple`:
    >>> for row in con.execute("SELECT 1 AS a, 2 AS b"):
    ...     print(row)
    {'a': 1, 'b': 2}
+   >>> con.close()
 
 The following row factory returns a :term:`named tuple`:
 
@@ -2354,10 +2550,52 @@ The following row factory returns a :term:`named tuple`:
    1
    >>> row.b   # Attribute access.
    2
+   >>> con.close()
 
 With some adjustments, the above recipe can be adapted to use a
 :class:`~dataclasses.dataclass`, or any other custom class,
 instead of a :class:`~collections.namedtuple`.
+
+
+.. _sqlite3-howto-encoding:
+
+How to handle non-UTF-8 text encodings
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, :mod:`!sqlite3` uses :class:`str` to adapt SQLite values
+with the ``TEXT`` data type.
+This works well for UTF-8 encoded text, but it might fail for other encodings
+and invalid UTF-8.
+You can use a custom :attr:`~Connection.text_factory` to handle such cases.
+
+Because of SQLite's `flexible typing`_, it is not uncommon to encounter table
+columns with the ``TEXT`` data type containing non-UTF-8 encodings,
+or even arbitrary data.
+To demonstrate, let's assume we have a database with ISO-8859-2 (Latin-2)
+encoded text, for example a table of Czech-English dictionary entries.
+Assuming we now have a :class:`Connection` instance :py:data:`!con`
+connected to this database,
+we can decode the Latin-2 encoded text using this :attr:`~Connection.text_factory`:
+
+.. testcode::
+
+   con.text_factory = lambda data: str(data, encoding="latin2")
+
+For invalid UTF-8 or arbitrary data in stored in ``TEXT`` table columns,
+you can use the following technique, borrowed from the :ref:`unicode-howto`:
+
+.. testcode::
+
+   con.text_factory = lambda data: str(data, errors="surrogateescape")
+
+.. note::
+
+   The :mod:`!sqlite3` module API does not support strings
+   containing surrogates.
+
+.. seealso::
+
+   :ref:`unicode-howto`
 
 
 .. _sqlite3-explanation:
@@ -2365,13 +2603,72 @@ instead of a :class:`~collections.namedtuple`.
 Explanation
 -----------
 
+.. _sqlite3-transaction-control:
 .. _sqlite3-controlling-transactions:
 
 Transaction control
 ^^^^^^^^^^^^^^^^^^^
 
-The :mod:`!sqlite3` module does not adhere to the transaction handling recommended
-by :pep:`249`.
+:mod:`!sqlite3` offers multiple methods of controlling whether,
+when and how database transactions are opened and closed.
+:ref:`sqlite3-transaction-control-autocommit` is recommended,
+while :ref:`sqlite3-transaction-control-isolation-level`
+retains the pre-Python 3.12 behaviour.
+
+.. _sqlite3-transaction-control-autocommit:
+
+Transaction control via the ``autocommit`` attribute
+""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+The recommended way of controlling transaction behaviour is through
+the :attr:`Connection.autocommit` attribute,
+which should preferably be set using the *autocommit* parameter
+of :func:`connect`.
+
+It is suggested to set *autocommit* to ``False``,
+which implies :pep:`249`-compliant transaction control.
+This means:
+
+* :mod:`!sqlite3` ensures that a transaction is always open,
+  so :func:`connect`, :meth:`Connection.commit`, and :meth:`Connection.rollback`
+  will implicitly open a new transaction
+  (immediately after closing the pending one, for the latter two).
+  :mod:`!sqlite3` uses ``BEGIN DEFERRED`` statements when opening transactions.
+* Transactions should be committed explicitly using :meth:`!commit`.
+* Transactions should be rolled back explicitly using :meth:`!rollback`.
+* An implicit rollback is performed if the database is
+  :meth:`~Connection.close`-ed with pending changes.
+
+Set *autocommit* to ``True`` to enable SQLite's `autocommit mode`_.
+In this mode, :meth:`Connection.commit` and :meth:`Connection.rollback`
+have no effect.
+Note that SQLite's autocommit mode is distinct from
+the :pep:`249`-compliant :attr:`Connection.autocommit` attribute;
+use :attr:`Connection.in_transaction` to query
+the low-level SQLite autocommit mode.
+
+Set *autocommit* to :data:`LEGACY_TRANSACTION_CONTROL`
+to leave transaction control behaviour to the
+:attr:`Connection.isolation_level` attribute.
+See :ref:`sqlite3-transaction-control-isolation-level` for more information.
+
+
+.. _sqlite3-transaction-control-isolation-level:
+
+Transaction control via the ``isolation_level`` attribute
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+.. note::
+
+   The recommended way of controlling transactions is via the
+   :attr:`~Connection.autocommit` attribute.
+   See :ref:`sqlite3-transaction-control-autocommit`.
+
+If :attr:`Connection.autocommit` is set to
+:data:`LEGACY_TRANSACTION_CONTROL` (the default),
+transaction behaviour is controlled using
+the :attr:`Connection.isolation_level` attribute.
+Otherwise, :attr:`!isolation_level` has no effect.
 
 If the connection attribute :attr:`~Connection.isolation_level`
 is not ``None``,
@@ -2402,8 +2699,20 @@ regardless of the value of :attr:`~Connection.isolation_level`.
    :mod:`!sqlite3` used to implicitly commit an open transaction before DDL
    statements.  This is no longer the case.
 
+.. versionchanged:: 3.12
+   The recommended way of controlling transactions is now via the
+   :attr:`~Connection.autocommit` attribute.
+
 .. _autocommit mode:
    https://www.sqlite.org/lang_transaction.html#implicit_versus_explicit_transactions
 
 .. _SQLite transaction behaviour:
    https://www.sqlite.org/lang_transaction.html#deferred_immediate_and_exclusive_transactions
+
+.. testcleanup::
+
+   import os
+   os.remove("backup.db")
+   os.remove("dump.sql")
+   os.remove("example.db")
+   os.remove("tutorial.db")

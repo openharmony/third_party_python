@@ -1,5 +1,5 @@
-:mod:`msvcrt` --- Useful routines from the MS VC++ runtime
-==========================================================
+:mod:`!msvcrt` --- Useful routines from the MS VC++ runtime
+===========================================================
 
 .. module:: msvcrt
    :platform: Windows
@@ -38,7 +38,7 @@ File Operations
    Lock part of a file based on file descriptor *fd* from the C runtime.  Raises
    :exc:`OSError` on failure.  The locked region of the file extends from the
    current file position for *nbytes* bytes, and may continue beyond the end of the
-   file.  *mode* must be one of the :const:`LK_\*` constants listed below. Multiple
+   file.  *mode* must be one of the :const:`!LK_\*` constants listed below. Multiple
    regions in a file may be locked at the same time, but may not overlap.  Adjacent
    regions are not merged; they must be unlocked individually.
 
@@ -157,4 +157,18 @@ Other Functions
 .. function:: heapmin()
 
    Force the :c:func:`malloc` heap to clean itself up and return unused blocks to
-   the operating system.  On failure, this raises :exc:`OSError`.
+   the operating system. On failure, this raises :exc:`OSError`.
+
+.. data:: CRT_ASSEMBLY_VERSION
+
+   The CRT Assembly version, from the :file:`crtassem.h` header file.
+
+
+.. data:: VC_ASSEMBLY_PUBLICKEYTOKEN
+
+   The VC Assembly public key token, from the :file:`crtassem.h` header file.
+
+
+.. data:: LIBRARIES_ASSEMBLY_NAME_PREFIX
+
+   The Libraries Assembly name prefix, from the :file:`crtassem.h` header file.

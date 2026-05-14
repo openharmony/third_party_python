@@ -8,6 +8,11 @@ extern "C" {
 #  error "this header requires Py_BUILD_CORE define"
 #endif
 
+PyAPI_FUNC(int) _PySys_GetOptionalAttr(PyObject *, PyObject **);
+PyAPI_FUNC(int) _PySys_GetOptionalAttrString(const char *, PyObject **);
+PyAPI_FUNC(PyObject *) _PySys_GetRequiredAttr(PyObject *);
+PyAPI_FUNC(PyObject *) _PySys_GetRequiredAttrString(const char *);
+
 PyAPI_FUNC(int) _PySys_Audit(
     PyThreadState *tstate,
     const char *event,
@@ -19,6 +24,9 @@ PyAPI_FUNC(int) _PySys_Audit(
 extern void _PySys_ClearAuditHooks(PyThreadState *tstate);
 
 PyAPI_FUNC(int) _PySys_SetAttr(PyObject *, PyObject *);
+
+extern int _PySys_ClearAttrString(PyInterpreterState *interp,
+                                  const char *name, int verbose);
 
 #ifdef __cplusplus
 }

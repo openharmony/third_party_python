@@ -118,7 +118,7 @@ class LinuxPythonBuilder(PythonBuilder):
             #f'--with-openssl={self._deps_dir / "ssl"}',
             #f'--with-openssl-rpath={self._deps_dir / "ssl" / "lib64"}',
             '--enable-shared',
-            '--with-ensurepip=upgrade',
+            '--with-ensurepip=install',
             '--disable-ipv6'
         ]
         cmd = [str(self._source_dir / 'configure')] + config_flags

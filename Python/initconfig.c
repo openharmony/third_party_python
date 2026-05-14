@@ -5,10 +5,11 @@
 #include "pycore_interp.h"        // _PyInterpreterState.runtime
 #include "pycore_long.h"          // _PY_LONG_MAX_STR_DIGITS_THRESHOLD
 #include "pycore_pathconfig.h"    // _Py_path_config
-#include "pycore_pyerrors.h"      // _PyErr_Fetch()
+#include "pycore_pyerrors.h"      // _PyErr_GetRaisedException()
 #include "pycore_pylifecycle.h"   // _Py_PreInitializeFromConfig()
 #include "pycore_pymem.h"         // _PyMem_SetDefaultAllocator()
 #include "pycore_pystate.h"       // _PyThreadState_GET()
+#include "pycore_sysmodule.h"     // _PySys_GetOptionalAttrString()
 
 #include "osdefs.h"               // DELIM
 
@@ -33,8 +34,8 @@ static const char usage_line[] =
 /* Lines sorted by option name; keep in sync with usage_envvars* below */
 static const char usage_help[] = "\
 Options (and corresponding environment variables):\n\
--b     : issue warnings about str(bytes_instance), str(bytearray_instance)\n\
-         and comparing bytes/bytearray with str. (-bb: issue errors)\n\
+-b     : issue warnings about converting bytes/bytearray to str and comparing\n\
+         bytes/bytearray with str or bytes with int. (-bb: issue errors)\n\
 -B     : don't write .pyc files on import; also PYTHONDONTWRITEBYTECODE=x\n\
 -c cmd : program passed in as string (terminates option list)\n\
 -d     : turn on parser debugging output (for experts only, only works on\n\
@@ -43,15 +44,16 @@ Options (and corresponding environment variables):\n\
 -h     : print this help message and exit (also -? or --help)\n\
 -i     : inspect interactively after running script; forces a prompt even\n\
          if stdin does not appear to be a terminal; also PYTHONINSPECT=x\n\
--I     : isolate Python from the user's environment (implies -E and -s)\n\
+-I     : isolate Python from the user's environment (implies -E, -P and -s)\n\
 -m mod : run library module as a script (terminates option list)\n\
 -O     : remove assert and __debug__-dependent statements; add .opt-1 before\n\
          .pyc extension; also PYTHONOPTIMIZE=x\n\
 -OO    : do -O changes and also discard docstrings; add .opt-2 before\n\
          .pyc extension\n\
--P     : don't prepend a potentially unsafe path to sys.path\n\
+-P     : don't prepend a potentially unsafe path to sys.path; also\n\
+         PYTHONSAFEPATH\n\
 -q     : don't print version and copyright messages on interactive startup\n\
--s     : don't add user site directory to sys.path; also PYTHONNOUSERSITE\n\
+-s     : don't add user site directory to sys.path; also PYTHONNOUSERSITE=x\n\
 -S     : don't imply 'import site' on initialization\n\
 -u     : force the stdout and stderr streams to be unbuffered;\n\
          this option has no effect on stdin; also PYTHONUNBUFFERED=x\n\
@@ -65,9 +67,10 @@ Options (and corresponding environment variables):\n\
 -X opt : set implementation-specific option\n\
 --check-hash-based-pycs always|default|never:\n\
          control how Python invalidates hash-based .pyc files\n\
---help-env      : print help about Python environment variables and exit\n\
---help-xoptions : print help about implementation-specific -X options and exit\n\
---help-all      : print complete help information and exit\n\
+--help-env: print help about Python environment variables and exit\n\
+--help-xoptions: print help about implementation-specific -X options and exit\n\
+--help-all: print complete help information and exit\n\
+\n\
 Arguments:\n\
 file   : program read from script file\n\
 -      : program read from stdin (default; interactive mode if a tty)\n\
@@ -76,105 +79,90 @@ arg ...: arguments passed to program in sys.argv[1:]\n\
 
 static const char usage_xoptions[] = "\
 The following implementation-specific options are available:\n\
-\n\
--X faulthandler: enable faulthandler\n\
-\n\
+-X dev : enable Python Development Mode; also PYTHONDEVMODE\n\
+-X faulthandler: dump the Python traceback on fatal errors;\n\
+         also PYTHONFAULTHANDLER\n\
+-X frozen_modules=[on|off]: whether to use frozen modules; the default is \"on\"\n\
+         for installed Python and \"off\" for a local build\n\
+-X importtime: show how long each import takes; also PYTHONPROFILEIMPORTTIME\n\
+-X int_max_str_digits=N: limit the size of int<->str conversions;\n\
+         0 disables the limit; also PYTHONINTMAXSTRDIGITS\n\
+-X no_debug_ranges: don't include extra location information in code objects;\n\
+         also PYTHONNODEBUGRANGES\n\
+-X perf: support the Linux \"perf\" profiler; also PYTHONPERFSUPPORT=1\n\
+"
+#ifdef Py_DEBUG
+"-X presite=MOD: import this module before site; also PYTHON_PRESITE\n"
+#endif
+"\
+-X pycache_prefix=PATH: write .pyc files to a parallel tree instead of to the\n\
+         code tree; also PYTHONPYCACHEPREFIX\n\
+"
+#ifdef Py_STATS
+"-X pystats: enable pystats collection at startup; also PYTHONSTATS\n"
+#endif
+"\
 -X showrefcount: output the total reference count and number of used\n\
-    memory blocks when the program finishes or after each statement in the\n\
-    interactive interpreter. This only works on debug builds\n\
-\n\
--X tracemalloc: start tracing Python memory allocations using the\n\
-    tracemalloc module. By default, only the most recent frame is stored in a\n\
-    traceback of a trace. Use -X tracemalloc=NFRAME to start tracing with a\n\
-    traceback limit of NFRAME frames\n\
-\n\
--X importtime: show how long each import takes. It shows module name,\n\
-    cumulative time (including nested imports) and self time (excluding\n\
-    nested imports). Note that its output may be broken in multi-threaded\n\
-    application. Typical usage is python3 -X importtime -c 'import asyncio'\n\
-\n\
--X dev: enable CPython's \"development mode\", introducing additional runtime\n\
-    checks which are too expensive to be enabled by default. Effect of the\n\
-    developer mode:\n\
-       * Add default warning filter, as -W default\n\
-       * Install debug hooks on memory allocators: see the PyMem_SetupDebugHooks()\n\
-         C function\n\
-       * Enable the faulthandler module to dump the Python traceback on a crash\n\
-       * Enable asyncio debug mode\n\
-       * Set the dev_mode attribute of sys.flags to True\n\
-       * io.IOBase destructor logs close() exceptions\n\
-\n\
--X utf8: enable UTF-8 mode for operating system interfaces, overriding the default\n\
-    locale-aware mode. -X utf8=0 explicitly disables UTF-8 mode (even when it would\n\
-    otherwise activate automatically)\n\
-\n\
--X pycache_prefix=PATH: enable writing .pyc files to a parallel tree rooted at the\n\
-    given directory instead of to the code tree\n\
-\n\
--X warn_default_encoding: enable opt-in EncodingWarning for 'encoding=None'\n\
-\n\
--X no_debug_ranges: disable the inclusion of the tables mapping extra location \n\
-   information (end line, start column offset and end column offset) to every \n\
-   instruction in code objects. This is useful when smaller code objects and pyc \n\
-   files are desired as well as suppressing the extra visual location indicators \n\
-   when the interpreter displays tracebacks.\n\
-\n\
--X frozen_modules=[on|off]: whether or not frozen modules should be used.\n\
-   The default is \"on\" (or \"off\" if you are running a local build).\n\
-\n\
--X int_max_str_digits=number: limit the size of int<->str conversions.\n\
-    This helps avoid denial of service attacks when parsing untrusted data.\n\
-    The default is sys.int_info.default_max_str_digits.  0 disables.";
+         memory blocks when the program finishes or after each statement in\n\
+         the interactive interpreter; only works on debug builds\n\
+-X tracemalloc[=N]: trace Python memory allocations; N sets a traceback limit\n\
+         of N frames (default: 1); also PYTHONTRACEMALLOC=N\n\
+-X utf8[=0|1]: enable (1) or disable (0) UTF-8 mode; also PYTHONUTF8\n\
+-X warn_default_encoding: enable opt-in EncodingWarning for 'encoding=None';\n\
+         also PYTHONWARNDEFAULTENCODING\
+";
 
 /* Envvars that don't have equivalent command-line options are listed first */
 static const char usage_envvars[] =
 "Environment variables that change behavior:\n"
-"PYTHONSTARTUP: file executed on interactive startup (no default)\n"
-"PYTHONPATH   : '%lc'-separated list of directories prefixed to the\n"
-"               default module search path.  The result is sys.path.\n"
-"PYTHONSAFEPATH: don't prepend a potentially unsafe path to sys.path.\n"
-"PYTHONHOME   : alternate <prefix> directory (or <prefix>%lc<exec_prefix>).\n"
-"               The default module search path uses %s.\n"
-"PYTHONPLATLIBDIR : override sys.platlibdir.\n"
-"PYTHONCASEOK : ignore case in 'import' statements (Windows).\n"
-"PYTHONUTF8: if set to 1, enable the UTF-8 mode.\n"
-"PYTHONIOENCODING: Encoding[:errors] used for stdin/stdout/stderr.\n"
-"PYTHONFAULTHANDLER: dump the Python traceback on fatal errors.\n"
-"PYTHONHASHSEED: if this variable is set to 'random', a random value is used\n"
-"   to seed the hashes of str and bytes objects.  It can also be set to an\n"
-"   integer in the range [0,4294967295] to get hash values with a\n"
-"   predictable seed.\n"
-"PYTHONINTMAXSTRDIGITS: limits the maximum digit characters in an int value\n"
-"   when converting from a string and when converting an int back to a str.\n"
-"   A value of 0 disables the limit.  Conversions to or from bases 2, 4, 8,\n"
-"   16, and 32 are never limited.\n"
-"PYTHONMALLOC: set the Python memory allocators and/or install debug hooks\n"
-"   on Python memory allocators. Use PYTHONMALLOC=debug to install debug\n"
-"   hooks.\n"
+"PYTHONSTARTUP   : file executed on interactive startup (no default)\n"
+"PYTHONPATH      : '%lc'-separated list of directories prefixed to the\n"
+"                  default module search path.  The result is sys.path.\n"
+"PYTHONHOME      : alternate <prefix> directory (or <prefix>%lc<exec_prefix>).\n"
+"                  The default module search path uses %s.\n"
+"PYTHONPLATLIBDIR: override sys.platlibdir\n"
+"PYTHONCASEOK    : ignore case in 'import' statements (Windows)\n"
+"PYTHONIOENCODING: encoding[:errors] used for stdin/stdout/stderr\n"
+"PYTHONHASHSEED  : if this variable is set to 'random', a random value is used\n"
+"                  to seed the hashes of str and bytes objects.  It can also be\n"
+"                  set to an integer in the range [0,4294967295] to get hash\n"
+"                  values with a predictable seed.\n"
+"PYTHONMALLOC    : set the Python memory allocators and/or install debug hooks\n"
+"                  on Python memory allocators.  Use PYTHONMALLOC=debug to\n"
+"                  install debug hooks.\n"
 "PYTHONCOERCECLOCALE: if this variable is set to 0, it disables the locale\n"
-"   coercion behavior. Use PYTHONCOERCECLOCALE=warn to request display of\n"
-"   locale coercion and locale compatibility warnings on stderr.\n"
+"                  coercion behavior.  Use PYTHONCOERCECLOCALE=warn to request\n"
+"                  display of locale coercion and locale compatibility warnings\n"
+"                  on stderr.\n"
 "PYTHONBREAKPOINT: if this variable is set to 0, it disables the default\n"
-"   debugger. It can be set to the callable of your debugger of choice.\n"
-"PYTHONDEVMODE: enable the development mode.\n"
-"PYTHONPYCACHEPREFIX: root directory for bytecode cache (pyc) files.\n"
-"PYTHONWARNDEFAULTENCODING: enable opt-in EncodingWarning for 'encoding=None'.\n"
-"PYTHONNODEBUGRANGES: If this variable is set, it disables the inclusion of the \n"
-"   tables mapping extra location information (end line, start column offset \n"
-"   and end column offset) to every instruction in code objects. This is useful \n"
-"   when smaller code objects and pyc files are desired as well as suppressing the \n"
-"   extra visual location indicators when the interpreter displays tracebacks.\n"
-"These variables have equivalent command-line parameters (see --help for details):\n"
-"PYTHONDEBUG             : enable parser debug mode (-d)\n"
-"PYTHONDONTWRITEBYTECODE : don't write .pyc files (-B)\n"
-"PYTHONINSPECT           : inspect interactively after running script (-i)\n"
-"PYTHONINTMAXSTRDIGITS   : limit max digit characters in an int value\n"
-"                          (-X int_max_str_digits=number)\n"
-"PYTHONNOUSERSITE        : disable user site directory (-s)\n"
-"PYTHONOPTIMIZE          : enable level 1 optimizations (-O)\n"
-"PYTHONUNBUFFERED        : disable stdout/stderr buffering (-u)\n"
-"PYTHONVERBOSE           : trace import statements (-v)\n"
-"PYTHONWARNINGS=arg      : warning control (-W arg)\n";
+"                  debugger.  It can be set to the callable of your debugger of\n"
+"                  choice.\n"
+"\n"
+"These variables have equivalent command-line options (see --help for details):\n"
+"PYTHONDEBUG     : enable parser debug mode (-d)\n"
+"PYTHONDEVMODE   : enable Python Development Mode (-X dev)\n"
+"PYTHONDONTWRITEBYTECODE: don't write .pyc files (-B)\n"
+"PYTHONFAULTHANDLER: dump the Python traceback on fatal errors (-X faulthandler)\n"
+"PYTHONINSPECT   : inspect interactively after running script (-i)\n"
+"PYTHONINTMAXSTRDIGITS: limit the size of int<->str conversions;\n"
+"                  0 disables the limit (-X int_max_str_digits=N)\n"
+"PYTHONNODEBUGRANGES: don't include extra location information in code objects\n"
+"                  (-X no_debug_ranges)\n"
+"PYTHONNOUSERSITE: disable user site directory (-s)\n"
+"PYTHONOPTIMIZE  : enable level 1 optimizations (-O)\n"
+"PYTHONPERFSUPPORT: support the Linux \"perf\" profiler (-X perf)\n"
+"PYTHONPROFILEIMPORTTIME: show how long each import takes (-X importtime)\n"
+"PYTHONPYCACHEPREFIX: root directory for bytecode cache (pyc) files\n"
+"                  (-X pycache_prefix)\n"
+"PYTHONSAFEPATH  : don't prepend a potentially unsafe path to sys.path.\n"
+"PYTHONTRACEMALLOC: trace Python memory allocations (-X tracemalloc)\n"
+"PYTHONUNBUFFERED: disable stdout/stderr buffering (-u)\n"
+"PYTHONUTF8      : control the UTF-8 mode (-X utf8)\n"
+"PYTHONVERBOSE   : trace import statements (-v)\n"
+"PYTHONWARNDEFAULTENCODING: enable opt-in EncodingWarning for 'encoding=None'\n"
+"                  (-X warn_default_encoding)\n"
+"PYTHONWARNINGS  : warning control (-W)\n"
+;
 
 #if defined(MS_WINDOWS)
 #  define PYTHONHOMEHELP "<prefix>\\python{major}{minor}"
@@ -191,7 +179,7 @@ int Py_UTF8Mode = 0;
 int Py_DebugFlag = 0; /* Needed by parser.c */
 int Py_VerboseFlag = 0; /* Needed by import.c */
 int Py_QuietFlag = 0; /* Needed by sysmodule.c */
-int Py_InteractiveFlag = 0; /* Needed by Py_FdIsInteractive() below */
+int Py_InteractiveFlag = 0; /* Previously, was used by Py_FdIsInteractive() */
 int Py_InspectFlag = 0; /* Needed to determine whether to exit at SystemExit */
 int Py_OptimizeFlag = 0; /* Needed by compile.c */
 int Py_NoSiteFlag = 0; /* Suppress 'import site' */
@@ -212,6 +200,8 @@ int Py_LegacyWindowsStdioFlag = 0; /* Uses FileIO instead of WindowsConsoleIO */
 static PyObject *
 _Py_GetGlobalVariablesAsDict(void)
 {
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
     PyObject *dict, *obj;
 
     dict = PyDict_New();
@@ -236,7 +226,7 @@ _Py_GetGlobalVariablesAsDict(void)
 #define FROM_STRING(STR) \
     ((STR != NULL) ? \
         PyUnicode_FromString(STR) \
-        : (Py_INCREF(Py_None), Py_None))
+        : Py_NewRef(Py_None))
 #define SET_ITEM_STR(VAR) \
     SET_ITEM(#VAR, FROM_STRING(VAR))
 
@@ -278,15 +268,19 @@ fail:
 #undef SET_ITEM
 #undef SET_ITEM_INT
 #undef SET_ITEM_STR
+_Py_COMP_DIAG_POP
 }
 
 char*
 Py_GETENV(const char *name)
 {
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
     if (Py_IgnoreEnvironmentFlag) {
         return NULL;
     }
     return getenv(name);
+_Py_COMP_DIAG_POP
 }
 
 /* --- PyStatus ----------------------------------------------- */
@@ -548,8 +542,11 @@ Py_SetStandardStreamEncoding(const char *encoding, const char *errors)
     }
 #ifdef MS_WINDOWS
     if (_Py_StandardStreamEncoding) {
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
         /* Overriding the stream encoding implies legacy streams */
         Py_LegacyWindowsStdioFlag = 1;
+_Py_COMP_DIAG_POP
     }
 #endif
 
@@ -583,17 +580,13 @@ _Py_ClearStandardStreamEncoding(void)
 
 /* --- Py_GetArgcArgv() ------------------------------------------- */
 
-/* For Py_GetArgcArgv(); set by _Py_SetArgcArgv() */
-static PyWideStringList orig_argv = {.length = 0, .items = NULL};
-
-
 void
 _Py_ClearArgcArgv(void)
 {
     PyMemAllocatorEx old_alloc;
     _PyMem_SetDefaultAllocator(PYMEM_DOMAIN_RAW, &old_alloc);
 
-    _PyWideStringList_Clear(&orig_argv);
+    _PyWideStringList_Clear(&_PyRuntime.orig_argv);
 
     PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &old_alloc);
 }
@@ -608,7 +601,9 @@ _Py_SetArgcArgv(Py_ssize_t argc, wchar_t * const *argv)
     PyMemAllocatorEx old_alloc;
     _PyMem_SetDefaultAllocator(PYMEM_DOMAIN_RAW, &old_alloc);
 
-    res = _PyWideStringList_Copy(&orig_argv, &argv_list);
+    // XXX _PyRuntime.orig_argv only gets cleared by Py_Main(),
+    // so it it currently leaks for embedders.
+    res = _PyWideStringList_Copy(&_PyRuntime.orig_argv, &argv_list);
 
     PyMem_SetAllocator(PYMEM_DOMAIN_RAW, &old_alloc);
     return res;
@@ -619,8 +614,8 @@ _Py_SetArgcArgv(Py_ssize_t argc, wchar_t * const *argv)
 void
 Py_GetArgcArgv(int *argc, wchar_t ***argv)
 {
-    *argc = (int)orig_argv.length;
-    *argv = orig_argv.items;
+    *argc = (int)_PyRuntime.orig_argv.length;
+    *argv = _PyRuntime.orig_argv.items;
 }
 
 
@@ -683,6 +678,7 @@ config_check_consistency(const PyConfig *config)
     assert(config->pathconfig_warnings >= 0);
     assert(config->_is_python_build >= 0);
     assert(config->safe_path >= 0);
+    assert(config->int_max_str_digits >= 0);
     // config->use_frozen_modules is initialized later
     // by _PyConfig_InitImportConfig().
     return 1;
@@ -747,6 +743,7 @@ _PyConfig_InitCompatConfig(PyConfig *config)
     config->use_hash_seed = -1;
     config->faulthandler = -1;
     config->tracemalloc = -1;
+    config->perf_profiling = -1;
     config->module_search_paths_set = 0;
     config->parse_argv = 0;
     config->site_import = -1;
@@ -766,7 +763,6 @@ _PyConfig_InitCompatConfig(PyConfig *config)
     config->check_hash_pycs_mode = NULL;
     config->pathconfig_warnings = -1;
     config->_init_main = 1;
-    config->_isolated_interpreter = 0;
 #ifdef MS_WINDOWS
     config->legacy_windows_stdio = -1;
 #endif
@@ -776,13 +772,10 @@ _PyConfig_InitCompatConfig(PyConfig *config)
     config->use_frozen_modules = 1;
 #endif
     config->safe_path = 0;
+    config->int_max_str_digits = -1;
     config->_is_python_build = 0;
     config->code_debug_ranges = 1;
 }
-
-/* Excluded from public struct PyConfig for backporting reasons. */
-/* default to unconfigured, _PyLong_InitTypes() does the rest */
-int _Py_global_config_int_max_str_digits = -1;
 
 
 static void
@@ -835,6 +828,8 @@ PyConfig_InitIsolatedConfig(PyConfig *config)
     config->use_hash_seed = 0;
     config->faulthandler = 0;
     config->tracemalloc = 0;
+    config->perf_profiling = 0;
+    config->int_max_str_digits = _PY_LONG_DEFAULT_MAX_STR_DIGITS;
     config->safe_path = 1;
     config->pathconfig_warnings = 0;
 #ifdef MS_WINDOWS
@@ -946,6 +941,7 @@ _PyConfig_Copy(PyConfig *config, const PyConfig *config2)
     COPY_ATTR(_install_importlib);
     COPY_ATTR(faulthandler);
     COPY_ATTR(tracemalloc);
+    COPY_ATTR(perf_profiling);
     COPY_ATTR(import_time);
     COPY_ATTR(code_debug_ranges);
     COPY_ATTR(show_ref_count);
@@ -1001,11 +997,11 @@ _PyConfig_Copy(PyConfig *config, const PyConfig *config2)
     COPY_WSTR_ATTR(check_hash_pycs_mode);
     COPY_ATTR(pathconfig_warnings);
     COPY_ATTR(_init_main);
-    COPY_ATTR(_isolated_interpreter);
     COPY_ATTR(use_frozen_modules);
     COPY_ATTR(safe_path);
     COPY_WSTRLIST(orig_argv);
     COPY_ATTR(_is_python_build);
+    COPY_ATTR(int_max_str_digits);
 
 #undef COPY_ATTR
 #undef COPY_WSTR_ATTR
@@ -1041,7 +1037,7 @@ _PyConfig_AsDict(const PyConfig *config)
 #define FROM_WSTRING(STR) \
     ((STR != NULL) ? \
         PyUnicode_FromWideChar(STR, -1) \
-        : (Py_INCREF(Py_None), Py_None))
+        : Py_NewRef(Py_None))
 #define SET_ITEM_WSTR(ATTR) \
     SET_ITEM(#ATTR, FROM_WSTRING(config->ATTR))
 #define SET_ITEM_WSTRLIST(LIST) \
@@ -1056,6 +1052,7 @@ _PyConfig_AsDict(const PyConfig *config)
     SET_ITEM_UINT(hash_seed);
     SET_ITEM_INT(faulthandler);
     SET_ITEM_INT(tracemalloc);
+    SET_ITEM_INT(perf_profiling);
     SET_ITEM_INT(import_time);
     SET_ITEM_INT(code_debug_ranges);
     SET_ITEM_INT(show_ref_count);
@@ -1107,11 +1104,11 @@ _PyConfig_AsDict(const PyConfig *config)
     SET_ITEM_WSTR(check_hash_pycs_mode);
     SET_ITEM_INT(pathconfig_warnings);
     SET_ITEM_INT(_init_main);
-    SET_ITEM_INT(_isolated_interpreter);
     SET_ITEM_WSTRLIST(orig_argv);
     SET_ITEM_INT(use_frozen_modules);
     SET_ITEM_INT(safe_path);
     SET_ITEM_INT(_is_python_build);
+    SET_ITEM_INT(int_max_str_digits);
 
     return dict;
 
@@ -1301,6 +1298,12 @@ _PyConfig_FromDict(PyConfig *config, PyObject *dict)
         } \
         CHECK_VALUE(#KEY, config->KEY >= 0); \
     } while (0)
+#define GET_INT(KEY) \
+    do { \
+        if (config_dict_get_int(dict, #KEY, &config->KEY) < 0) { \
+            return -1; \
+        } \
+    } while (0)
 #define GET_WSTR(KEY) \
     do { \
         if (config_dict_get_wstr(dict, #KEY, config, &config->KEY) < 0) { \
@@ -1337,6 +1340,7 @@ _PyConfig_FromDict(PyConfig *config, PyObject *dict)
     CHECK_VALUE("hash_seed", config->hash_seed <= MAX_HASH_SEED);
     GET_UINT(faulthandler);
     GET_UINT(tracemalloc);
+    GET_UINT(perf_profiling);
     GET_UINT(import_time);
     GET_UINT(code_debug_ranges);
     GET_UINT(show_ref_count);
@@ -1394,13 +1398,14 @@ _PyConfig_FromDict(PyConfig *config, PyObject *dict)
 
     GET_UINT(_install_importlib);
     GET_UINT(_init_main);
-    GET_UINT(_isolated_interpreter);
     GET_UINT(use_frozen_modules);
     GET_UINT(safe_path);
     GET_UINT(_is_python_build);
+    GET_INT(int_max_str_digits);
 
 #undef CHECK_VALUE
 #undef GET_UINT
+#undef GET_INT
 #undef GET_WSTR
 #undef GET_WSTR_OPT
     return 0;
@@ -1458,6 +1463,8 @@ config_get_env_dup(PyConfig *config,
 static void
 config_get_global_vars(PyConfig *config)
 {
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
     if (config->_config_init != _PyConfig_INIT_COMPAT) {
         /* Python and Isolated configuration ignore global variables */
         return;
@@ -1493,6 +1500,7 @@ config_get_global_vars(PyConfig *config)
 
 #undef COPY_FLAG
 #undef COPY_NOT_FLAG
+_Py_COMP_DIAG_POP
 }
 
 
@@ -1500,6 +1508,8 @@ config_get_global_vars(PyConfig *config)
 static void
 config_set_global_vars(const PyConfig *config)
 {
+_Py_COMP_DIAG_PUSH
+_Py_COMP_DIAG_IGNORE_DEPR_DECLS
 #define COPY_FLAG(ATTR, VAR) \
         if (config->ATTR != -1) { \
             VAR = config->ATTR; \
@@ -1534,6 +1544,7 @@ config_set_global_vars(const PyConfig *config)
 
 #undef COPY_FLAG
 #undef COPY_NOT_FLAG
+_Py_COMP_DIAG_POP
 }
 
 
@@ -1687,6 +1698,26 @@ config_read_env_vars(PyConfig *config)
     return _PyStatus_OK();
 }
 
+static PyStatus
+config_init_perf_profiling(PyConfig *config)
+{
+    int active = 0;
+    const char *env = config_get_env(config, "PYTHONPERFSUPPORT");
+    if (env) {
+        if (_Py_str_to_int(env, &active) != 0) {
+            active = 0;
+        }
+        if (active) {
+            config->perf_profiling = 1;
+        }
+    }
+    const wchar_t *xoption = config_get_xoption(config, L"perf");
+    if (xoption) {
+        config->perf_profiling = 1;
+    }
+    return _PyStatus_OK();
+
+}
 
 static PyStatus
 config_init_tracemalloc(PyConfig *config)
@@ -1739,7 +1770,7 @@ config_init_int_max_str_digits(PyConfig *config)
 
     const char *env = config_get_env(config, "PYTHONINTMAXSTRDIGITS");
     if (env) {
-        int valid = 0;
+        bool valid = 0;
         if (!_Py_str_to_int(env, &maxdigits)) {
             valid = ((maxdigits == 0) || (maxdigits >= _PY_LONG_MAX_STR_DIGITS_THRESHOLD));
         }
@@ -1751,13 +1782,13 @@ config_init_int_max_str_digits(PyConfig *config)
                     STRINGIFY(_PY_LONG_MAX_STR_DIGITS_THRESHOLD)
                     " or 0 for unlimited.");
         }
-        _Py_global_config_int_max_str_digits = maxdigits;
+        config->int_max_str_digits = maxdigits;
     }
 
     const wchar_t *xoption = config_get_xoption(config, L"int_max_str_digits");
     if (xoption) {
         const wchar_t *sep = wcschr(xoption, L'=');
-        int valid = 0;
+        bool valid = 0;
         if (sep) {
             if (!config_wstr_to_int(sep + 1, &maxdigits)) {
                 valid = ((maxdigits == 0) || (maxdigits >= _PY_LONG_MAX_STR_DIGITS_THRESHOLD));
@@ -1771,7 +1802,10 @@ config_init_int_max_str_digits(PyConfig *config)
 #undef _STRINGIFY
 #undef STRINGIFY
         }
-        _Py_global_config_int_max_str_digits = maxdigits;
+        config->int_max_str_digits = maxdigits;
+    }
+    if (config->int_max_str_digits < 0) {
+        config->int_max_str_digits = _PY_LONG_DEFAULT_MAX_STR_DIGITS;
     }
     return _PyStatus_OK();
 }
@@ -1831,7 +1865,15 @@ config_read_complex_options(PyConfig *config)
             return status;
         }
     }
-    if (_Py_global_config_int_max_str_digits < 0) {
+
+    if (config->perf_profiling < 0) {
+        status = config_init_perf_profiling(config);
+        if (_PyStatus_EXCEPTION(status)) {
+            return status;
+        }
+    }
+
+    if (config->int_max_str_digits < 0) {
         status = config_init_int_max_str_digits(config);
         if (_PyStatus_EXCEPTION(status)) {
             return status;
@@ -2129,6 +2171,12 @@ config_read(PyConfig *config, int compute_path_config)
         config->show_ref_count = 1;
     }
 
+#ifdef Py_STATS
+    if (config_get_xoption(config, L"pystats")) {
+        _py_stats = &_py_stats_struct;
+    }
+#endif
+
     status = config_read_complex_options(config);
     if (_PyStatus_EXCEPTION(status)) {
         return status;
@@ -2152,6 +2200,9 @@ config_read(PyConfig *config, int compute_path_config)
     }
     if (config->tracemalloc < 0) {
         config->tracemalloc = 0;
+    }
+    if (config->perf_profiling < 0) {
+        config->perf_profiling = 0;
     }
     if (config->use_hash_seed < 0) {
         config->use_hash_seed = 0;
@@ -2280,13 +2331,13 @@ config_usage(int error, const wchar_t* program)
 }
 
 static void
-config_envvars_usage()
+config_envvars_usage(void)
 {
     printf(usage_envvars, (wint_t)DELIM, (wint_t)DELIM, PYTHONHOMEHELP);
 }
 
 static void
-config_xoptions_usage()
+config_xoptions_usage(void)
 {
     puts(usage_xoptions);
 }
@@ -2295,9 +2346,9 @@ static void
 config_complete_usage(const wchar_t* program)
 {
    config_usage(0, program);
-   puts("\n");
+   putchar('\n');
    config_envvars_usage();
-   puts("\n");
+   putchar('\n');
    config_xoptions_usage();
 }
 
@@ -3068,8 +3119,7 @@ init_dump_ascii_wstr(const wchar_t *str)
 void
 _Py_DumpPathConfig(PyThreadState *tstate)
 {
-    PyObject *exc_type, *exc_value, *exc_tb;
-    _PyErr_Fetch(tstate, &exc_type, &exc_value, &exc_tb);
+    PyObject *exc = _PyErr_GetRaisedException(tstate);
 
     PySys_WriteStderr("Python path configuration:\n");
 
@@ -3095,10 +3145,13 @@ _Py_DumpPathConfig(PyThreadState *tstate)
 
 #define DUMP_SYS(NAME) \
         do { \
-            obj = PySys_GetObject(#NAME); \
             PySys_FormatStderr("  sys.%s = ", #NAME); \
+            if (_PySys_GetOptionalAttrString(#NAME, &obj) < 0) { \
+                PyErr_Clear(); \
+            } \
             if (obj != NULL) { \
                 PySys_FormatStderr("%A", obj); \
+                Py_DECREF(obj); \
             } \
             else { \
                 PySys_WriteStderr("(not set)"); \
@@ -3116,7 +3169,8 @@ _Py_DumpPathConfig(PyThreadState *tstate)
     DUMP_SYS(exec_prefix);
 #undef DUMP_SYS
 
-    PyObject *sys_path = PySys_GetObject("path");  /* borrowed reference */
+    PyObject *sys_path;
+    (void) _PySys_GetOptionalAttrString("path", &sys_path);
     if (sys_path != NULL && PyList_Check(sys_path)) {
         PySys_WriteStderr("  sys.path = [\n");
         Py_ssize_t len = PyList_GET_SIZE(sys_path);
@@ -3126,6 +3180,7 @@ _Py_DumpPathConfig(PyThreadState *tstate)
         }
         PySys_WriteStderr("  ]\n");
     }
+    Py_XDECREF(sys_path);
 
-    _PyErr_Restore(tstate, exc_type, exc_value, exc_tb);
+    _PyErr_SetRaisedException(tstate, exc);
 }

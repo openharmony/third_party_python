@@ -1,5 +1,5 @@
-:mod:`filecmp` --- File and Directory Comparisons
-=================================================
+:mod:`!filecmp` --- File and Directory Comparisons
+==================================================
 
 .. module:: filecmp
    :synopsis: Compare files efficiently.
@@ -74,7 +74,7 @@ The :class:`dircmp` class
 
    Construct a new directory comparison object, to compare the directories *a*
    and *b*.  *ignore* is a list of names to ignore, and defaults to
-   :attr:`filecmp.DEFAULT_IGNORES`.  *hide* is a list of names to hide, and
+   :const:`filecmp.DEFAULT_IGNORES`.  *hide* is a list of names to hide, and
    defaults to ``[os.curdir, os.pardir]``.
 
    The :class:`dircmp` class compares files by doing *shallow* comparisons
@@ -100,7 +100,7 @@ The :class:`dircmp` class
    used to get various bits of information about the directory trees being
    compared.
 
-   Note that via :meth:`__getattr__` hooks, all attributes are computed lazily,
+   Note that via :meth:`~object.__getattr__` hooks, all attributes are computed lazily,
    so there is no speed penalty if only those attributes which are lightweight
    to compute are used.
 
@@ -184,7 +184,7 @@ The :class:`dircmp` class
          are the same type as *self*, if *self* is a subclass of
          :class:`dircmp`.
 
-.. attribute:: DEFAULT_IGNORES
+.. data:: DEFAULT_IGNORES
 
    .. versionadded:: 3.4
 

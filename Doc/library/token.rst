@@ -1,5 +1,5 @@
-:mod:`token` --- Constants used with Python parse trees
-=======================================================
+:mod:`!token` --- Constants used with Python parse trees
+========================================================
 
 .. module:: token
    :synopsis: Constants representing terminal nodes of the parse tree.
@@ -50,11 +50,13 @@ The following token type values aren't used by the C tokenizer but are needed fo
 the :mod:`tokenize` module.
 
 .. data:: COMMENT
+   :noindex:
 
    Token value used to indicate a comment.
 
 
 .. data:: NL
+   :noindex:
 
    Token value used to indicate a non-terminating newline.  The
    :data:`NEWLINE` token indicates the end of a logical line of Python code;
@@ -73,8 +75,15 @@ the :mod:`tokenize` module.
    :noindex:
 
    Token value indicating that a type comment was recognized.  Such
-   tokens are only produced when :func:`ast.parse()` is invoked with
+   tokens are only produced when :func:`ast.parse` is invoked with
    ``type_comments=True``.
+
+
+.. data:: EXACT_TOKEN_TYPES
+
+   A dictionary mapping the string representation of a token to its numeric code.
+
+   .. versionadded:: 3.8
 
 
 .. versionchanged:: 3.5

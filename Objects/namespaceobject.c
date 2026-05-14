@@ -85,9 +85,8 @@ namespace_repr(PyObject *ns)
     if (pairs == NULL)
         goto error;
 
-    d = ((_PyNamespaceObject *)ns)->ns_dict;
-    assert(d != NULL);
-    Py_INCREF(d);
+    assert(((_PyNamespaceObject *)ns)->ns_dict != NULL);
+    d = Py_NewRef(((_PyNamespaceObject *)ns)->ns_dict);
 
     keys = PyDict_Keys(d);
     if (keys == NULL)
@@ -120,6 +119,10 @@ namespace_repr(PyObject *ns)
         Py_DECREF(key);
         if (loop_error)
             goto error;
+    }
+
+    if (PyErr_Occurred()) {
+        goto error;
     }
 
     separator = PyUnicode_FromString(", ");

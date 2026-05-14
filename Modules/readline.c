@@ -11,7 +11,10 @@
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>               // free()
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#include <time.h>
 
 #if defined(HAVE_SETLOCALE)
 /* GNU readline() mistakenly sets the LC_CTYPE locale.
@@ -333,6 +336,12 @@ readline_append_history_file_impl(PyObject *module, int nelements,
                                   PyObject *filename_obj)
 /*[clinic end generated code: output=5df06fc9da56e4e4 input=784b774db3a4b7c5]*/
 {
+    if (nelements < 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "nelements must be positive");
+        return NULL;
+    }
+
     PyObject *filename_bytes;
     const char *filename;
     int err;
@@ -402,8 +411,7 @@ set_hook(const char *funcname, PyObject **hook_var, PyObject *function)
         Py_CLEAR(*hook_var);
     }
     else if (PyCallable_Check(function)) {
-        Py_INCREF(function);
-        Py_XSETREF(*hook_var, function);
+        Py_XSETREF(*hook_var, Py_NewRef(function));
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -440,7 +448,7 @@ readline_set_completion_display_matches_hook_impl(PyObject *module,
        default completion display. */
     rl_completion_display_matches_hook =
         readlinestate_global->completion_display_matches_hook ?
-#if defined(_RL_FUNCTION_TYPEDEF)
+#if defined(HAVE_RL_COMPDISP_FUNC_T)
         (rl_compdisp_func_t *)on_completion_display_matches_hook : 0;
 #else
         (VFunction *)on_completion_display_matches_hook : 0;
@@ -524,8 +532,7 @@ static PyObject *
 readline_get_begidx_impl(PyObject *module)
 /*[clinic end generated code: output=362616ee8ed1b2b1 input=e083b81c8eb4bac3]*/
 {
-    Py_INCREF(readlinestate_global->begidx);
-    return readlinestate_global->begidx;
+    return Py_NewRef(readlinestate_global->begidx);
 }
 
 /* Get the ending index for the scope of the tab-completion */
@@ -540,8 +547,7 @@ static PyObject *
 readline_get_endidx_impl(PyObject *module)
 /*[clinic end generated code: output=7f763350b12d7517 input=d4c7e34a625fd770]*/
 {
-    Py_INCREF(readlinestate_global->endidx);
-    return readlinestate_global->endidx;
+    return Py_NewRef(readlinestate_global->endidx);
 }
 
 /* Set the tab-completion word-delimiters that readline uses */
@@ -572,6 +578,13 @@ readline_set_completer_delims(PyObject *module, PyObject *string)
     if (break_chars) {
         free(completer_word_break_characters);
         completer_word_break_characters = break_chars;
+#ifdef WITH_EDITLINE
+        rl_basic_word_break_characters = break_chars;
+#else
+        if (using_libedit_emulation) {
+            rl_basic_word_break_characters = break_chars;
+        }
+#endif
         rl_completer_word_break_characters = break_chars;
         Py_RETURN_NONE;
     }
@@ -784,8 +797,7 @@ readline_get_completer_impl(PyObject *module)
     if (readlinestate_global->completer == NULL) {
         Py_RETURN_NONE;
     }
-    Py_INCREF(readlinestate_global->completer);
-    return readlinestate_global->completer;
+    return Py_NewRef(readlinestate_global->completer);
 }
 
 /* Private function to get current length of history.  XXX It may be
@@ -1260,6 +1272,15 @@ setup_readline(readlinestate *mod_state)
     completer_word_break_characters =
         strdup(" \t\n`~!@#$%^&*()-=+[{]}\\|;:'\",<>/?");
         /* All nonalphanums except '.' */
+#ifdef WITH_EDITLINE
+    // libedit uses rl_basic_word_break_characters instead of
+    // rl_completer_word_break_characters as complete delimiter
+    rl_basic_word_break_characters = completer_word_break_characters;
+#else
+    if (using_libedit_emulation) {
+        rl_basic_word_break_characters = completer_word_break_characters;
+    }
+#endif
     rl_completer_word_break_characters = completer_word_break_characters;
 
     mod_state->begidx = PyLong_FromLong(0L);

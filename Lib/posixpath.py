@@ -28,14 +28,14 @@ import stat
 import genericpath
 from genericpath import *
 
-__all__ = ["normcase","isabs","join","splitdrive","split","splitext",
+__all__ = ["normcase","isabs","join","splitdrive","splitroot","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
            "getatime","getctime","islink","exists","lexists","isdir","isfile",
            "ismount", "expanduser","expandvars","normpath","abspath",
            "samefile","sameopenfile","samestat",
            "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
            "devnull","realpath","supports_unicode_filenames","relpath",
-           "commonpath", "ALLOW_MISSING"]
+           "commonpath", "isjunction"]
 
 
 def _get_sep(path):
@@ -135,6 +135,35 @@ def splitdrive(p):
     return p[:0], p
 
 
+def splitroot(p):
+    """Split a pathname into drive, root and tail. On Posix, drive is always
+    empty; the root may be empty, a single slash, or two slashes. The tail
+    contains anything after the root. For example:
+
+        splitroot('foo/bar') == ('', '', 'foo/bar')
+        splitroot('/foo/bar') == ('', '/', 'foo/bar')
+        splitroot('//foo/bar') == ('', '//', 'foo/bar')
+        splitroot('///foo/bar') == ('', '/', '//foo/bar')
+    """
+    p = os.fspath(p)
+    if isinstance(p, bytes):
+        sep = b'/'
+        empty = b''
+    else:
+        sep = '/'
+        empty = ''
+    if p[:1] != sep:
+        # Relative path, e.g.: 'foo'
+        return empty, empty, p
+    elif p[1:2] != sep or p[2:3] == sep:
+        # Absolute path, e.g.: '/foo', '///foo', '////foo', etc.
+        return empty, sep, p[1:]
+    else:
+        # Precisely two leading slashes, e.g.: '//foo'. Implementation defined per POSIX, see
+        # https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13
+        return empty, p[:2], p[2:]
+
+
 # Return the tail (basename) part of a path, same as split(path)[1].
 
 def basename(p):
@@ -158,16 +187,14 @@ def dirname(p):
     return head
 
 
-# Is a path a symbolic link?
-# This will always return false on systems where os.lstat doesn't exist.
+# Is a path a junction?
 
-def islink(path):
-    """Test whether a path is a symbolic link"""
-    try:
-        st = os.lstat(path)
-    except (OSError, ValueError, AttributeError):
-        return False
-    return stat.S_ISLNK(st.st_mode)
+def isjunction(path):
+    """Test whether a path is a junction
+    Junctions are not a part of posix semantics"""
+    os.fspath(path)
+    return False
+
 
 # Being true for dangling symbolic links is also useful.
 
@@ -263,7 +290,7 @@ def expanduser(path):
             return path
         name = path[1:i]
         if isinstance(name, bytes):
-            name = str(name, 'ASCII')
+            name = os.fsdecode(name)
         try:
             pwent = pwd.getpwnam(name)
         except KeyError:
@@ -287,19 +314,18 @@ def expanduser(path):
 # This expands the forms $variable and ${variable} only.
 # Non-existent variables are left unchanged.
 
-_varpattern = r'\$(\w+|\{[^}]*\}?)'
-_varsub = None
-_varsubb = None
+_varprog = None
+_varprogb = None
 
 def expandvars(path):
     """Expand shell variables of form $var and ${var}.  Unknown variables
     are left unchanged."""
     path = os.fspath(path)
-    global _varsub, _varsubb
+    global _varprog, _varprogb
     if isinstance(path, bytes):
         if b'$' not in path:
             return path
-        if not _varsubb:
+        if not _varprogb:
             import re
             _varprogb = re.compile(br'\$(\w+|\{[^}]*\})', re.ASCII)
         search = _varprogb.search
@@ -309,19 +335,21 @@ def expandvars(path):
     else:
         if '$' not in path:
             return path
-        if not _varsub:
+        if not _varprog:
             import re
-            _varsub = re.compile(_varpattern, re.ASCII).sub
-        sub = _varsub
+            _varprog = re.compile(r'\$(\w+|\{[^}]*\})', re.ASCII)
+        search = _varprog.search
         start = '{'
         end = '}'
         environ = os.environ
-
-    def repl(m):
-        name = m[1]
-        if name.startswith(start):
-            if not name.endswith(end):
-                return m[0]
+    i = 0
+    while True:
+        m = search(path, i)
+        if not m:
+            break
+        i, j = m.span(0)
+        name = m.group(1)
+        if name.startswith(start) and name.endswith(end):
             name = name[1:-1]
         try:
             if environ is None:
@@ -329,18 +357,21 @@ def expandvars(path):
             else:
                 value = environ[name]
         except KeyError:
-            return m[0]
+            i = j
         else:
-            return value
+            tail = path[j:]
+            path = path[:i] + value
+            i = len(path)
+            path += tail
+    return path
 
-    return sub(repl, path)
 
 # Normalize a path, e.g. A//B, A/./B and A/foo/../B all become A/B.
 # It should be understood that this may change the meaning of the path
 # if it contains symbolic links!
 
 try:
-    from posix import _path_normpath
+    from posix import _path_normpath as normpath
 
 except ImportError:
     def normpath(path):
@@ -358,13 +389,7 @@ except ImportError:
             dotdot = '..'
         if path == empty:
             return dot
-        initial_slashes = path.startswith(sep)
-        # POSIX allows one or two initial slashes, but treats three or more
-        # as single slash.
-        # (see https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_13)
-        if (initial_slashes and
-            path.startswith(sep*2) and not path.startswith(sep*3)):
-            initial_slashes = 2
+        _, initial_slashes, path = splitroot(path)
         comps = path.split(sep)
         new_comps = []
         for comp in comps:
@@ -376,18 +401,8 @@ except ImportError:
             elif new_comps:
                 new_comps.pop()
         comps = new_comps
-        path = sep.join(comps)
-        if initial_slashes:
-            path = sep*initial_slashes + path
+        path = initial_slashes + sep.join(comps)
         return path or dot
-
-else:
-    def normpath(path):
-        """Normalize path, eliminating double slashes, etc."""
-        path = os.fspath(path)
-        if isinstance(path, bytes):
-            return os.fsencode(_path_normpath(os.fsdecode(path))) or b"."
-        return _path_normpath(path) or "."
 
 
 def abspath(path):
@@ -423,15 +438,6 @@ def _joinrealpath(path, rest, strict, seen):
         sep = '/'
         curdir = '.'
         pardir = '..'
-        getcwd = os.getcwd
-    if strict is ALLOW_MISSING:
-        ignored_error = FileNotFoundError
-    elif strict:
-        ignored_error = ()
-    else:
-        ignored_error = OSError
-
-    maxlinks = None
 
     if isabs(rest):
         rest = rest[1:]
@@ -454,7 +460,9 @@ def _joinrealpath(path, rest, strict, seen):
         newpath = join(path, name)
         try:
             st = os.lstat(newpath)
-        except ignored_error:
+        except OSError:
+            if strict:
+                raise
             is_link = False
         else:
             is_link = stat.S_ISLNK(st.st_mode)

@@ -25,7 +25,7 @@ The following functions can be safely called before Python is initialized:
 
   * :c:func:`PyImport_AppendInittab`
   * :c:func:`PyImport_ExtendInittab`
-  * :c:func:`PyInitFrozenExtensions`
+  * :c:func:`!PyInitFrozenExtensions`
   * :c:func:`PyMem_SetAllocator`
   * :c:func:`PyMem_SetupDebugHooks`
   * :c:func:`PyObject_SetArenaAllocator`
@@ -83,13 +83,23 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
 .. c:var:: int Py_BytesWarningFlag
 
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.bytes_warning` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
+
    Issue a warning when comparing :class:`bytes` or :class:`bytearray` with
    :class:`str` or :class:`bytes` with :class:`int`.  Issue an error if greater
    or equal to ``2``.
 
    Set by the :option:`-b` option.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_DebugFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.parser_debug` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
 
    Turn on parser debugging output (for expert only, depending on compilation
    options).
@@ -97,7 +107,13 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
    Set by the :option:`-d` option and the :envvar:`PYTHONDEBUG` environment
    variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_DontWriteBytecodeFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.write_bytecode` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
 
    If set to non-zero, Python won't try to write ``.pyc`` files on the
    import of source modules.
@@ -105,14 +121,27 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
    Set by the :option:`-B` option and the :envvar:`PYTHONDONTWRITEBYTECODE`
    environment variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_FrozenFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.pathconfig_warnings` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Suppress error messages when calculating the module search path in
    :c:func:`Py_GetPath`.
 
    Private flag used by ``_freeze_module`` and ``frozenmain`` programs.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_HashRandomizationFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.hash_seed` and :c:member:`PyConfig.use_hash_seed` should
+   be used instead, see :ref:`Python Initialization Configuration
+   <init-config>`.
 
    Set to ``1`` if the :envvar:`PYTHONHASHSEED` environment variable is set to
    a non-empty string.
@@ -120,14 +149,26 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
    If the flag is non-zero, read the :envvar:`PYTHONHASHSEED` environment
    variable to initialize the secret hash seed.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_IgnoreEnvironmentFlag
 
-   Ignore all :envvar:`PYTHON*` environment variables, e.g.
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.use_environment` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
+
+   Ignore all :envvar:`!PYTHON*` environment variables, e.g.
    :envvar:`PYTHONPATH` and :envvar:`PYTHONHOME`, that might be set.
 
    Set by the :option:`-E` and :option:`-I` options.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_InspectFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.inspect` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    When a script is passed as first argument or the :option:`-c` option is used,
    enter interactive mode after executing the script or the command, even when
@@ -136,11 +177,23 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
    Set by the :option:`-i` option and the :envvar:`PYTHONINSPECT` environment
    variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_InteractiveFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.interactive` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Set by the :option:`-i` option.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_IsolatedFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.isolated` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Run Python in isolated mode. In isolated mode :data:`sys.path` contains
    neither the script's directory nor the user's site-packages directory.
@@ -149,7 +202,13 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    .. versionadded:: 3.4
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_LegacyWindowsFSEncodingFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyPreConfig.legacy_windows_fs_encoding` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    If the flag is non-zero, use the ``mbcs`` encoding with ``replace`` error
    handler, instead of the UTF-8 encoding with ``surrogatepass`` error handler,
@@ -162,10 +221,16 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    .. availability:: Windows.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_LegacyWindowsStdioFlag
 
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.legacy_windows_stdio` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
+
    If the flag is non-zero, use :class:`io.FileIO` instead of
-   :class:`WindowsConsoleIO` for :mod:`sys` standard streams.
+   :class:`!io._WindowsConsoleIO` for :mod:`sys` standard streams.
 
    Set to ``1`` if the :envvar:`PYTHONLEGACYWINDOWSSTDIO` environment
    variable is set to a non-empty string.
@@ -174,7 +239,13 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    .. availability:: Windows.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_NoSiteFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.site_import` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Disable the import of the module :mod:`site` and the site-dependent
    manipulations of :data:`sys.path` that it entails.  Also disable these
@@ -183,7 +254,13 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    Set by the :option:`-S` option.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_NoUserSiteDirectory
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.user_site_directory` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Don't add the :data:`user site-packages directory <site.USER_SITE>` to
    :data:`sys.path`.
@@ -191,12 +268,24 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
    Set by the :option:`-s` and :option:`-I` options, and the
    :envvar:`PYTHONNOUSERSITE` environment variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_OptimizeFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.optimization_level` should be used instead, see
+   :ref:`Python Initialization Configuration <init-config>`.
 
    Set by the :option:`-O` option and the :envvar:`PYTHONOPTIMIZE` environment
    variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_QuietFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.quiet` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
 
    Don't display the copyright and version messages even in interactive mode.
 
@@ -204,14 +293,26 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    .. versionadded:: 3.2
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_UnbufferedStdioFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.buffered_stdio` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
 
    Force the stdout and stderr streams to be unbuffered.
 
    Set by the :option:`-u` option and the :envvar:`PYTHONUNBUFFERED`
    environment variable.
 
+   .. deprecated:: 3.12
+
 .. c:var:: int Py_VerboseFlag
+
+   This API is kept for backward compatibility: setting
+   :c:member:`PyConfig.verbose` should be used instead, see :ref:`Python
+   Initialization Configuration <init-config>`.
 
    Print a message each time a module is initialized, showing the place
    (filename or built-in module) from which it is loaded.  If greater or equal
@@ -220,6 +321,8 @@ to 1 and ``-bb`` sets :c:data:`Py_BytesWarningFlag` to 2.
 
    Set by the :option:`-v` option and the :envvar:`PYTHONVERBOSE` environment
    variable.
+
+   .. deprecated:: 3.12
 
 
 Initializing and finalizing the interpreter
@@ -237,9 +340,9 @@ Initializing and finalizing the interpreter
       pair: module; __main__
       pair: module; sys
       triple: module; search; path
-      single: PySys_SetArgv()
-      single: PySys_SetArgvEx()
-      single: Py_FinalizeEx()
+      single: PySys_SetArgv (C function)
+      single: PySys_SetArgvEx (C function)
+      single: Py_FinalizeEx (C function)
 
    Initialize the Python interpreter.  In an application embedding  Python,
    this should be called before using any other Python/C API functions; see
@@ -253,6 +356,9 @@ Initializing and finalizing the interpreter
    (without calling :c:func:`Py_FinalizeEx` first).  There is no return value; it is a
    fatal error if the initialization fails.
 
+   Use the :c:func:`Py_InitializeFromConfig` function to customize the
+   :ref:`Python Initialization Configuration <init-config>`.
+
    .. note::
       On Windows, changes the console mode from ``O_TEXT`` to ``O_BINARY``, which will
       also affect non-Python uses of the console using the C Runtime.
@@ -263,6 +369,9 @@ Initializing and finalizing the interpreter
    This function works like :c:func:`Py_Initialize` if *initsigs* is ``1``. If
    *initsigs* is ``0``, it skips initialization registration of signal handlers, which
    might be useful when Python is embedded.
+
+   Use the :c:func:`Py_InitializeFromConfig` function to customize the
+   :ref:`Python Initialization Configuration <init-config>`.
 
 
 .. c:function:: int Py_IsInitialized()
@@ -279,9 +388,16 @@ Initializing and finalizing the interpreter
    :c:func:`Py_NewInterpreter` below) that were created and not yet destroyed since
    the last call to :c:func:`Py_Initialize`.  Ideally, this frees all memory
    allocated by the Python interpreter.  This is a no-op when called for a second
-   time (without calling :c:func:`Py_Initialize` again first).  Normally the
-   return value is ``0``.  If there were errors during finalization
-   (flushing buffered data), ``-1`` is returned.
+   time (without calling :c:func:`Py_Initialize` again first).
+
+   Since this is the reverse of :c:func:`Py_Initialize`, it should be called
+   in the same thread with the same interpreter active.  That means
+   the main thread and the main interpreter.
+   This should never be called while :c:func:`Py_RunMain` is running.
+
+   Normally the return value is ``0``.
+   If there were errors during finalization (flushing buffered data),
+   ``-1`` is returned.
 
    This function is provided for a number of reasons.  An embedding application
    might want to restart Python without having to restart the application itself.
@@ -292,7 +408,7 @@ Initializing and finalizing the interpreter
    the application.
 
    **Bugs and caveats:** The destruction of modules and objects in modules is done
-   in random order; this may cause destructors (:meth:`__del__` methods) to fail
+   in random order; this may cause destructors (:meth:`~object.__del__` methods) to fail
    when they depend on other objects (even functions) or modules.  Dynamically
    loaded extension modules loaded by Python are not unloaded.  Small amounts of
    memory allocated by the Python interpreter may not be freed (if you find a leak,
@@ -376,12 +492,12 @@ Process-wide parameters
    interpreter will change the contents of this storage.
 
    Use :c:func:`Py_DecodeLocale` to decode a bytes string to get a
-   :c:expr:`wchar_*` string.
+   :c:expr:`wchar_t*` string.
 
    .. deprecated:: 3.11
 
 
-.. c:function:: wchar* Py_GetProgramName()
+.. c:function:: wchar_t* Py_GetProgramName()
 
    .. index:: single: Py_SetProgramName()
 
@@ -642,7 +758,7 @@ Process-wide parameters
      directory (``"."``).
 
    Use :c:func:`Py_DecodeLocale` to decode a bytes string to get a
-   :c:expr:`wchar_*` string.
+   :c:expr:`wchar_t*` string.
 
    See also :c:member:`PyConfig.orig_argv` and :c:member:`PyConfig.argv`
    members of the :ref:`Python Initialization Configuration <init-config>`.
@@ -651,7 +767,7 @@ Process-wide parameters
       It is recommended that applications embedding the Python interpreter
       for purposes other than executing a single script pass ``0`` as *updatepath*,
       and update :data:`sys.path` themselves if desired.
-      See `CVE-2008-5983 <https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2008-5983>`_.
+      See :cve:`2008-5983`.
 
       On versions before 3.1.3, you can achieve the same effect by manually
       popping the first :data:`sys.path` element after having called
@@ -678,7 +794,7 @@ Process-wide parameters
    :option:`-I`.
 
    Use :c:func:`Py_DecodeLocale` to decode a bytes string to get a
-   :c:expr:`wchar_*` string.
+   :c:expr:`wchar_t*` string.
 
    See also :c:member:`PyConfig.orig_argv` and :c:member:`PyConfig.argv`
    members of the :ref:`Python Initialization Configuration <init-config>`.
@@ -704,7 +820,7 @@ Process-wide parameters
    this storage.
 
    Use :c:func:`Py_DecodeLocale` to decode a bytes string to get a
-   :c:expr:`wchar_*` string.
+   :c:expr:`wchar_t*` string.
 
    .. deprecated:: 3.11
 
@@ -740,7 +856,7 @@ operations could cause problems in a multi-threaded program: for example, when
 two threads simultaneously increment the reference count of the same object, the
 reference count could end up being incremented only once instead of twice.
 
-.. index:: single: setswitchinterval() (in module sys)
+.. index:: single: setswitchinterval (in module sys)
 
 Therefore, the rule exists that only the thread that has acquired the
 :term:`GIL` may operate on Python objects or call Python/C API functions.
@@ -750,8 +866,7 @@ released around potentially blocking I/O operations like reading or writing
 a file, so that other Python threads can run in the meantime.
 
 .. index::
-   single: PyThreadState
-   single: PyThreadState
+   single: PyThreadState (C type)
 
 The Python interpreter keeps some thread-specific bookkeeping information
 inside a data structure called :c:type:`PyThreadState`.  There's also one
@@ -777,8 +892,8 @@ This is so common that a pair of macros exists to simplify it::
    Py_END_ALLOW_THREADS
 
 .. index::
-   single: Py_BEGIN_ALLOW_THREADS
-   single: Py_END_ALLOW_THREADS
+   single: Py_BEGIN_ALLOW_THREADS (C macro)
+   single: Py_END_ALLOW_THREADS (C macro)
 
 The :c:macro:`Py_BEGIN_ALLOW_THREADS` macro opens a new block and declares a
 hidden local variable; the :c:macro:`Py_END_ALLOW_THREADS` macro closes the
@@ -793,8 +908,8 @@ The block above expands to the following code::
    PyEval_RestoreThread(_save);
 
 .. index::
-   single: PyEval_RestoreThread()
-   single: PyEval_SaveThread()
+   single: PyEval_RestoreThread (C function)
+   single: PyEval_SaveThread (C function)
 
 Here is how these functions work: the global interpreter lock is used to protect the pointer to the
 current thread state.  When releasing the lock and saving the thread state,
@@ -872,7 +987,7 @@ the fork, and releasing them afterwards. In addition, it resets any
 :ref:`lock-objects` in the child. When extending or embedding Python, there
 is no way to inform Python of additional (non-Python) locks that need to be
 acquired before or reset after a fork. OS facilities such as
-:c:func:`pthread_atfork` would need to be used to accomplish the same thing.
+:c:func:`!pthread_atfork` would need to be used to accomplish the same thing.
 Additionally, when extending or embedding Python, calling :c:func:`fork`
 directly rather than through :func:`os.fork` (and returning to or calling
 into Python) may result in a deadlock by one of Python's internal locks
@@ -914,8 +1029,11 @@ code, or when embedding the Python interpreter:
 .. c:type:: PyThreadState
 
    This data structure represents the state of a single thread.  The only public
-   data member is :attr:`interp` (:c:expr:`PyInterpreterState *`), which points to
-   this thread's interpreter state.
+   data member is:
+
+   .. c:member:: PyInterpreterState *interp
+
+      This thread's interpreter state.
 
 
 .. c:function:: void PyEval_InitThreads()
@@ -975,7 +1093,7 @@ code, or when embedding the Python interpreter:
    .. note::
       Calling this function from a thread when the runtime is finalizing
       will terminate the thread, even if the thread was not created by Python.
-      You can use :c:func:`_Py_IsFinalizing` or :func:`sys.is_finalizing` to
+      You can use :c:func:`!_Py_IsFinalizing` or :func:`sys.is_finalizing` to
       check if the interpreter is in process of being finalized before calling
       this function to avoid unwanted termination.
 
@@ -1021,7 +1139,7 @@ with sub-interpreters:
    .. note::
       Calling this function from a thread when the runtime is finalizing
       will terminate the thread, even if the thread was not created by Python.
-      You can use :c:func:`_Py_IsFinalizing` or :func:`sys.is_finalizing` to
+      You can use :c:func:`!_Py_IsFinalizing` or :func:`sys.is_finalizing` to
       check if the interpreter is in process of being finalized before calling
       this function to avoid unwanted termination.
 
@@ -1151,7 +1269,7 @@ All of the following functions must be called after :c:func:`Py_Initialize`.
 .. c:function:: void PyThreadState_DeleteCurrent(void)
 
    Destroy the current thread state and release the global interpreter lock.
-   Like :c:func:`PyThreadState_Delete`, the global interpreter lock need not
+   Like :c:func:`PyThreadState_Delete`, the global interpreter lock must
    be held. The thread state must have been reset with a previous call
    to :c:func:`PyThreadState_Clear`.
 
@@ -1287,7 +1405,7 @@ All of the following functions must be called after :c:func:`Py_Initialize`.
    function does not steal any references to *exc*. To prevent naive misuse, you
    must write your own C extension to call this.  Must be called with the GIL held.
    Returns the number of thread states modified; this is normally one, but will be
-   zero if the thread id isn't found.  If *exc* is :const:`NULL`, the pending
+   zero if the thread id isn't found.  If *exc* is ``NULL``, the pending
    exception (if any) for the thread is cleared. This raises no exceptions.
 
    .. versionchanged:: 3.7
@@ -1303,7 +1421,7 @@ All of the following functions must be called after :c:func:`Py_Initialize`.
    .. note::
       Calling this function from a thread when the runtime is finalizing
       will terminate the thread, even if the thread was not created by Python.
-      You can use :c:func:`_Py_IsFinalizing` or :func:`sys.is_finalizing` to
+      You can use :c:func:`!_Py_IsFinalizing` or :func:`sys.is_finalizing` to
       check if the interpreter is in process of being finalized before calling
       this function to avoid unwanted termination.
 
@@ -1382,7 +1500,96 @@ You can switch between sub-interpreters using the :c:func:`PyThreadState_Swap`
 function. You can create and destroy them using the following functions:
 
 
-.. c:function:: PyThreadState* Py_NewInterpreter()
+.. c:type:: PyInterpreterConfig
+
+   Structure containing most parameters to configure a sub-interpreter.
+   Its values are used only in :c:func:`Py_NewInterpreterFromConfig` and
+   never modified by the runtime.
+
+   .. versionadded:: 3.12
+
+   Structure fields:
+
+   .. c:member:: int use_main_obmalloc
+
+      If this is ``0`` then the sub-interpreter will use its own
+      "object" allocator state.
+      Otherwise it will use (share) the main interpreter's.
+
+      If this is ``0`` then
+      :c:member:`~PyInterpreterConfig.check_multi_interp_extensions`
+      must be ``1`` (non-zero).
+      If this is ``1`` then :c:member:`~PyInterpreterConfig.gil`
+      must not be :c:macro:`PyInterpreterConfig_OWN_GIL`.
+
+   .. c:member:: int allow_fork
+
+      If this is ``0`` then the runtime will not support forking the
+      process in any thread where the sub-interpreter is currently active.
+      Otherwise fork is unrestricted.
+
+      Note that the :mod:`subprocess` module still works
+      when fork is disallowed.
+
+   .. c:member:: int allow_exec
+
+      If this is ``0`` then the runtime will not support replacing the
+      current process via exec (e.g. :func:`os.execv`) in any thread
+      where the sub-interpreter is currently active.
+      Otherwise exec is unrestricted.
+
+      Note that the :mod:`subprocess` module still works
+      when exec is disallowed.
+
+   .. c:member:: int allow_threads
+
+      If this is ``0`` then the sub-interpreter's :mod:`threading` module
+      won't create threads.
+      Otherwise threads are allowed.
+
+   .. c:member:: int allow_daemon_threads
+
+      If this is ``0`` then the sub-interpreter's :mod:`threading` module
+      won't create daemon threads.
+      Otherwise daemon threads are allowed (as long as
+      :c:member:`~PyInterpreterConfig.allow_threads` is non-zero).
+
+   .. c:member:: int check_multi_interp_extensions
+
+      If this is ``0`` then all extension modules may be imported,
+      including legacy (single-phase init) modules,
+      in any thread where the sub-interpreter is currently active.
+      Otherwise only multi-phase init extension modules
+      (see :pep:`489`) may be imported.
+      (Also see :c:macro:`Py_mod_multiple_interpreters`.)
+
+      This must be ``1`` (non-zero) if
+      :c:member:`~PyInterpreterConfig.use_main_obmalloc` is ``0``.
+
+   .. c:member:: int gil
+
+      This determines the operation of the GIL for the sub-interpreter.
+      It may be one of the following:
+
+      .. c:namespace:: NULL
+
+      .. c:macro:: PyInterpreterConfig_DEFAULT_GIL
+
+         Use the default selection (:c:macro:`PyInterpreterConfig_SHARED_GIL`).
+
+      .. c:macro:: PyInterpreterConfig_SHARED_GIL
+
+         Use (share) the main interpreter's GIL.
+
+      .. c:macro:: PyInterpreterConfig_OWN_GIL
+
+         Use the sub-interpreter's own GIL.
+
+      If this is :c:macro:`PyInterpreterConfig_OWN_GIL` then
+      :c:member:`PyInterpreterConfig.use_main_obmalloc` must be ``0``.
+
+
+.. c:function:: PyStatus Py_NewInterpreterFromConfig(PyThreadState **tstate_p, const PyInterpreterConfig *config)
 
    .. index::
       pair: module; builtins
@@ -1402,20 +1609,55 @@ function. You can create and destroy them using the following functions:
    ``sys.stdout`` and ``sys.stderr`` (however these refer to the same underlying
    file descriptors).
 
-   The return value points to the first thread state created in the new
+   The given *config* controls the options with which the interpreter
+   is initialized.
+
+   Upon success, *tstate_p* will be set to the first thread state
+   created in the new
    sub-interpreter.  This thread state is made in the current thread state.
    Note that no actual thread is created; see the discussion of thread states
-   below.  If creation of the new interpreter is unsuccessful, ``NULL`` is
-   returned; no exception is set since the exception state is stored in the
-   current thread state and there may not be a current thread state.  (Like all
-   other Python/C API functions, the global interpreter lock must be held before
-   calling this function and is still held when it returns; however, unlike most
-   other Python/C API functions, there needn't be a current thread state on
-   entry.)
+   below.  If creation of the new interpreter is unsuccessful,
+   *tstate_p* is set to ``NULL``;
+   no exception is set since the exception state is stored in the
+   current thread state and there may not be a current thread state.
+
+   Like all other Python/C API functions, the global interpreter lock
+   must be held before calling this function and is still held when it
+   returns.  Likewise a current thread state must be set on entry.  On
+   success, the returned thread state will be set as current.  If the
+   sub-interpreter is created with its own GIL then the GIL of the
+   calling interpreter will be released.  When the function returns,
+   the new interpreter's GIL will be held by the current thread and
+   the previously interpreter's GIL will remain released here.
+
+   .. versionadded:: 3.12
+
+   Sub-interpreters are most effective when isolated from each other,
+   with certain functionality restricted::
+
+      PyInterpreterConfig config = {
+          .use_main_obmalloc = 0,
+          .allow_fork = 0,
+          .allow_exec = 0,
+          .allow_threads = 1,
+          .allow_daemon_threads = 0,
+          .check_multi_interp_extensions = 1,
+          .gil = PyInterpreterConfig_OWN_GIL,
+      };
+      PyThreadState *tstate = NULL;
+      PyStatus status = Py_NewInterpreterFromConfig(&tstate, &config);
+      if (PyStatus_Exception(status)) {
+          Py_ExitStatusException(status);
+      }
+
+   Note that the config is used only briefly and does not get modified.
+   During initialization the config's values are converted into various
+   :c:type:`PyInterpreterState` values.  A read-only copy of the config
+   may be stored internally on the :c:type:`PyInterpreterState`.
 
    .. index::
-      single: Py_FinalizeEx()
-      single: Py_Initialize()
+      single: Py_FinalizeEx (C function)
+      single: Py_Initialize (C function)
 
    Extension modules are shared between (sub-)interpreters as follows:
 
@@ -1443,20 +1685,80 @@ function. You can create and destroy them using the following functions:
       As with multi-phase initialization, this means that only C-level static
       and global variables are shared between these modules.
 
-   .. index:: single: close() (in module os)
+   .. index:: single: close (in module os)
+
+
+.. c:function:: PyThreadState* Py_NewInterpreter(void)
+
+   .. index::
+      pair: module; builtins
+      pair: module; __main__
+      pair: module; sys
+      single: stdout (in module sys)
+      single: stderr (in module sys)
+      single: stdin (in module sys)
+
+   Create a new sub-interpreter.  This is essentially just a wrapper
+   around :c:func:`Py_NewInterpreterFromConfig` with a config that
+   preserves the existing behavior.  The result is an unisolated
+   sub-interpreter that shares the main interpreter's GIL, allows
+   fork/exec, allows daemon threads, and allows single-phase init
+   modules.
 
 
 .. c:function:: void Py_EndInterpreter(PyThreadState *tstate)
 
-   .. index:: single: Py_FinalizeEx()
+   .. index:: single: Py_FinalizeEx (C function)
 
-   Destroy the (sub-)interpreter represented by the given thread state. The given
-   thread state must be the current thread state.  See the discussion of thread
-   states below.  When the call returns, the current thread state is ``NULL``.  All
-   thread states associated with this interpreter are destroyed.  (The global
-   interpreter lock must be held before calling this function and is still held
-   when it returns.)  :c:func:`Py_FinalizeEx` will destroy all sub-interpreters that
+   Destroy the (sub-)interpreter represented by the given thread state.
+   The given thread state must be the current thread state.  See the
+   discussion of thread states below.  When the call returns,
+   the current thread state is ``NULL``.  All thread states associated
+   with this interpreter are destroyed.  The global interpreter lock
+   used by the target interpreter must be held before calling this
+   function.  No GIL is held when it returns.
+
+   :c:func:`Py_FinalizeEx` will destroy all sub-interpreters that
    haven't been explicitly destroyed at that point.
+
+
+A Per-Interpreter GIL
+---------------------
+
+Using :c:func:`Py_NewInterpreterFromConfig` you can create
+a sub-interpreter that is completely isolated from other interpreters,
+including having its own GIL.  The most important benefit of this
+isolation is that such an interpreter can execute Python code without
+being blocked by other interpreters or blocking any others.  Thus a
+single Python process can truly take advantage of multiple CPU cores
+when running Python code.  The isolation also encourages a different
+approach to concurrency than that of just using threads.
+(See :pep:`554`.)
+
+Using an isolated interpreter requires vigilance in preserving that
+isolation.  That especially means not sharing any objects or mutable
+state without guarantees about thread-safety.  Even objects that are
+otherwise immutable (e.g. ``None``, ``(1, 5)``) can't normally be shared
+because of the refcount.  One simple but less-efficient approach around
+this is to use a global lock around all use of some state (or object).
+Alternately, effectively immutable objects (like integers or strings)
+can be made safe in spite of their refcounts by making them "immortal".
+In fact, this has been done for the builtin singletons, small integers,
+and a number of other builtin objects.
+
+If you preserve isolation then you will have access to proper multi-core
+computing without the complications that come with free-threading.
+Failure to preserve isolation will expose you to the full consequences
+of free-threading, including races and hard-to-debug crashes.
+
+Aside from that, one of the main challenges of using multiple isolated
+interpreters is how to communicate between them safely (not break
+isolation) and efficiently.  The runtime and stdlib do not provide
+any standard approach to this yet.  A future stdlib module would help
+mitigate the effort of preserving isolation and expose effective tools
+for communicating (and sharing) data between interpreters.
+
+.. versionadded:: 3.12
 
 
 Bugs and caveats
@@ -1498,8 +1800,6 @@ pointer and a void pointer argument.
 
 .. c:function:: int Py_AddPendingCall(int (*func)(void *), void *arg)
 
-   .. index:: single: Py_AddPendingCall()
-
    Schedule a function to be called from the main interpreter thread.  On
    success, ``0`` is returned and *func* is queued for being called in the
    main thread.  On failure, ``-1`` is returned without setting any exception.
@@ -1533,13 +1833,13 @@ pointer and a void pointer argument.
       function is generally **not** suitable for calling Python code from
       arbitrary C threads.  Instead, use the :ref:`PyGILState API<gilstate>`.
 
+   .. versionadded:: 3.1
+
    .. versionchanged:: 3.9
       If this function is called in a subinterpreter, the function *func* is
       now scheduled to be called from the subinterpreter, rather than being
       called from the main interpreter. Each subinterpreter now has its own
       list of scheduled calls.
-
-   .. versionadded:: 3.1
 
 .. _profiling:
 
@@ -1566,32 +1866,32 @@ Python-level trace functions in previous versions.
    The type of the trace function registered using :c:func:`PyEval_SetProfile` and
    :c:func:`PyEval_SetTrace`. The first parameter is the object passed to the
    registration function as *obj*, *frame* is the frame object to which the event
-   pertains, *what* is one of the constants :const:`PyTrace_CALL`,
-   :const:`PyTrace_EXCEPTION`, :const:`PyTrace_LINE`, :const:`PyTrace_RETURN`,
-   :const:`PyTrace_C_CALL`, :const:`PyTrace_C_EXCEPTION`, :const:`PyTrace_C_RETURN`,
-   or :const:`PyTrace_OPCODE`, and *arg* depends on the value of *what*:
+   pertains, *what* is one of the constants :c:data:`PyTrace_CALL`,
+   :c:data:`PyTrace_EXCEPTION`, :c:data:`PyTrace_LINE`, :c:data:`PyTrace_RETURN`,
+   :c:data:`PyTrace_C_CALL`, :c:data:`PyTrace_C_EXCEPTION`, :c:data:`PyTrace_C_RETURN`,
+   or :c:data:`PyTrace_OPCODE`, and *arg* depends on the value of *what*:
 
-   +------------------------------+----------------------------------------+
-   | Value of *what*              | Meaning of *arg*                       |
-   +==============================+========================================+
-   | :const:`PyTrace_CALL`        | Always :c:data:`Py_None`.              |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_EXCEPTION`   | Exception information as returned by   |
-   |                              | :func:`sys.exc_info`.                  |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_LINE`        | Always :c:data:`Py_None`.              |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_RETURN`      | Value being returned to the caller,    |
-   |                              | or ``NULL`` if caused by an exception. |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_C_CALL`      | Function object being called.          |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_C_EXCEPTION` | Function object being called.          |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_C_RETURN`    | Function object being called.          |
-   +------------------------------+----------------------------------------+
-   | :const:`PyTrace_OPCODE`      | Always :c:data:`Py_None`.              |
-   +------------------------------+----------------------------------------+
+   +-------------------------------+----------------------------------------+
+   | Value of *what*               | Meaning of *arg*                       |
+   +===============================+========================================+
+   | :c:data:`PyTrace_CALL`        | Always :c:data:`Py_None`.              |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_EXCEPTION`   | Exception information as returned by   |
+   |                               | :func:`sys.exc_info`.                  |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_LINE`        | Always :c:data:`Py_None`.              |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_RETURN`      | Value being returned to the caller,    |
+   |                               | or ``NULL`` if caused by an exception. |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_C_CALL`      | Function object being called.          |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_C_EXCEPTION` | Function object being called.          |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_C_RETURN`    | Function object being called.          |
+   +-------------------------------+----------------------------------------+
+   | :c:data:`PyTrace_OPCODE`      | Always :c:data:`Py_None`.              |
+   +-------------------------------+----------------------------------------+
 
 .. c:var:: int PyTrace_CALL
 
@@ -1617,7 +1917,8 @@ Python-level trace functions in previous versions.
 
    The value passed as the *what* parameter to a :c:type:`Py_tracefunc` function
    (but not a profiling function) when a line-number event is being reported.
-   It may be disabled for a frame by setting :attr:`f_trace_lines` to *0* on that frame.
+   It may be disabled for a frame by setting :attr:`~frame.f_trace_lines` to
+   *0* on that frame.
 
 
 .. c:var:: int PyTrace_RETURN
@@ -1649,7 +1950,7 @@ Python-level trace functions in previous versions.
    The value for the *what* parameter to :c:type:`Py_tracefunc` functions (but not
    profiling functions) when a new opcode is about to be executed.  This event is
    not emitted by default: it must be explicitly requested by setting
-   :attr:`f_trace_opcodes` to *1* on the frame.
+   :attr:`~frame.f_trace_opcodes` to *1* on the frame.
 
 
 .. c:function:: void PyEval_SetProfile(Py_tracefunc func, PyObject *obj)
@@ -1658,12 +1959,24 @@ Python-level trace functions in previous versions.
    function as its first parameter, and may be any Python object, or ``NULL``.  If
    the profile function needs to maintain state, using a different value for *obj*
    for each thread provides a convenient and thread-safe place to store it.  The
-   profile function is called for all monitored events except :const:`PyTrace_LINE`
-   :const:`PyTrace_OPCODE` and :const:`PyTrace_EXCEPTION`.
+   profile function is called for all monitored events except :c:data:`PyTrace_LINE`
+   :c:data:`PyTrace_OPCODE` and :c:data:`PyTrace_EXCEPTION`.
 
    See also the :func:`sys.setprofile` function.
 
    The caller must hold the :term:`GIL`.
+
+.. c:function:: void PyEval_SetProfileAllThreads(Py_tracefunc func, PyObject *obj)
+
+   Like :c:func:`PyEval_SetProfile` but sets the profile function in all running threads
+   belonging to the current interpreter instead of the setting it only on the current thread.
+
+   The caller must hold the :term:`GIL`.
+
+   As :c:func:`PyEval_SetProfile`, this function ignores any exceptions raised while
+   setting the profile functions in all threads.
+
+.. versionadded:: 3.12
 
 
 .. c:function:: void PyEval_SetTrace(Py_tracefunc func, PyObject *obj)
@@ -1672,12 +1985,24 @@ Python-level trace functions in previous versions.
    :c:func:`PyEval_SetProfile`, except the tracing function does receive line-number
    events and per-opcode events, but does not receive any event related to C function
    objects being called.  Any trace function registered using :c:func:`PyEval_SetTrace`
-   will not receive :const:`PyTrace_C_CALL`, :const:`PyTrace_C_EXCEPTION` or
-   :const:`PyTrace_C_RETURN` as a value for the *what* parameter.
+   will not receive :c:data:`PyTrace_C_CALL`, :c:data:`PyTrace_C_EXCEPTION` or
+   :c:data:`PyTrace_C_RETURN` as a value for the *what* parameter.
 
    See also the :func:`sys.settrace` function.
 
    The caller must hold the :term:`GIL`.
+
+.. c:function:: void PyEval_SetTraceAllThreads(Py_tracefunc func, PyObject *obj)
+
+   Like :c:func:`PyEval_SetTrace` but sets the tracing function in all running threads
+   belonging to the current interpreter instead of the setting it only on the current thread.
+
+   The caller must hold the :term:`GIL`.
+
+   As :c:func:`PyEval_SetTrace`, this function ignores any exceptions raised while
+   setting the trace functions in all threads.
+
+.. versionadded:: 3.12
 
 
 .. _advanced-debugging:

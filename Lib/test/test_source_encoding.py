@@ -1,7 +1,7 @@
-# -*- coding: koi8-r -*-
+# -*- coding: utf-8 -*-
 
 import unittest
-from test.support import script_helper, captured_stdout, requires_subprocess
+from test.support import script_helper, captured_stdout, requires_subprocess, requires_resource
 from test.support.os_helper import TESTFN, unlink, rmtree
 from test.support.import_helper import unload
 import importlib
@@ -12,15 +12,14 @@ import tempfile
 
 class MiscSourceEncodingTest(unittest.TestCase):
 
-    def test_pep263(self):
-        self.assertEqual(
-            "Питон".encode("utf-8"),
-            b'\xd0\x9f\xd0\xb8\xd1\x82\xd0\xbe\xd0\xbd'
-        )
-        self.assertEqual(
-            "\П".encode("utf-8"),
-            b'\\\xd0\x9f'
-        )
+    def test_import_encoded_module(self):
+        from test.encoded_modules import test_strings
+        # Make sure we're actually testing something
+        self.assertGreaterEqual(len(test_strings), 1)
+        for modname, encoding, teststr in test_strings:
+            mod = importlib.import_module('test.encoded_modules.'
+                                          'module_' + modname)
+            self.assertEqual(teststr, mod.test)
 
     def test_compilestring(self):
         # see #1882
@@ -69,6 +68,7 @@ class MiscSourceEncodingTest(unittest.TestCase):
     def test_20731(self):
         sub = subprocess.Popen([sys.executable,
                         os.path.join(os.path.dirname(__file__),
+                                     'tokenizedata',
                                      'coding20731.py')],
                         stderr=subprocess.PIPE)
         err = sub.communicate()[1]
@@ -101,10 +101,10 @@ class MiscSourceEncodingTest(unittest.TestCase):
         self.verify_bad_module(module_name)
 
     def verify_bad_module(self, module_name):
-        self.assertRaises(SyntaxError, __import__, 'test.' + module_name)
+        self.assertRaises(SyntaxError, __import__, 'test.tokenizedata.' + module_name)
 
         path = os.path.dirname(__file__)
-        filename = os.path.join(path, module_name + '.py')
+        filename = os.path.join(path, 'tokenizedata', module_name + '.py')
         with open(filename, "rb") as fp:
             bytes = fp.read()
         self.assertRaises(SyntaxError, compile, bytes, filename, 'exec')
@@ -251,6 +251,7 @@ class AbstractSourceEncodingTest:
 class UTF8ValidatorTest(unittest.TestCase):
     @unittest.skipIf(not sys.platform.startswith("linux"),
                      "Too slow to run on non-Linux platforms")
+    @requires_resource('cpu')
     def test_invalid_utf8(self):
         # This is a port of test_utf8_decode_invalid_sequences in
         # test_unicode.py to exercise the separate utf8 validator in

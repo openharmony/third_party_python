@@ -1,5 +1,5 @@
-:mod:`platform` ---  Access to underlying platform's identifying data
-=====================================================================
+:mod:`!platform` ---  Access to underlying platform's identifying data
+======================================================================
 
 .. module:: platform
    :synopsis: Retrieves as much platform identifying data as possible.
@@ -46,7 +46,7 @@ Cross Platform
       universal files containing multiple architectures.
 
       To get at the "64-bitness" of the current interpreter, it is more
-      reliable to query the :attr:`sys.maxsize` attribute::
+      reliable to query the :data:`sys.maxsize` attribute::
 
          is_64bits = sys.maxsize > 2**32
 
@@ -63,7 +63,7 @@ Cross Platform
    string is returned if the value cannot be determined.
 
 
-.. function:: platform(aliased=0, terse=0)
+.. function:: platform(aliased=False, terse=False)
 
    Returns a single string identifying the underlying platform with as much useful
    information as possible.
@@ -168,15 +168,19 @@ Cross Platform
    containing six attributes: :attr:`system`, :attr:`node`, :attr:`release`,
    :attr:`version`, :attr:`machine`, and :attr:`processor`.
 
-   Note that this adds a sixth attribute (:attr:`processor`) not present
-   in the :func:`os.uname` result.  Also, the attribute names are different
-   for the first two attributes; :func:`os.uname` names them
-   :attr:`sysname` and :attr:`nodename`.
+   :attr:`processor` is resolved late, on demand.
+
+   Note: the first two attribute names differ from the names presented by
+   :func:`os.uname`, where they are named :attr:`sysname` and
+   :attr:`nodename`.
 
    Entries which cannot be determined are set to ``''``.
 
    .. versionchanged:: 3.3
       Result changed from a tuple to a :func:`~collections.namedtuple`.
+
+   .. versionchanged:: 3.9
+      :attr:`processor` is resolved late instead of immediately.
 
 
 Java Platform
@@ -206,8 +210,8 @@ Windows Platform
    default to an empty string).
 
    As a hint: *ptype* is ``'Uniprocessor Free'`` on single processor NT machines
-   and ``'Multiprocessor Free'`` on multi processor machines. The *'Free'* refers
-   to the OS version being free of debugging code. It could also state *'Checked'*
+   and ``'Multiprocessor Free'`` on multi processor machines. The ``'Free'`` refers
+   to the OS version being free of debugging code. It could also state ``'Checked'``
    which means the OS version uses debugging code, i.e. code that checks arguments,
    ranges, etc.
 

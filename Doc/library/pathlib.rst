@@ -1,6 +1,5 @@
-
-:mod:`pathlib` --- Object-oriented filesystem paths
-===================================================
+:mod:`!pathlib` --- Object-oriented filesystem paths
+====================================================
 
 .. module:: pathlib
    :synopsis: Object-oriented filesystem paths
@@ -22,6 +21,12 @@ inherit from pure paths but also provide I/O operations.
 .. image:: pathlib-inheritance.png
    :align: center
    :class: invert-in-dark-mode
+   :alt: Inheritance diagram showing the classes available in pathlib. The
+         most basic class is PurePath, which has three direct subclasses:
+         PurePosixPath, PureWindowsPath, and Path. Further to these four
+         classes, there are two classes that use multiple inheritance:
+         PosixPath subclasses PurePosixPath and Path, and WindowsPath
+         subclasses PureWindowsPath and Path.
 
 If you've never used this module before or just aren't sure which class is
 right for your task, :class:`Path` is most likely what you need. It instantiates
@@ -106,8 +111,9 @@ we also call *flavours*:
       PurePosixPath('setup.py')
 
    Each element of *pathsegments* can be either a string representing a
-   path segment, an object implementing the :class:`os.PathLike` interface
-   which returns a string, or another path object::
+   path segment, or an object implementing the :class:`os.PathLike` interface
+   where the :meth:`~os.PathLike.__fspath__` method returns a string,
+   such as another path object::
 
       >>> PurePath('foo', 'some/path', 'bar')
       PurePosixPath('foo/some/path/bar')
@@ -161,8 +167,8 @@ we also call *flavours*:
    A subclass of :class:`PurePath`, this path flavour represents non-Windows
    filesystem paths::
 
-      >>> PurePosixPath('/etc')
-      PurePosixPath('/etc')
+      >>> PurePosixPath('/etc/hosts')
+      PurePosixPath('/etc/hosts')
 
    *pathsegments* is specified similarly to :class:`PurePath`.
 
@@ -171,8 +177,8 @@ we also call *flavours*:
    A subclass of :class:`PurePath`, this path flavour represents Windows
    filesystem paths, including `UNC paths`_::
 
-      >>> PureWindowsPath('c:/Program Files/')
-      PureWindowsPath('c:/Program Files')
+      >>> PureWindowsPath('c:/', 'Users', 'Ximénez')
+      PureWindowsPath('c:/Users/Ximénez')
       >>> PureWindowsPath('//server/share/file')
       PureWindowsPath('//server/share/file')
 
@@ -498,7 +504,7 @@ Pure paths provide the following methods and properties:
       True
 
 
-.. method:: PurePath.is_relative_to(*other)
+.. method:: PurePath.is_relative_to(other)
 
    Return whether or not this path is relative to the *other* path.
 
@@ -508,8 +514,19 @@ Pure paths provide the following methods and properties:
       >>> p.is_relative_to('/usr')
       False
 
+   This method is string-based; it neither accesses the filesystem nor treats
+   "``..``" segments specially. The following code is equivalent:
+
+      >>> u = PurePath('/usr')
+      >>> u == p or u in p.parents
+      False
+
    .. versionadded:: 3.9
 
+   .. deprecated-removed:: 3.12 3.14
+
+      Passing additional arguments is deprecated; if supplied, they are joined
+      with *other*.
 
 .. method:: PurePath.is_reserved()
 
@@ -526,10 +543,10 @@ Pure paths provide the following methods and properties:
    unintended effects.
 
 
-.. method:: PurePath.joinpath(*other)
+.. method:: PurePath.joinpath(*pathsegments)
 
    Calling this method is equivalent to combining the path with each of
-   the *other* arguments in turn::
+   the given *pathsegments* in turn::
 
       >>> PurePosixPath('/etc').joinpath('passwd')
       PurePosixPath('/etc/passwd')
@@ -541,7 +558,7 @@ Pure paths provide the following methods and properties:
       PureWindowsPath('c:/Program Files')
 
 
-.. method:: PurePath.match(pattern)
+.. method:: PurePath.match(pattern, *, case_sensitive=None)
 
    Match this path against the provided glob-style pattern.  Return ``True``
    if matching is successful, ``False`` otherwise.
@@ -564,6 +581,20 @@ Pure paths provide the following methods and properties:
       >>> PurePath('a/b.py').match('/*.py')
       False
 
+   The *pattern* may be another path object; this speeds up matching the same
+   pattern against multiple files::
+
+      >>> pattern = PurePath('*.py')
+      >>> PurePath('a/b.py').match(pattern)
+      True
+
+   .. note::
+      The recursive wildcard "``**``" isn't supported by this method (it acts
+      like non-recursive "``*``".)
+
+   .. versionchanged:: 3.12
+      Accepts an object implementing the :class:`os.PathLike` interface.
+
    As with other methods, case-sensitivity follows platform defaults::
 
       >>> PurePosixPath('b.py').match('*.PY')
@@ -571,11 +602,16 @@ Pure paths provide the following methods and properties:
       >>> PureWindowsPath('b.py').match('*.PY')
       True
 
+   Set *case_sensitive* to ``True`` or ``False`` to override this behaviour.
 
-.. method:: PurePath.relative_to(*other)
+   .. versionchanged:: 3.12
+      The *case_sensitive* parameter was added.
+
+
+.. method:: PurePath.relative_to(other, walk_up=False)
 
    Compute a version of this path relative to the path represented by
-   *other*.  If it's impossible, ValueError is raised::
+   *other*.  If it's impossible, :exc:`ValueError` is raised::
 
       >>> p = PurePosixPath('/etc/passwd')
       >>> p.relative_to('/')
@@ -585,12 +621,38 @@ Pure paths provide the following methods and properties:
       >>> p.relative_to('/usr')
       Traceback (most recent call last):
         File "<stdin>", line 1, in <module>
-        File "pathlib.py", line 694, in relative_to
-          .format(str(self), str(formatted)))
-      ValueError: '/etc/passwd' is not in the subpath of '/usr' OR one path is relative and the other absolute.
+        File "pathlib.py", line 941, in relative_to
+          raise ValueError(error_message.format(str(self), str(formatted)))
+      ValueError: '/etc/passwd' is not in the subpath of '/usr' OR one path is relative and the other is absolute.
 
-   NOTE: This function is part of :class:`PurePath` and works with strings. It does not check or access the underlying file structure.
+   When *walk_up* is false (the default), the path must start with *other*.
+   When the argument is true, ``..`` entries may be added to form the
+   relative path. In all other cases, such as the paths referencing
+   different drives, :exc:`ValueError` is raised.::
 
+      >>> p.relative_to('/usr', walk_up=True)
+      PurePosixPath('../etc/passwd')
+      >>> p.relative_to('foo', walk_up=True)
+      Traceback (most recent call last):
+        File "<stdin>", line 1, in <module>
+        File "pathlib.py", line 941, in relative_to
+          raise ValueError(error_message.format(str(self), str(formatted)))
+      ValueError: '/etc/passwd' is not on the same drive as 'foo' OR one path is relative and the other is absolute.
+
+   .. warning::
+      This function is part of :class:`PurePath` and works with strings.
+      It does not check or access the underlying file structure.
+      This can impact the *walk_up* option as it assumes that no symlinks
+      are present in the path; call :meth:`~Path.resolve` first if
+      necessary to resolve symlinks.
+
+   .. versionchanged:: 3.12
+      The *walk_up* parameter was added (old behavior is the same as ``walk_up=False``).
+
+   .. deprecated-removed:: 3.12 3.14
+
+      Passing additional positional arguments is deprecated; if supplied,
+      they are joined with *other*.
 
 .. method:: PurePath.with_name(name)
 
@@ -650,6 +712,30 @@ Pure paths provide the following methods and properties:
       PureWindowsPath('README')
 
 
+.. method:: PurePath.with_segments(*pathsegments)
+
+   Create a new path object of the same type by combining the given
+   *pathsegments*. This method is called whenever a derivative path is created,
+   such as from :attr:`parent` and :meth:`relative_to`. Subclasses may
+   override this method to pass information to derivative paths, for example::
+
+      from pathlib import PurePosixPath
+
+      class MyPath(PurePosixPath):
+          def __init__(self, *pathsegments, session_id):
+              super().__init__(*pathsegments)
+              self.session_id = session_id
+
+          def with_segments(self, *pathsegments):
+              return type(self)(*pathsegments, session_id=self.session_id)
+
+      etc = MyPath('/etc', session_id=42)
+      hosts = etc / 'hosts'
+      print(hosts.session_id)  # 42
+
+   .. versionadded:: 3.12
+
+
 .. _concrete-paths:
 
 
@@ -676,8 +762,8 @@ calls on path objects.  There are three ways to instantiate concrete paths:
    A subclass of :class:`Path` and :class:`PurePosixPath`, this class
    represents concrete non-Windows filesystem paths::
 
-      >>> PosixPath('/etc')
-      PosixPath('/etc')
+      >>> PosixPath('/etc/hosts')
+      PosixPath('/etc/hosts')
 
    *pathsegments* is specified similarly to :class:`PurePath`.
 
@@ -686,8 +772,8 @@ calls on path objects.  There are three ways to instantiate concrete paths:
    A subclass of :class:`Path` and :class:`PureWindowsPath`, this class
    represents concrete Windows filesystem paths::
 
-      >>> WindowsPath('c:/Program Files/')
-      WindowsPath('c:/Program Files')
+      >>> WindowsPath('c:/', 'Users', 'Ximénez')
+      WindowsPath('c:/Users/Ximénez')
 
    *pathsegments* is specified similarly to :class:`PurePath`.
 
@@ -709,32 +795,12 @@ bugs or failures in your application)::
        % (cls.__name__,))
    NotImplementedError: cannot instantiate 'WindowsPath' on your system
 
-
-Methods
-^^^^^^^
-
-Concrete paths provide the following methods in addition to pure paths
-methods.  Many of these methods can raise an :exc:`OSError` if a system
-call fails (for example because the path doesn't exist).
-
-.. versionchanged:: 3.8
-
-   :meth:`~Path.exists()`, :meth:`~Path.is_dir()`, :meth:`~Path.is_file()`,
-   :meth:`~Path.is_mount()`, :meth:`~Path.is_symlink()`,
-   :meth:`~Path.is_block_device()`, :meth:`~Path.is_char_device()`,
-   :meth:`~Path.is_fifo()`, :meth:`~Path.is_socket()` now return ``False``
-   instead of raising an exception for paths that contain characters
-   unrepresentable at the OS level.
+Some concrete path methods can raise an :exc:`OSError` if a system call fails
+(for example because the path doesn't exist).
 
 
-.. classmethod:: Path.cwd()
-
-   Return a new path object representing the current directory (as returned
-   by :func:`os.getcwd`)::
-
-      >>> Path.cwd()
-      PosixPath('/home/antoine/pathlib')
-
+Expanding and resolving paths
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. classmethod:: Path.home()
 
@@ -748,63 +814,6 @@ call fails (for example because the path doesn't exist).
       PosixPath('/home/antoine')
 
    .. versionadded:: 3.5
-
-
-.. method:: Path.stat(*, follow_symlinks=True)
-
-   Return a :class:`os.stat_result` object containing information about this path, like :func:`os.stat`.
-   The result is looked up at each call to this method.
-
-   This method normally follows symlinks; to stat a symlink add the argument
-   ``follow_symlinks=False``, or use :meth:`~Path.lstat`.
-
-   ::
-
-      >>> p = Path('setup.py')
-      >>> p.stat().st_size
-      956
-      >>> p.stat().st_mtime
-      1327883547.852554
-
-   .. versionchanged:: 3.10
-      The *follow_symlinks* parameter was added.
-
-.. method:: Path.chmod(mode, *, follow_symlinks=True)
-
-   Change the file mode and permissions, like :func:`os.chmod`.
-
-   This method normally follows symlinks. Some Unix flavours support changing
-   permissions on the symlink itself; on these platforms you may add the
-   argument ``follow_symlinks=False``, or use :meth:`~Path.lchmod`.
-
-   ::
-
-      >>> p = Path('setup.py')
-      >>> p.stat().st_mode
-      33277
-      >>> p.chmod(0o444)
-      >>> p.stat().st_mode
-      33060
-
-   .. versionchanged:: 3.10
-      The *follow_symlinks* parameter was added.
-
-.. method:: Path.exists()
-
-   Whether the path points to an existing file or directory::
-
-      >>> Path('.').exists()
-      True
-      >>> Path('setup.py').exists()
-      True
-      >>> Path('/etc').exists()
-      True
-      >>> Path('nonexistentfile').exists()
-      False
-
-   .. note::
-      If the path points to a symlink, :meth:`exists` returns whether the
-      symlink *points to* an existing file or directory.
 
 
 .. method:: Path.expanduser()
@@ -822,50 +831,126 @@ call fails (for example because the path doesn't exist).
    .. versionadded:: 3.5
 
 
-.. method:: Path.glob(pattern)
+.. classmethod:: Path.cwd()
 
-   Glob the given relative *pattern* in the directory represented by this path,
-   yielding all matching files (of any kind)::
+   Return a new path object representing the current directory (as returned
+   by :func:`os.getcwd`)::
 
-      >>> sorted(Path('.').glob('*.py'))
-      [PosixPath('pathlib.py'), PosixPath('setup.py'), PosixPath('test_pathlib.py')]
-      >>> sorted(Path('.').glob('*/*.py'))
-      [PosixPath('docs/conf.py')]
-
-   Patterns are the same as for :mod:`fnmatch`, with the addition of "``**``"
-   which means "this directory and all subdirectories, recursively".  In other
-   words, it enables recursive globbing::
-
-      >>> sorted(Path('.').glob('**/*.py'))
-      [PosixPath('build/lib/pathlib.py'),
-       PosixPath('docs/conf.py'),
-       PosixPath('pathlib.py'),
-       PosixPath('setup.py'),
-       PosixPath('test_pathlib.py')]
-
-   .. note::
-      Using the "``**``" pattern in large directory trees may consume
-      an inordinate amount of time.
-
-   .. audit-event:: pathlib.Path.glob self,pattern pathlib.Path.glob
-
-   .. versionchanged:: 3.11
-      Return only directories if *pattern* ends with a pathname components
-      separator (:data:`~os.sep` or :data:`~os.altsep`).
-
-.. method:: Path.group()
-
-   Return the name of the group owning the file.  :exc:`KeyError` is raised
-   if the file's gid isn't found in the system database.
+      >>> Path.cwd()
+      PosixPath('/home/antoine/pathlib')
 
 
-.. method:: Path.is_dir()
+.. method:: Path.absolute()
 
-   Return ``True`` if the path points to a directory (or a symbolic link
-   pointing to a directory), ``False`` if it points to another kind of file.
+   Make the path absolute, without normalization or resolving symlinks.
+   Returns a new path object::
 
-   ``False`` is also returned if the path doesn't exist or is a broken symlink;
-   other errors (such as permission errors) are propagated.
+      >>> p = Path('tests')
+      >>> p
+      PosixPath('tests')
+      >>> p.absolute()
+      PosixPath('/home/antoine/pathlib/tests')
+
+
+.. method:: Path.resolve(strict=False)
+
+   Make the path absolute, resolving any symlinks.  A new path object is
+   returned::
+
+      >>> p = Path()
+      >>> p
+      PosixPath('.')
+      >>> p.resolve()
+      PosixPath('/home/antoine/pathlib')
+
+   "``..``" components are also eliminated (this is the only method to do so)::
+
+      >>> p = Path('docs/../setup.py')
+      >>> p.resolve()
+      PosixPath('/home/antoine/pathlib/setup.py')
+
+   If the path doesn't exist and *strict* is ``True``, :exc:`FileNotFoundError`
+   is raised.  If *strict* is ``False``, the path is resolved as far as possible
+   and any remainder is appended without checking whether it exists.  If an
+   infinite loop is encountered along the resolution path, :exc:`RuntimeError`
+   is raised.
+
+   .. versionchanged:: 3.6
+      The *strict* parameter was added (pre-3.6 behavior is strict).
+
+
+.. method:: Path.readlink()
+
+   Return the path to which the symbolic link points (as returned by
+   :func:`os.readlink`)::
+
+      >>> p = Path('mylink')
+      >>> p.symlink_to('setup.py')
+      >>> p.readlink()
+      PosixPath('setup.py')
+
+   .. versionadded:: 3.9
+
+
+Querying file type and status
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionchanged:: 3.8
+
+   :meth:`~Path.exists`, :meth:`~Path.is_dir`, :meth:`~Path.is_file`,
+   :meth:`~Path.is_mount`, :meth:`~Path.is_symlink`,
+   :meth:`~Path.is_block_device`, :meth:`~Path.is_char_device`,
+   :meth:`~Path.is_fifo`, :meth:`~Path.is_socket` now return ``False``
+   instead of raising an exception for paths that contain characters
+   unrepresentable at the OS level.
+
+
+.. method:: Path.stat(*, follow_symlinks=True)
+
+   Return an :class:`os.stat_result` object containing information about this path, like :func:`os.stat`.
+   The result is looked up at each call to this method.
+
+   This method normally follows symlinks; to stat a symlink add the argument
+   ``follow_symlinks=False``, or use :meth:`~Path.lstat`.
+
+   ::
+
+      >>> p = Path('setup.py')
+      >>> p.stat().st_size
+      956
+      >>> p.stat().st_mtime
+      1327883547.852554
+
+   .. versionchanged:: 3.10
+      The *follow_symlinks* parameter was added.
+
+
+.. method:: Path.lstat()
+
+   Like :meth:`Path.stat` but, if the path points to a symbolic link, return
+   the symbolic link's information rather than its target's.
+
+
+.. method:: Path.exists(*, follow_symlinks=True)
+
+   Return ``True`` if the path points to an existing file or directory.
+
+   This method normally follows symlinks; to check if a symlink exists, add
+   the argument ``follow_symlinks=False``.
+
+   ::
+
+      >>> Path('.').exists()
+      True
+      >>> Path('setup.py').exists()
+      True
+      >>> Path('/etc').exists()
+      True
+      >>> Path('nonexistentfile').exists()
+      False
+
+   .. versionchanged:: 3.12
+      The *follow_symlinks* parameter was added.
 
 
 .. method:: Path.is_file()
@@ -877,16 +962,13 @@ call fails (for example because the path doesn't exist).
    other errors (such as permission errors) are propagated.
 
 
-.. method:: Path.is_mount()
+.. method:: Path.is_dir()
 
-   Return ``True`` if the path is a :dfn:`mount point`: a point in a
-   file system where a different file system has been mounted.  On POSIX, the
-   function checks whether *path*'s parent, :file:`path/..`, is on a different
-   device than *path*, or whether :file:`path/..` and *path* point to the same
-   i-node on the same device --- this should detect mount points for all Unix
-   and POSIX variants.  Not implemented on Windows.
+   Return ``True`` if the path points to a directory (or a symbolic link
+   pointing to a directory), ``False`` if it points to another kind of file.
 
-   .. versionadded:: 3.7
+   ``False`` is also returned if the path doesn't exist or is a broken symlink;
+   other errors (such as permission errors) are propagated.
 
 
 .. method:: Path.is_symlink()
@@ -895,6 +977,31 @@ call fails (for example because the path doesn't exist).
 
    ``False`` is also returned if the path doesn't exist; other errors (such
    as permission errors) are propagated.
+
+
+.. method:: Path.is_junction()
+
+   Return ``True`` if the path points to a junction, and ``False`` for any other
+   type of file. Currently only Windows supports junctions.
+
+   .. versionadded:: 3.12
+
+
+.. method:: Path.is_mount()
+
+   Return ``True`` if the path is a :dfn:`mount point`: a point in a
+   file system where a different file system has been mounted.  On POSIX, the
+   function checks whether *path*'s parent, :file:`path/..`, is on a different
+   device than *path*, or whether :file:`path/..` and *path* point to the same
+   i-node on the same device --- this should detect mount points for all Unix
+   and POSIX variants.  On Windows, a mount point is considered to be a drive
+   letter root (e.g. ``c:\``), a UNC share (e.g. ``\\server\share``), or a
+   mounted filesystem directory.
+
+   .. versionadded:: 3.7
+
+   .. versionchanged:: 3.12
+      Windows support was added.
 
 
 .. method:: Path.is_socket()
@@ -933,226 +1040,6 @@ call fails (for example because the path doesn't exist).
    other errors (such as permission errors) are propagated.
 
 
-.. method:: Path.iterdir()
-
-   When the path points to a directory, yield path objects of the directory
-   contents::
-
-      >>> p = Path('docs')
-      >>> for child in p.iterdir(): child
-      ...
-      PosixPath('docs/conf.py')
-      PosixPath('docs/_templates')
-      PosixPath('docs/make.bat')
-      PosixPath('docs/index.rst')
-      PosixPath('docs/_build')
-      PosixPath('docs/_static')
-      PosixPath('docs/Makefile')
-
-   The children are yielded in arbitrary order, and the special entries
-   ``'.'`` and ``'..'`` are not included.  If a file is removed from or added
-   to the directory after creating the iterator, whether a path object for
-   that file be included is unspecified.
-
-.. method:: Path.lchmod(mode)
-
-   Like :meth:`Path.chmod` but, if the path points to a symbolic link, the
-   symbolic link's mode is changed rather than its target's.
-
-
-.. method:: Path.lstat()
-
-   Like :meth:`Path.stat` but, if the path points to a symbolic link, return
-   the symbolic link's information rather than its target's.
-
-
-.. method:: Path.mkdir(mode=0o777, parents=False, exist_ok=False)
-
-   Create a new directory at this given path.  If *mode* is given, it is
-   combined with the process' ``umask`` value to determine the file mode
-   and access flags.  If the path already exists, :exc:`FileExistsError`
-   is raised.
-
-   If *parents* is true, any missing parents of this path are created
-   as needed; they are created with the default permissions without taking
-   *mode* into account (mimicking the POSIX ``mkdir -p`` command).
-
-   If *parents* is false (the default), a missing parent raises
-   :exc:`FileNotFoundError`.
-
-   If *exist_ok* is false (the default), :exc:`FileExistsError` is
-   raised if the target directory already exists.
-
-   If *exist_ok* is true, :exc:`FileExistsError` exceptions will be
-   ignored (same behavior as the POSIX ``mkdir -p`` command), but only if the
-   last path component is not an existing non-directory file.
-
-   .. versionchanged:: 3.5
-      The *exist_ok* parameter was added.
-
-
-.. method:: Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
-
-   Open the file pointed to by the path, like the built-in :func:`open`
-   function does::
-
-      >>> p = Path('setup.py')
-      >>> with p.open() as f:
-      ...     f.readline()
-      ...
-      '#!/usr/bin/env python3\n'
-
-
-.. method:: Path.owner()
-
-   Return the name of the user owning the file.  :exc:`KeyError` is raised
-   if the file's uid isn't found in the system database.
-
-
-.. method:: Path.read_bytes()
-
-   Return the binary contents of the pointed-to file as a bytes object::
-
-      >>> p = Path('my_binary_file')
-      >>> p.write_bytes(b'Binary file contents')
-      20
-      >>> p.read_bytes()
-      b'Binary file contents'
-
-   .. versionadded:: 3.5
-
-
-.. method:: Path.read_text(encoding=None, errors=None)
-
-   Return the decoded contents of the pointed-to file as a string::
-
-      >>> p = Path('my_text_file')
-      >>> p.write_text('Text file contents')
-      18
-      >>> p.read_text()
-      'Text file contents'
-
-   The file is opened and then closed. The optional parameters have the same
-   meaning as in :func:`open`.
-
-   .. versionadded:: 3.5
-
-
-.. method:: Path.readlink()
-
-   Return the path to which the symbolic link points (as returned by
-   :func:`os.readlink`)::
-
-      >>> p = Path('mylink')
-      >>> p.symlink_to('setup.py')
-      >>> p.readlink()
-      PosixPath('setup.py')
-
-   .. versionadded:: 3.9
-
-
-.. method:: Path.rename(target)
-
-   Rename this file or directory to the given *target*, and return a new Path
-   instance pointing to *target*.  On Unix, if *target* exists and is a file,
-   it will be replaced silently if the user has permission.
-   On Windows, if *target* exists, :exc:`FileExistsError` will be raised.
-   *target* can be either a string or another path object::
-
-      >>> p = Path('foo')
-      >>> p.open('w').write('some text')
-      9
-      >>> target = Path('bar')
-      >>> p.rename(target)
-      PosixPath('bar')
-      >>> target.open().read()
-      'some text'
-
-   The target path may be absolute or relative. Relative paths are interpreted
-   relative to the current working directory, *not* the directory of the Path
-   object.
-
-   It is implemented in terms of :func:`os.rename` and gives the same guarantees.
-
-   .. versionchanged:: 3.8
-      Added return value, return the new Path instance.
-
-
-.. method:: Path.replace(target)
-
-   Rename this file or directory to the given *target*, and return a new Path
-   instance pointing to *target*.  If *target* points to an existing file or
-   empty directory, it will be unconditionally replaced.
-
-   The target path may be absolute or relative. Relative paths are interpreted
-   relative to the current working directory, *not* the directory of the Path
-   object.
-
-   .. versionchanged:: 3.8
-      Added return value, return the new Path instance.
-
-
-.. method:: Path.absolute()
-
-   Make the path absolute, without normalization or resolving symlinks.
-   Returns a new path object::
-
-      >>> p = Path('tests')
-      >>> p
-      PosixPath('tests')
-      >>> p.absolute()
-      PosixPath('/home/antoine/pathlib/tests')
-
-
-.. method:: Path.resolve(strict=False)
-
-   Make the path absolute, resolving any symlinks.  A new path object is
-   returned::
-
-      >>> p = Path()
-      >>> p
-      PosixPath('.')
-      >>> p.resolve()
-      PosixPath('/home/antoine/pathlib')
-
-   "``..``" components are also eliminated (this is the only method to do so)::
-
-      >>> p = Path('docs/../setup.py')
-      >>> p.resolve()
-      PosixPath('/home/antoine/pathlib/setup.py')
-
-   If the path doesn't exist and *strict* is ``True``, :exc:`FileNotFoundError`
-   is raised.  If *strict* is ``False``, the path is resolved as far as possible
-   and any remainder is appended without checking whether it exists.  If an
-   infinite loop is encountered along the resolution path, :exc:`RuntimeError`
-   is raised.
-
-   .. versionadded:: 3.6
-      The *strict* argument (pre-3.6 behavior is strict).
-
-.. method:: Path.rglob(pattern)
-
-   This is like calling :func:`Path.glob` with "``**/``" added in front of the
-   given relative *pattern*::
-
-      >>> sorted(Path().rglob("*.py"))
-      [PosixPath('build/lib/pathlib.py'),
-       PosixPath('docs/conf.py'),
-       PosixPath('pathlib.py'),
-       PosixPath('setup.py'),
-       PosixPath('test_pathlib.py')]
-
-   .. audit-event:: pathlib.Path.rglob self,pattern pathlib.Path.rglob
-
-   .. versionchanged:: 3.11
-      Return only directories if *pattern* ends with a pathname components
-      separator (:data:`~os.sep` or :data:`~os.altsep`).
-
-.. method:: Path.rmdir()
-
-   Remove this directory.  The directory must be empty.
-
-
 .. method:: Path.samefile(other_path)
 
    Return whether this path points to the same file as *other_path*, which
@@ -1174,93 +1061,47 @@ call fails (for example because the path doesn't exist).
    .. versionadded:: 3.5
 
 
-.. method:: Path.symlink_to(target, target_is_directory=False)
-
-   Make this path a symbolic link to *target*.  Under Windows,
-   *target_is_directory* must be true (default ``False``) if the link's target
-   is a directory.  Under POSIX, *target_is_directory*'s value is ignored.
-
-   ::
-
-      >>> p = Path('mylink')
-      >>> p.symlink_to('setup.py')
-      >>> p.resolve()
-      PosixPath('/home/antoine/pathlib/setup.py')
-      >>> p.stat().st_size
-      956
-      >>> p.lstat().st_size
-      8
-
-   .. note::
-      The order of arguments (link, target) is the reverse
-      of :func:`os.symlink`'s.
-
-.. method:: Path.hardlink_to(target)
-
-   Make this path a hard link to the same file as *target*.
-
-   .. note::
-      The order of arguments (link, target) is the reverse
-      of :func:`os.link`'s.
-
-   .. versionadded:: 3.10
-
-.. method:: Path.link_to(target)
-
-   Make *target* a hard link to this path.
-
-   .. warning::
-
-      This function does not make this path a hard link to *target*, despite
-      the implication of the function and argument names. The argument order
-      (target, link) is the reverse of :func:`Path.symlink_to` and
-      :func:`Path.hardlink_to`, but matches that of :func:`os.link`.
-
-   .. versionadded:: 3.8
-
-   .. deprecated:: 3.10
-
-      This method is deprecated in favor of :meth:`Path.hardlink_to`, as the
-      argument order of :meth:`Path.link_to`  does not match that of
-      :meth:`Path.symlink_to`.
+Reading and writing files
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-.. method:: Path.touch(mode=0o666, exist_ok=True)
+.. method:: Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
 
-   Create a file at this given path.  If *mode* is given, it is combined
-   with the process' ``umask`` value to determine the file mode and access
-   flags.  If the file already exists, the function succeeds if *exist_ok*
-   is true (and its modification time is updated to the current time),
-   otherwise :exc:`FileExistsError` is raised.
+   Open the file pointed to by the path, like the built-in :func:`open`
+   function does::
 
-
-.. method:: Path.unlink(missing_ok=False)
-
-   Remove this file or symbolic link.  If the path points to a directory,
-   use :func:`Path.rmdir` instead.
-
-   If *missing_ok* is false (the default), :exc:`FileNotFoundError` is
-   raised if the path does not exist.
-
-   If *missing_ok* is true, :exc:`FileNotFoundError` exceptions will be
-   ignored (same behavior as the POSIX ``rm -f`` command).
-
-   .. versionchanged:: 3.8
-      The *missing_ok* parameter was added.
+      >>> p = Path('setup.py')
+      >>> with p.open() as f:
+      ...     f.readline()
+      ...
+      '#!/usr/bin/env python3\n'
 
 
-.. method:: Path.write_bytes(data)
+.. method:: Path.read_text(encoding=None, errors=None)
 
-   Open the file pointed to in bytes mode, write *data* to it, and close the
-   file::
+   Return the decoded contents of the pointed-to file as a string::
+
+      >>> p = Path('my_text_file')
+      >>> p.write_text('Text file contents')
+      18
+      >>> p.read_text()
+      'Text file contents'
+
+   The file is opened and then closed. The optional parameters have the same
+   meaning as in :func:`open`.
+
+   .. versionadded:: 3.5
+
+
+.. method:: Path.read_bytes()
+
+   Return the binary contents of the pointed-to file as a bytes object::
 
       >>> p = Path('my_binary_file')
       >>> p.write_bytes(b'Binary file contents')
       20
       >>> p.read_bytes()
       b'Binary file contents'
-
-   An existing file of the same name is overwritten.
 
    .. versionadded:: 3.5
 
@@ -1284,56 +1125,456 @@ call fails (for example because the path doesn't exist).
    .. versionchanged:: 3.10
       The *newline* parameter was added.
 
+
+.. method:: Path.write_bytes(data)
+
+   Open the file pointed to in bytes mode, write *data* to it, and close the
+   file::
+
+      >>> p = Path('my_binary_file')
+      >>> p.write_bytes(b'Binary file contents')
+      20
+      >>> p.read_bytes()
+      b'Binary file contents'
+
+   An existing file of the same name is overwritten.
+
+   .. versionadded:: 3.5
+
+
+Reading directories
+^^^^^^^^^^^^^^^^^^^
+
+.. method:: Path.iterdir()
+
+   When the path points to a directory, yield path objects of the directory
+   contents::
+
+      >>> p = Path('docs')
+      >>> for child in p.iterdir(): child
+      ...
+      PosixPath('docs/conf.py')
+      PosixPath('docs/_templates')
+      PosixPath('docs/make.bat')
+      PosixPath('docs/index.rst')
+      PosixPath('docs/_build')
+      PosixPath('docs/_static')
+      PosixPath('docs/Makefile')
+
+   The children are yielded in arbitrary order, and the special entries
+   ``'.'`` and ``'..'`` are not included.  If a file is removed from or added
+   to the directory after creating the iterator, it is unspecified whether
+   a path object for that file is included.
+
+   If the path is not a directory or otherwise inaccessible, :exc:`OSError` is
+   raised.
+
+.. method:: Path.glob(pattern, *, case_sensitive=None)
+
+   Glob the given relative *pattern* in the directory represented by this path,
+   yielding all matching files (of any kind)::
+
+      >>> sorted(Path('.').glob('*.py'))
+      [PosixPath('pathlib.py'), PosixPath('setup.py'), PosixPath('test_pathlib.py')]
+      >>> sorted(Path('.').glob('*/*.py'))
+      [PosixPath('docs/conf.py')]
+
+   Patterns are the same as for :mod:`fnmatch`, with the addition of "``**``"
+   which means "this directory and all subdirectories, recursively".  In other
+   words, it enables recursive globbing::
+
+      >>> sorted(Path('.').glob('**/*.py'))
+      [PosixPath('build/lib/pathlib.py'),
+       PosixPath('docs/conf.py'),
+       PosixPath('pathlib.py'),
+       PosixPath('setup.py'),
+       PosixPath('test_pathlib.py')]
+
+   This method calls :meth:`Path.is_dir` on the top-level directory and
+   propagates any :exc:`OSError` exception that is raised. Subsequent
+   :exc:`OSError` exceptions from scanning directories are suppressed.
+
+   By default, or when the *case_sensitive* keyword-only argument is set to
+   ``None``, this method matches paths using platform-specific casing rules:
+   typically, case-sensitive on POSIX, and case-insensitive on Windows.
+   Set *case_sensitive* to ``True`` or ``False`` to override this behaviour.
+
+   .. note::
+      Using the "``**``" pattern in large directory trees may consume
+      an inordinate amount of time.
+
+   .. audit-event:: pathlib.Path.glob self,pattern pathlib.Path.glob
+
+   .. versionchanged:: 3.11
+      Return only directories if *pattern* ends with a pathname components
+      separator (:data:`~os.sep` or :data:`~os.altsep`).
+
+   .. versionchanged:: 3.12
+      The *case_sensitive* parameter was added.
+
+
+.. method:: Path.rglob(pattern, *, case_sensitive=None)
+
+   Glob the given relative *pattern* recursively.  This is like calling
+   :func:`Path.glob` with "``**/``" added in front of the *pattern*, where
+   *patterns* are the same as for :mod:`fnmatch`::
+
+      >>> sorted(Path().rglob("*.py"))
+      [PosixPath('build/lib/pathlib.py'),
+       PosixPath('docs/conf.py'),
+       PosixPath('pathlib.py'),
+       PosixPath('setup.py'),
+       PosixPath('test_pathlib.py')]
+
+   By default, or when the *case_sensitive* keyword-only argument is set to
+   ``None``, this method matches paths using platform-specific casing rules:
+   typically, case-sensitive on POSIX, and case-insensitive on Windows.
+   Set *case_sensitive* to ``True`` or ``False`` to override this behaviour.
+
+   .. audit-event:: pathlib.Path.rglob self,pattern pathlib.Path.rglob
+
+   .. versionchanged:: 3.11
+      Return only directories if *pattern* ends with a pathname components
+      separator (:data:`~os.sep` or :data:`~os.altsep`).
+
+   .. versionchanged:: 3.12
+      The *case_sensitive* parameter was added.
+
+
+.. method:: Path.walk(top_down=True, on_error=None, follow_symlinks=False)
+
+   Generate the file names in a directory tree by walking the tree
+   either top-down or bottom-up.
+
+   For each directory in the directory tree rooted at *self* (including
+   *self* but excluding '.' and '..'), the method yields a 3-tuple of
+   ``(dirpath, dirnames, filenames)``.
+
+   *dirpath* is a :class:`Path` to the directory currently being walked,
+   *dirnames* is a list of strings for the names of subdirectories in *dirpath*
+   (excluding ``'.'`` and ``'..'``), and *filenames* is a list of strings for
+   the names of the non-directory files in *dirpath*. To get a full path
+   (which begins with *self*) to a file or directory in *dirpath*, do
+   ``dirpath / name``. Whether or not the lists are sorted is file
+   system-dependent.
+
+   If the optional argument *top_down* is true (which is the default), the triple for a
+   directory is generated before the triples for any of its subdirectories
+   (directories are walked top-down).  If *top_down* is false, the triple
+   for a directory is generated after the triples for all of its subdirectories
+   (directories are walked bottom-up). No matter the value of *top_down*, the
+   list of subdirectories is retrieved before the triples for the directory and
+   its subdirectories are walked.
+
+   When *top_down* is true, the caller can modify the *dirnames* list in-place
+   (for example, using :keyword:`del` or slice assignment), and :meth:`Path.walk`
+   will only recurse into the subdirectories whose names remain in *dirnames*.
+   This can be used to prune the search, or to impose a specific order of visiting,
+   or even to inform :meth:`Path.walk` about directories the caller creates or
+   renames before it resumes :meth:`Path.walk` again. Modifying *dirnames* when
+   *top_down* is false has no effect on the behavior of :meth:`Path.walk` since the
+   directories in *dirnames* have already been generated by the time *dirnames*
+   is yielded to the caller.
+
+   By default, errors from :func:`os.scandir` are ignored.  If the optional
+   argument *on_error* is specified, it should be a callable; it will be
+   called with one argument, an :exc:`OSError` instance. The callable can handle the
+   error to continue the walk or re-raise it to stop the walk. Note that the
+   filename is available as the ``filename`` attribute of the exception object.
+
+   By default, :meth:`Path.walk` does not follow symbolic links, and instead adds them
+   to the *filenames* list. Set *follow_symlinks* to true to resolve symlinks
+   and place them in *dirnames* and *filenames* as appropriate for their targets, and
+   consequently visit directories pointed to by symlinks (where supported).
+
+   .. note::
+
+      Be aware that setting *follow_symlinks* to true can lead to infinite
+      recursion if a link points to a parent directory of itself. :meth:`Path.walk`
+      does not keep track of the directories it has already visited.
+
+   .. note::
+      :meth:`Path.walk` assumes the directories it walks are not modified during
+      execution. For example, if a directory from *dirnames* has been replaced
+      with a symlink and *follow_symlinks* is false, :meth:`Path.walk` will
+      still try to descend into it. To prevent such behavior, remove directories
+      from *dirnames* as appropriate.
+
+   .. note::
+
+      Unlike :func:`os.walk`, :meth:`Path.walk` lists symlinks to directories in
+      *filenames* if *follow_symlinks* is false.
+
+   This example displays the number of bytes used by all files in each directory,
+   while ignoring ``__pycache__`` directories::
+
+      from pathlib import Path
+      for root, dirs, files in Path("cpython/Lib/concurrent").walk(on_error=print):
+        print(
+            root,
+            "consumes",
+            sum((root / file).stat().st_size for file in files),
+            "bytes in",
+            len(files),
+            "non-directory files"
+        )
+        if '__pycache__' in dirs:
+              dirs.remove('__pycache__')
+
+   This next example is a simple implementation of :func:`shutil.rmtree`.
+   Walking the tree bottom-up is essential as :func:`rmdir` doesn't allow
+   deleting a directory before it is empty::
+
+      # Delete everything reachable from the directory "top".
+      # CAUTION:  This is dangerous! For example, if top == Path('/'),
+      # it could delete all of your files.
+      for root, dirs, files in top.walk(top_down=False):
+          for name in files:
+              (root / name).unlink()
+          for name in dirs:
+              (root / name).rmdir()
+
+   .. versionadded:: 3.12
+
+
+Creating files and directories
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. method:: Path.touch(mode=0o666, exist_ok=True)
+
+   Create a file at this given path.  If *mode* is given, it is combined
+   with the process's ``umask`` value to determine the file mode and access
+   flags.  If the file already exists, the function succeeds when *exist_ok*
+   is true (and its modification time is updated to the current time),
+   otherwise :exc:`FileExistsError` is raised.
+
+   .. seealso::
+      The :meth:`~Path.open`, :meth:`~Path.write_text` and
+      :meth:`~Path.write_bytes` methods are often used to create files.
+
+
+.. method:: Path.mkdir(mode=0o777, parents=False, exist_ok=False)
+
+   Create a new directory at this given path.  If *mode* is given, it is
+   combined with the process's ``umask`` value to determine the file mode
+   and access flags.  If the path already exists, :exc:`FileExistsError`
+   is raised.
+
+   If *parents* is true, any missing parents of this path are created
+   as needed; they are created with the default permissions without taking
+   *mode* into account (mimicking the POSIX ``mkdir -p`` command).
+
+   If *parents* is false (the default), a missing parent raises
+   :exc:`FileNotFoundError`.
+
+   If *exist_ok* is false (the default), :exc:`FileExistsError` is
+   raised if the target directory already exists.
+
+   If *exist_ok* is true, :exc:`FileExistsError` will not be raised unless the given
+   path already exists in the file system and is not a directory (same
+   behavior as the POSIX ``mkdir -p`` command).
+
+   .. versionchanged:: 3.5
+      The *exist_ok* parameter was added.
+
+
+.. method:: Path.symlink_to(target, target_is_directory=False)
+
+   Make this path a symbolic link pointing to *target*.
+
+   On Windows, a symlink represents either a file or a directory, and does not
+   morph to the target dynamically.  If the target is present, the type of the
+   symlink will be created to match. Otherwise, the symlink will be created
+   as a directory if *target_is_directory* is true or a file symlink (the
+   default) otherwise.  On non-Windows platforms, *target_is_directory* is ignored.
+
+   ::
+
+      >>> p = Path('mylink')
+      >>> p.symlink_to('setup.py')
+      >>> p.resolve()
+      PosixPath('/home/antoine/pathlib/setup.py')
+      >>> p.stat().st_size
+      956
+      >>> p.lstat().st_size
+      8
+
+   .. note::
+      The order of arguments (link, target) is the reverse
+      of :func:`os.symlink`'s.
+
+
+.. method:: Path.hardlink_to(target)
+
+   Make this path a hard link to the same file as *target*.
+
+   .. note::
+      The order of arguments (link, target) is the reverse
+      of :func:`os.link`'s.
+
+   .. versionadded:: 3.10
+
+
+Renaming and deleting
+^^^^^^^^^^^^^^^^^^^^^
+
+.. method:: Path.rename(target)
+
+   Rename this file or directory to the given *target*, and return a new
+   :class:`!Path` instance pointing to *target*.  On Unix, if *target* exists
+   and is a file, it will be replaced silently if the user has permission.
+   On Windows, if *target* exists, :exc:`FileExistsError` will be raised.
+   *target* can be either a string or another path object::
+
+      >>> p = Path('foo')
+      >>> p.open('w').write('some text')
+      9
+      >>> target = Path('bar')
+      >>> p.rename(target)
+      PosixPath('bar')
+      >>> target.open().read()
+      'some text'
+
+   The target path may be absolute or relative. Relative paths are interpreted
+   relative to the current working directory, *not* the directory of the
+   :class:`!Path` object.
+
+   It is implemented in terms of :func:`os.rename` and gives the same guarantees.
+
+   .. versionchanged:: 3.8
+      Added return value, return the new :class:`!Path` instance.
+
+
+.. method:: Path.replace(target)
+
+   Rename this file or directory to the given *target*, and return a new
+   :class:`!Path` instance pointing to *target*.  If *target* points to an
+   existing file or empty directory, it will be unconditionally replaced.
+
+   The target path may be absolute or relative. Relative paths are interpreted
+   relative to the current working directory, *not* the directory of the
+   :class:`!Path` object.
+
+   .. versionchanged:: 3.8
+      Added return value, return the new :class:`!Path` instance.
+
+
+.. method:: Path.unlink(missing_ok=False)
+
+   Remove this file or symbolic link.  If the path points to a directory,
+   use :func:`Path.rmdir` instead.
+
+   If *missing_ok* is false (the default), :exc:`FileNotFoundError` is
+   raised if the path does not exist.
+
+   If *missing_ok* is true, :exc:`FileNotFoundError` exceptions will be
+   ignored (same behavior as the POSIX ``rm -f`` command).
+
+   .. versionchanged:: 3.8
+      The *missing_ok* parameter was added.
+
+
+.. method:: Path.rmdir()
+
+   Remove this directory.  The directory must be empty.
+
+
+Permissions and ownership
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. method:: Path.owner()
+
+   Return the name of the user owning the file.  :exc:`KeyError` is raised
+   if the file's user identifier (UID) isn't found in the system database.
+
+
+.. method:: Path.group()
+
+   Return the name of the group owning the file.  :exc:`KeyError` is raised
+   if the file's group identifier (GID) isn't found in the system database.
+
+
+.. method:: Path.chmod(mode, *, follow_symlinks=True)
+
+   Change the file mode and permissions, like :func:`os.chmod`.
+
+   This method normally follows symlinks. Some Unix flavours support changing
+   permissions on the symlink itself; on these platforms you may add the
+   argument ``follow_symlinks=False``, or use :meth:`~Path.lchmod`.
+
+   ::
+
+      >>> p = Path('setup.py')
+      >>> p.stat().st_mode
+      33277
+      >>> p.chmod(0o444)
+      >>> p.stat().st_mode
+      33060
+
+   .. versionchanged:: 3.10
+      The *follow_symlinks* parameter was added.
+
+
+.. method:: Path.lchmod(mode)
+
+   Like :meth:`Path.chmod` but, if the path points to a symbolic link, the
+   symbolic link's mode is changed rather than its target's.
+
+
 Correspondence to tools in the :mod:`os` module
 -----------------------------------------------
 
 Below is a table mapping various :mod:`os` functions to their corresponding
 :class:`PurePath`/:class:`Path` equivalent.
 
-.. note::
-
-   Not all pairs of functions/methods below are equivalent. Some of them,
-   despite having some overlapping use-cases, have different semantics. They
-   include :func:`os.path.abspath` and :meth:`Path.absolute`,
-   :func:`os.path.relpath` and :meth:`PurePath.relative_to`.
-
-====================================   ==============================
-:mod:`os` and :mod:`os.path`           :mod:`pathlib`
-====================================   ==============================
-:func:`os.path.abspath`                :meth:`Path.absolute` [#]_
-:func:`os.path.realpath`               :meth:`Path.resolve`
-:func:`os.chmod`                       :meth:`Path.chmod`
-:func:`os.mkdir`                       :meth:`Path.mkdir`
-:func:`os.makedirs`                    :meth:`Path.mkdir`
-:func:`os.rename`                      :meth:`Path.rename`
-:func:`os.replace`                     :meth:`Path.replace`
-:func:`os.rmdir`                       :meth:`Path.rmdir`
-:func:`os.remove`, :func:`os.unlink`   :meth:`Path.unlink`
-:func:`os.getcwd`                      :func:`Path.cwd`
-:func:`os.path.exists`                 :meth:`Path.exists`
-:func:`os.path.expanduser`             :meth:`Path.expanduser` and
-                                       :meth:`Path.home`
-:func:`os.listdir`                     :meth:`Path.iterdir`
-:func:`os.path.isdir`                  :meth:`Path.is_dir`
-:func:`os.path.isfile`                 :meth:`Path.is_file`
-:func:`os.path.islink`                 :meth:`Path.is_symlink`
-:func:`os.link`                        :meth:`Path.hardlink_to`
-:func:`os.symlink`                     :meth:`Path.symlink_to`
-:func:`os.readlink`                    :meth:`Path.readlink`
-:func:`os.path.relpath`                :meth:`PurePath.relative_to` [#]_
-:func:`os.stat`                        :meth:`Path.stat`,
-                                       :meth:`Path.owner`,
-                                       :meth:`Path.group`
-:func:`os.path.isabs`                  :meth:`PurePath.is_absolute`
-:func:`os.path.join`                   :func:`PurePath.joinpath`
-:func:`os.path.basename`               :attr:`PurePath.name`
-:func:`os.path.dirname`                :attr:`PurePath.parent`
-:func:`os.path.samefile`               :meth:`Path.samefile`
-:func:`os.path.splitext`               :attr:`PurePath.stem` and
-                                       :attr:`PurePath.suffix`
-====================================   ==============================
+=====================================   ==============================================
+:mod:`os` and :mod:`os.path`            :mod:`pathlib`
+=====================================   ==============================================
+:func:`os.path.dirname`                 :attr:`PurePath.parent`
+:func:`os.path.basename`                :attr:`PurePath.name`
+:func:`os.path.splitext`                :attr:`PurePath.stem`, :attr:`PurePath.suffix`
+:func:`os.path.join`                    :meth:`PurePath.joinpath`
+:func:`os.path.isabs`                   :meth:`PurePath.is_absolute`
+:func:`os.path.relpath`                 :meth:`PurePath.relative_to` [1]_
+:func:`os.path.expanduser`              :meth:`Path.expanduser` [2]_
+:func:`os.path.realpath`                :meth:`Path.resolve`
+:func:`os.path.abspath`                 :meth:`Path.absolute` [3]_
+:func:`os.path.exists`                  :meth:`Path.exists`
+:func:`os.path.isfile`                  :meth:`Path.is_file`
+:func:`os.path.isdir`                   :meth:`Path.is_dir`
+:func:`os.path.islink`                  :meth:`Path.is_symlink`
+:func:`os.path.isjunction`              :meth:`Path.is_junction`
+:func:`os.path.ismount`                 :meth:`Path.is_mount`
+:func:`os.path.samefile`                :meth:`Path.samefile`
+:func:`os.getcwd`                       :meth:`Path.cwd`
+:func:`os.stat`                         :meth:`Path.stat`
+:func:`os.lstat`                        :meth:`Path.lstat`
+:func:`os.listdir`                      :meth:`Path.iterdir`
+:func:`os.walk`                         :meth:`Path.walk` [4]_
+:func:`os.mkdir`, :func:`os.makedirs`   :meth:`Path.mkdir`
+:func:`os.link`                         :meth:`Path.hardlink_to`
+:func:`os.symlink`                      :meth:`Path.symlink_to`
+:func:`os.readlink`                     :meth:`Path.readlink`
+:func:`os.rename`                       :meth:`Path.rename`
+:func:`os.replace`                      :meth:`Path.replace`
+:func:`os.remove`, :func:`os.unlink`    :meth:`Path.unlink`
+:func:`os.rmdir`                        :meth:`Path.rmdir`
+:func:`os.chmod`                        :meth:`Path.chmod`
+:func:`os.lchmod`                       :meth:`Path.lchmod`
+=====================================   ==============================================
 
 .. rubric:: Footnotes
 
-.. [#] :func:`os.path.abspath` normalizes the resulting path, which may change its meaning in the presence of symlinks, while :meth:`Path.absolute` does not.
-.. [#] :meth:`PurePath.relative_to` requires ``self`` to be the subpath of the argument, but :func:`os.path.relpath` does not.
+.. [1] :func:`os.path.relpath` calls :func:`~os.path.abspath` to make paths
+   absolute and remove "``..``" parts, whereas :meth:`PurePath.relative_to`
+   is a lexical operation that raises :exc:`ValueError` when its inputs'
+   anchors differ (e.g. if one path is absolute and the other relative.)
+.. [2] :func:`os.path.expanduser` returns the path unchanged if the home
+   directory can't be resolved, whereas :meth:`Path.expanduser` raises
+   :exc:`RuntimeError`.
+.. [3] :func:`os.path.abspath` removes "``..``" components without resolving
+   symlinks, which may change the meaning of the path, whereas
+   :meth:`Path.absolute` leaves any "``..``" components in the path.
+.. [4] :func:`os.walk` always follows symlinks when categorizing paths into
+   *dirnames* and *filenames*, whereas :meth:`Path.walk` categorizes all
+   symlinks into *filenames* when *follow_symlinks* is false (the default.)

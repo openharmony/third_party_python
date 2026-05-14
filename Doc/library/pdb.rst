@@ -48,8 +48,8 @@ at the location you want to break into the debugger, and then run the program.
 You can then step through the code following this statement, and continue
 running without the debugger using the :pdbcmd:`continue` command.
 
-.. versionadded:: 3.7
-   The built-in :func:`breakpoint()`, when called with defaults, can be used
+.. versionchanged:: 3.7
+   The built-in :func:`breakpoint`, when called with defaults, can be used
    instead of ``import pdb; pdb.set_trace()``.
 
 ::
@@ -75,10 +75,12 @@ The debugger's prompt is ``(Pdb)``, which is the indicator that you are in debug
    arguments of the ``p`` command.
 
 
+.. program:: pdb
+
 You can also invoke :mod:`pdb` from the command line to debug other scripts.  For
 example::
 
-   python -m pdb myscript.py
+   python -m pdb [-c command] (-m module | pyfile) [args ...]
 
 When invoked as a module, pdb will automatically enter post-mortem debugging if
 the program being debugged exits abnormally.  After post-mortem debugging (or
@@ -86,14 +88,21 @@ after normal exit of the program), pdb will restart the program.  Automatic
 restarting preserves pdb's state (such as breakpoints) and in most cases is more
 useful than quitting the debugger upon program's exit.
 
-.. versionadded:: 3.2
-   ``-c`` option is introduced to execute commands as if given
-   in a :file:`.pdbrc` file, see :ref:`debugger-commands`.
+.. option:: -c, --command <command>
 
-.. versionadded:: 3.7
-   ``-m`` option is introduced to execute modules similar to the way
-   ``python -m`` does. As with a script, the debugger will pause execution just
-   before the first line of the module.
+   To execute commands as if given in a :file:`.pdbrc` file; see
+   :ref:`debugger-commands`.
+
+   .. versionchanged:: 3.2
+      Added the ``-c`` option.
+
+.. option:: -m <module>
+
+   To execute modules similar to the way ``python -m`` does. As with a script,
+   the debugger will pause execution just before the first line of the module.
+
+   .. versionchanged:: 3.7
+      Added the ``-m`` option.
 
 Typical usage to execute a statement under control of the debugger is::
 
@@ -209,12 +218,12 @@ access further features, you have to do this yourself:
 
    .. audit-event:: pdb.Pdb "" pdb.Pdb
 
-   .. versionadded:: 3.1
-      The *skip* argument.
+   .. versionchanged:: 3.1
+      Added the *skip* parameter.
 
-   .. versionadded:: 3.2
-      The *nosigint* argument.  Previously, a SIGINT handler was never set by
-      Pdb.
+   .. versionchanged:: 3.2
+      Added the *nosigint* parameter.
+      Previously, a SIGINT handler was never set by Pdb.
 
    .. versionchanged:: 3.6
       The *readrc* argument.
@@ -263,24 +272,42 @@ the commands; the input is split at the first ``;;`` pair, even if it is in the
 middle of a quoted string. A workaround for strings with double semicolons
 is to use implicit string concatenation ``';'';'`` or ``";"";"``.
 
+To set a temporary global variable, use a *convenience variable*. A *convenience
+variable* is a variable whose name starts with ``$``.  For example, ``$foo = 1``
+sets a global variable ``$foo`` which you can use in the debugger session.  The
+*convenience variables* are cleared when the program resumes execution so it's
+less likely to interfere with your program compared to using normal variables
+like ``foo = 1``.
+
+There are three preset *convenience variables*:
+
+* ``$_frame``: the current frame you are debugging
+* ``$_retval``: the return value if the frame is returning
+* ``$_exception``: the exception if the frame is raising an exception
+
+.. versionadded:: 3.12
+
+   Added the *convenience variable* feature.
+
 .. index::
    pair: .pdbrc; file
    triple: debugger; configuration; file
 
 If a file :file:`.pdbrc` exists in the user's home directory or in the current
 directory, it is read with ``'utf-8'`` encoding and executed as if it had been
-typed at the debugger prompt.  This is particularly useful for aliases.  If both
+typed at the debugger prompt, with the exception that empty lines and lines
+starting with ``#`` are ignored.  This is particularly useful for aliases.  If both
 files exist, the one in the home directory is read first and aliases defined there
 can be overridden by the local file.
-
-.. versionchanged:: 3.11
-   :file:`.pdbrc` is now read with ``'utf-8'`` encoding. Previously, it was read
-   with the system locale encoding.
 
 .. versionchanged:: 3.2
    :file:`.pdbrc` can now contain commands that continue debugging, such as
    :pdbcmd:`continue` or :pdbcmd:`next`.  Previously, these commands had no
    effect.
+
+.. versionchanged:: 3.11
+   :file:`.pdbrc` is now read with ``'utf-8'`` encoding. Previously, it was read
+   with the system locale encoding.
 
 
 .. pdbcommand:: h(elp) [command]
@@ -333,14 +360,14 @@ can be overridden by the local file.
    With a space separated list of breakpoint numbers, clear those breakpoints.
    Without argument, clear all breaks (but first ask confirmation).
 
-.. pdbcommand:: disable [bpnumber ...]
+.. pdbcommand:: disable bpnumber [bpnumber ...]
 
    Disable the breakpoints given as a space separated list of breakpoint
    numbers.  Disabling a breakpoint means it cannot cause the program to stop
    execution, but unlike clearing a breakpoint, it remains in the list of
    breakpoints and can be (re-)enabled.
 
-.. pdbcommand:: enable [bpnumber ...]
+.. pdbcommand:: enable bpnumber [bpnumber ...]
 
    Enable the breakpoints specified.
 
@@ -448,8 +475,8 @@ can be overridden by the local file.
    raised or propagated is indicated by ``>>``, if it differs from the current
    line.
 
-   .. versionadded:: 3.2
-      The ``>>`` marker.
+   .. versionchanged:: 3.2
+      Added the ``>>`` marker.
 
 .. pdbcommand:: ll | longlist
 
@@ -587,9 +614,17 @@ can be overridden by the local file.
 
    Execute the (one-line) *statement* in the context of the current stack frame.
    The exclamation point can be omitted unless the first word of the statement
-   resembles a debugger command.  To set a global variable, you can prefix the
-   assignment command with a :keyword:`global` statement on the same line,
-   e.g.::
+   resembles a debugger command, e.g.:
+
+   .. code-block:: none
+
+      (Pdb) ! n=42
+      (Pdb)
+
+   To set a global variable, you can prefix the assignment command with a
+   :keyword:`global` statement on the same line, e.g.:
+
+   .. code-block:: none
 
       (Pdb) global list_options; list_options = ['-l']
       (Pdb)

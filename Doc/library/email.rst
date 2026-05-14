@@ -1,5 +1,5 @@
-:mod:`email` --- An email and MIME handling package
-===================================================
+:mod:`!email` --- An email and MIME handling package
+====================================================
 
 .. module:: email
    :synopsis: Package supporting the parsing, manipulating, and generating
@@ -147,6 +147,3 @@ Legacy API:
    Module :mod:`mailbox`
       Tools for creating, reading, and managing collections of messages on disk
       using a variety standard formats.
-
-   Module :mod:`smtpd`
-      SMTP server framework (primarily useful for testing)

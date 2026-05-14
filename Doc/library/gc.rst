@@ -1,5 +1,5 @@
-:mod:`gc` --- Garbage Collector interface
-=========================================
+:mod:`!gc` --- Garbage Collector interface
+==========================================
 
 .. module:: gc
    :synopsis: Interface to the cycle-detecting garbage collector.
@@ -69,7 +69,7 @@ The :mod:`gc` module provides the following functions:
 .. function:: get_objects(generation=None)
 
    Returns a list of all objects tracked by the collector, excluding the list
-   returned. If *generation* is not None, return only the objects tracked by
+   returned. If *generation* is not ``None``, return only the objects tracked by
    the collector that are in that generation.
 
    .. versionchanged:: 3.8
@@ -259,8 +259,8 @@ values but should not rebind them):
       are printed.
 
    .. versionchanged:: 3.4
-      Following :pep:`442`, objects with a :meth:`__del__` method don't end
-      up in :attr:`gc.garbage` anymore.
+      Following :pep:`442`, objects with a :meth:`~object.__del__` method don't end
+      up in :data:`gc.garbage` anymore.
 
 .. data:: callbacks
 

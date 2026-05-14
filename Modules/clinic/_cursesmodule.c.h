@@ -2,6 +2,12 @@
 preserve
 [clinic start generated code]*/
 
+#if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+#  include "pycore_gc.h"            // PyGC_Head
+#  include "pycore_runtime.h"       // _Py_ID()
+#endif
+
+
 PyDoc_STRVAR(_curses_window_addch__doc__,
 "addch([y, x,] ch, [attr=_curses.A_NORMAL])\n"
 "Paint the character.\n"
@@ -1742,7 +1748,7 @@ _curses_window_touchline(PyCursesWindowObject *self, PyObject *args)
             }
             break;
         case 3:
-            if (!PyArg_ParseTuple(args, "iii:touchline", &start, &count, &changed)) {
+            if (!PyArg_ParseTuple(args, "iip:touchline", &start, &count, &changed)) {
                 goto exit;
             }
             group_right_1 = 1;
@@ -1935,8 +1941,8 @@ _curses_cbreak(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 1) {
         goto skip_optional;
     }
-    flag = _PyLong_AsInt(args[0]);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(args[0]);
+    if (flag < 0) {
         goto exit;
     }
 skip_optional:
@@ -2171,8 +2177,8 @@ _curses_echo(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 1) {
         goto skip_optional;
     }
-    flag = _PyLong_AsInt(args[0]);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(args[0]);
+    if (flag < 0) {
         goto exit;
     }
 skip_optional:
@@ -2678,8 +2684,31 @@ static PyObject *
 _curses_setupterm(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 2
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(term), &_Py_ID(fd), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
     static const char * const _keywords[] = {"term", "fd", NULL};
-    static _PyArg_Parser _parser = {NULL, _keywords, "setupterm", 0};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "setupterm",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
     PyObject *argsbuf[2];
     Py_ssize_t noptargs = nargs + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0) - 0;
     const char *term = NULL;
@@ -2871,8 +2900,8 @@ _curses_intrflush(PyObject *module, PyObject *arg)
     PyObject *return_value = NULL;
     int flag;
 
-    flag = _PyLong_AsInt(arg);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(arg);
+    if (flag < 0) {
         goto exit;
     }
     return_value = _curses_intrflush_impl(module, flag);
@@ -3035,8 +3064,8 @@ _curses_meta(PyObject *module, PyObject *arg)
     PyObject *return_value = NULL;
     int yes;
 
-    yes = _PyLong_AsInt(arg);
-    if (yes == -1 && PyErr_Occurred()) {
+    yes = PyObject_IsTrue(arg);
+    if (yes < 0) {
         goto exit;
     }
     return_value = _curses_meta_impl(module, yes);
@@ -3279,8 +3308,8 @@ _curses_nl(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 1) {
         goto skip_optional;
     }
-    flag = _PyLong_AsInt(args[0]);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(args[0]);
+    if (flag < 0) {
         goto exit;
     }
 skip_optional:
@@ -3511,8 +3540,8 @@ _curses_qiflush(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 1) {
         goto skip_optional;
     }
-    flag = _PyLong_AsInt(args[0]);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(args[0]);
+    if (flag < 0) {
         goto exit;
     }
 skip_optional:
@@ -3574,8 +3603,8 @@ _curses_raw(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
     if (nargs < 1) {
         goto skip_optional;
     }
-    flag = _PyLong_AsInt(args[0]);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(args[0]);
+    if (flag < 0) {
         goto exit;
     }
 skip_optional:
@@ -3659,25 +3688,55 @@ PyDoc_STRVAR(_curses_resizeterm__doc__,
     {"resizeterm", _PyCFunction_CAST(_curses_resizeterm), METH_FASTCALL, _curses_resizeterm__doc__},
 
 static PyObject *
-_curses_resizeterm_impl(PyObject *module, int nlines, int ncols);
+_curses_resizeterm_impl(PyObject *module, short nlines, short ncols);
 
 static PyObject *
 _curses_resizeterm(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 {
     PyObject *return_value = NULL;
-    int nlines;
-    int ncols;
+    short nlines;
+    short ncols;
 
     if (!_PyArg_CheckPositional("resizeterm", nargs, 2, 2)) {
         goto exit;
     }
-    nlines = _PyLong_AsInt(args[0]);
-    if (nlines == -1 && PyErr_Occurred()) {
-        goto exit;
+    {
+        long ival = PyLong_AsLong(args[0]);
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        else if (ival < SHRT_MIN) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is less than minimum");
+            goto exit;
+        }
+        else if (ival > SHRT_MAX) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is greater than maximum");
+            goto exit;
+        }
+        else {
+            nlines = (short) ival;
+        }
     }
-    ncols = _PyLong_AsInt(args[1]);
-    if (ncols == -1 && PyErr_Occurred()) {
-        goto exit;
+    {
+        long ival = PyLong_AsLong(args[1]);
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        else if (ival < SHRT_MIN) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is less than minimum");
+            goto exit;
+        }
+        else if (ival > SHRT_MAX) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is greater than maximum");
+            goto exit;
+        }
+        else {
+            ncols = (short) ival;
+        }
     }
     return_value = _curses_resizeterm_impl(module, nlines, ncols);
 
@@ -3710,25 +3769,55 @@ PyDoc_STRVAR(_curses_resize_term__doc__,
     {"resize_term", _PyCFunction_CAST(_curses_resize_term), METH_FASTCALL, _curses_resize_term__doc__},
 
 static PyObject *
-_curses_resize_term_impl(PyObject *module, int nlines, int ncols);
+_curses_resize_term_impl(PyObject *module, short nlines, short ncols);
 
 static PyObject *
 _curses_resize_term(PyObject *module, PyObject *const *args, Py_ssize_t nargs)
 {
     PyObject *return_value = NULL;
-    int nlines;
-    int ncols;
+    short nlines;
+    short ncols;
 
     if (!_PyArg_CheckPositional("resize_term", nargs, 2, 2)) {
         goto exit;
     }
-    nlines = _PyLong_AsInt(args[0]);
-    if (nlines == -1 && PyErr_Occurred()) {
-        goto exit;
+    {
+        long ival = PyLong_AsLong(args[0]);
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        else if (ival < SHRT_MIN) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is less than minimum");
+            goto exit;
+        }
+        else if (ival > SHRT_MAX) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is greater than maximum");
+            goto exit;
+        }
+        else {
+            nlines = (short) ival;
+        }
     }
-    ncols = _PyLong_AsInt(args[1]);
-    if (ncols == -1 && PyErr_Occurred()) {
-        goto exit;
+    {
+        long ival = PyLong_AsLong(args[1]);
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        else if (ival < SHRT_MIN) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is less than minimum");
+            goto exit;
+        }
+        else if (ival > SHRT_MAX) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "signed short integer is greater than maximum");
+            goto exit;
+        }
+        else {
+            ncols = (short) ival;
+        }
     }
     return_value = _curses_resize_term_impl(module, nlines, ncols);
 
@@ -4135,8 +4224,8 @@ _curses_use_env(PyObject *module, PyObject *arg)
     PyObject *return_value = NULL;
     int flag;
 
-    flag = _PyLong_AsInt(arg);
-    if (flag == -1 && PyErr_Occurred()) {
+    flag = PyObject_IsTrue(arg);
+    if (flag < 0) {
         goto exit;
     }
     return_value = _curses_use_env_impl(module, flag);
@@ -4284,4 +4373,4 @@ _curses_has_extended_color_support(PyObject *module, PyObject *Py_UNUSED(ignored
 #ifndef _CURSES_USE_DEFAULT_COLORS_METHODDEF
     #define _CURSES_USE_DEFAULT_COLORS_METHODDEF
 #endif /* !defined(_CURSES_USE_DEFAULT_COLORS_METHODDEF) */
-/*[clinic end generated code: output=1e2a8a160a0fe811 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=764ee4c154c6d4a8 input=a9049054013a1b77]*/

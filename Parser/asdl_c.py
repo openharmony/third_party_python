@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 """Generate C code from an ASDL description."""
 
-import os
 import sys
 import textwrap
 import types
@@ -74,7 +73,7 @@ def reflow_c_string(s, depth):
 def is_simple(sum_type):
     """Return True if a sum is a simple.
 
-    A sum is simple if it's types have no fields and itself
+    A sum is simple if its types have no fields and itself
     doesn't have any attributes. Instances of these types are
     cached at C level, and they act like singletons when propagating
     parser generated nodes into Python level, e.g.
@@ -353,7 +352,7 @@ class PrototypeVisitor(EmitVisitor):
                 self.visit(t, name, sum.attributes)
 
     def get_args(self, fields):
-        """Return list of C argument into, one for each field.
+        """Return list of C argument info, one for each field.
 
         Argument info is 3-tuple of a C type, variable name, and flag
         that is true if type can be NULL.
@@ -602,6 +601,7 @@ class Obj2ModVisitor(PickleVisitor):
         args = [f.name for f in prod.fields]
         args.extend([a.name for a in prod.attributes])
         self.emit("*out = %s(%s);" % (ast_func_name(name), self.buildArgs(args)), 1)
+        self.emit("if (*out == NULL) goto failed;", 1)
         self.emit("return 0;", 1)
         self.emit("failed:", 0)
         self.emit("Py_XDECREF(tmp);", 1)
@@ -633,29 +633,38 @@ class Obj2ModVisitor(PickleVisitor):
         self.emit(line % field.name, depth)
         self.emit("return 1;", depth+1)
         self.emit("}", depth)
-        if not field.opt:
+        if field.seq:
             self.emit("if (tmp == NULL) {", depth)
-            message = "required field \\\"%s\\\" missing from %s" % (field.name, name)
-            format = "PyErr_SetString(PyExc_TypeError, \"%s\");"
-            self.emit(format % message, depth+1, reflow=False)
-            self.emit("return 1;", depth+1)
+            self.emit("tmp = PyList_New(0);", depth+1)
+            self.emit("if (tmp == NULL) {", depth+1)
+            self.emit("return 1;", depth+2)
+            self.emit("}", depth+1)
+            self.emit("}", depth)
+            self.emit("{", depth)
         else:
-            self.emit("if (tmp == NULL || tmp == Py_None) {", depth)
-            self.emit("Py_CLEAR(tmp);", depth+1)
-            if self.isNumeric(field):
-                if field.name in self.attribute_special_defaults:
-                    self.emit(
-                        "%s = %s;" % (field.name, self.attribute_special_defaults[field.name]),
-                        depth+1,
-                    )
-                else:
-                    self.emit("%s = 0;" % field.name, depth+1)
-            elif not self.isSimpleType(field):
-                self.emit("%s = NULL;" % field.name, depth+1)
+            if not field.opt:
+                self.emit("if (tmp == NULL) {", depth)
+                message = "required field \\\"%s\\\" missing from %s" % (field.name, name)
+                format = "PyErr_SetString(PyExc_TypeError, \"%s\");"
+                self.emit(format % message, depth+1, reflow=False)
+                self.emit("return 1;", depth+1)
             else:
-                raise TypeError("could not determine the default value for %s" % field.name)
-        self.emit("}", depth)
-        self.emit("else {", depth)
+                self.emit("if (tmp == NULL || tmp == Py_None) {", depth)
+                self.emit("Py_CLEAR(tmp);", depth+1)
+                if self.isNumeric(field):
+                    if field.name in self.attribute_special_defaults:
+                        self.emit(
+                            "%s = %s;" % (field.name, self.attribute_special_defaults[field.name]),
+                            depth+1,
+                        )
+                    else:
+                        self.emit("%s = 0;" % field.name, depth+1)
+                elif not self.isSimpleType(field):
+                    self.emit("%s = NULL;" % field.name, depth+1)
+                else:
+                    raise TypeError("could not determine the default value for %s" % field.name)
+            self.emit("}", depth)
+            self.emit("else {", depth)
 
         self.emit("int res;", depth+1)
         if field.seq:
@@ -676,8 +685,7 @@ class Obj2ModVisitor(PickleVisitor):
             self.emit("if (%s == NULL) goto failed;" % field.name, depth+1)
             self.emit("for (i = 0; i < len; i++) {", depth+1)
             self.emit("%s val;" % ctype, depth+2)
-            self.emit("PyObject *tmp2 = PyList_GET_ITEM(tmp, i);", depth+2)
-            self.emit("Py_INCREF(tmp2);", depth+2)
+            self.emit("PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));", depth+2)
             with self.recursive_call(name, depth+2):
                 self.emit("res = obj2ast_%s(state, tmp2, &val, arena);" %
                           field.type, depth+2, reflow=False)
@@ -723,7 +731,7 @@ class SequenceConstructorVisitor(EmitVisitor):
 class PyTypesDeclareVisitor(PickleVisitor):
 
     def visitProduct(self, prod, name):
-        self.emit("static PyObject* ast2obj_%s(struct ast_state *state, void*);" % name, 0)
+        self.emit("static PyObject* ast2obj_%s(struct ast_state *state, struct validator *vstate, void*);" % name, 0)
         if prod.attributes:
             self.emit("static const char * const %s_attributes[] = {" % name, 0)
             for a in prod.attributes:
@@ -744,7 +752,7 @@ class PyTypesDeclareVisitor(PickleVisitor):
         ptype = "void*"
         if is_simple(sum):
             ptype = get_c_type(name)
-        self.emit("static PyObject* ast2obj_%s(struct ast_state *state, %s);" % (name, ptype), 0)
+        self.emit("static PyObject* ast2obj_%s(struct ast_state *state, struct validator *vstate, %s);" % (name, ptype), 0)
         for t in sum.types:
             self.visitConstructor(t, name)
 
@@ -805,14 +813,15 @@ ast_type_init(PyObject *self, PyObject *args, PyObject *kw)
     Py_ssize_t i, numfields = 0;
     int res = -1;
     PyObject *key, *value, *fields;
-    if (_PyObject_LookupAttr((PyObject*)Py_TYPE(self), state->_fields, &fields) < 0) {
+
+    fields = PyObject_GetAttr((PyObject*)Py_TYPE(self), state->_fields);
+    if (fields == NULL) {
         goto cleanup;
     }
-    if (fields) {
-        numfields = PySequence_Size(fields);
-        if (numfields == -1) {
-            goto cleanup;
-        }
+
+    numfields = PySequence_Size(fields);
+    if (numfields == -1) {
+        goto cleanup;
     }
 
     res = 0; /* if no error occurs, this stays 0 to the end */
@@ -976,7 +985,8 @@ add_attributes(struct ast_state *state, PyObject *type, const char * const *attr
 
 /* Conversion AST -> Python */
 
-static PyObject* ast2obj_list(struct ast_state *state, asdl_seq *seq, PyObject* (*func)(struct ast_state *state, void*))
+static PyObject* ast2obj_list(struct ast_state *state, struct validator *vstate, asdl_seq *seq,
+                              PyObject* (*func)(struct ast_state *state, struct validator *vstate, void*))
 {
     Py_ssize_t i, n = asdl_seq_LEN(seq);
     PyObject *result = PyList_New(n);
@@ -984,7 +994,7 @@ static PyObject* ast2obj_list(struct ast_state *state, asdl_seq *seq, PyObject* 
     if (!result)
         return NULL;
     for (i = 0; i < n; i++) {
-        value = func(state, asdl_seq_GET_UNTYPED(seq, i));
+        value = func(state, vstate, asdl_seq_GET_UNTYPED(seq, i));
         if (!value) {
             Py_DECREF(result);
             return NULL;
@@ -994,18 +1004,19 @@ static PyObject* ast2obj_list(struct ast_state *state, asdl_seq *seq, PyObject* 
     return result;
 }
 
-static PyObject* ast2obj_object(struct ast_state *Py_UNUSED(state), void *o)
+static PyObject* ast2obj_object(struct ast_state *Py_UNUSED(state), struct validator *Py_UNUSED(vstate), void *o)
 {
-    if (!o)
-        o = Py_None;
-    Py_INCREF((PyObject*)o);
-    return (PyObject*)o;
+    PyObject *op = (PyObject*)o;
+    if (!op) {
+        op = Py_None;
+    }
+    return Py_NewRef(op);
 }
 #define ast2obj_constant ast2obj_object
 #define ast2obj_identifier ast2obj_object
 #define ast2obj_string ast2obj_object
 
-static PyObject* ast2obj_int(struct ast_state *Py_UNUSED(state), long b)
+static PyObject* ast2obj_int(struct ast_state *Py_UNUSED(state), struct validator *Py_UNUSED(vstate), long b)
 {
     return PyLong_FromLong(b);
 }
@@ -1021,9 +1032,11 @@ static int obj2ast_object(struct ast_state *Py_UNUSED(state), PyObject* obj, PyO
             *out = NULL;
             return -1;
         }
-        Py_INCREF(obj);
+        *out = Py_NewRef(obj);
     }
-    *out = obj;
+    else {
+        *out = NULL;
+    }
     return 0;
 }
 
@@ -1033,8 +1046,7 @@ static int obj2ast_constant(struct ast_state *Py_UNUSED(state), PyObject* obj, P
         *out = NULL;
         return -1;
     }
-    Py_INCREF(obj);
-    *out = obj;
+    *out = Py_NewRef(obj);
     return 0;
 }
 
@@ -1113,8 +1125,6 @@ static int add_ast_fields(struct ast_state *state)
         for dfn in mod.dfns:
             self.visit(dfn)
         self.file.write(textwrap.dedent('''
-                state->recursion_depth = 0;
-                state->recursion_limit = 0;
                 state->initialized = 1;
                 return 1;
             }
@@ -1206,6 +1216,7 @@ class ASTModuleVisitor(PickleVisitor):
         self.emit("""
 static PyModuleDef_Slot astmodule_slots[] = {
     {Py_mod_exec, astmodule_exec},
+    {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
     {0, NULL}
 };
 
@@ -1254,7 +1265,7 @@ class ObjVisitor(PickleVisitor):
     def func_begin(self, name):
         ctype = get_c_type(name)
         self.emit("PyObject*", 0)
-        self.emit("ast2obj_%s(struct ast_state *state, void* _o)" % (name), 0)
+        self.emit("ast2obj_%s(struct ast_state *state, struct validator *vstate, void* _o)" % (name), 0)
         self.emit("{", 0)
         self.emit("%s o = (%s)_o;" % (ctype, ctype), 1)
         self.emit("PyObject *result = NULL, *value = NULL;", 1)
@@ -1262,16 +1273,17 @@ class ObjVisitor(PickleVisitor):
         self.emit('if (!o) {', 1)
         self.emit("Py_RETURN_NONE;", 2)
         self.emit("}", 1)
-        self.emit("if (++state->recursion_depth > state->recursion_limit) {", 1)
+        self.emit("if (++vstate->recursion_depth > vstate->recursion_limit) {", 1)
         self.emit("PyErr_SetString(PyExc_RecursionError,", 2)
         self.emit('"maximum recursion depth exceeded during ast construction");', 3)
         self.emit("return 0;", 2)
         self.emit("}", 1)
 
     def func_end(self):
-        self.emit("state->recursion_depth--;", 1)
+        self.emit("vstate->recursion_depth--;", 1)
         self.emit("return result;", 1)
         self.emit("failed:", 0)
+        self.emit("vstate->recursion_depth--;", 1)
         self.emit("Py_XDECREF(value);", 1)
         self.emit("Py_XDECREF(result);", 1)
         self.emit("return NULL;", 1)
@@ -1289,7 +1301,7 @@ class ObjVisitor(PickleVisitor):
             self.visitConstructor(t, i + 1, name)
         self.emit("}", 1)
         for a in sum.attributes:
-            self.emit("value = ast2obj_%s(state, o->%s);" % (a.type, a.name), 1)
+            self.emit("value = ast2obj_%s(state, vstate, o->%s);" % (a.type, a.name), 1)
             self.emit("if (!value) goto failed;", 1)
             self.emit('if (PyObject_SetAttr(result, state->%s, value) < 0)' % a.name, 1)
             self.emit('goto failed;', 2)
@@ -1297,13 +1309,12 @@ class ObjVisitor(PickleVisitor):
         self.func_end()
 
     def simpleSum(self, sum, name):
-        self.emit("PyObject* ast2obj_%s(struct ast_state *state, %s_ty o)" % (name, name), 0)
+        self.emit("PyObject* ast2obj_%s(struct ast_state *state, struct validator *vstate, %s_ty o)" % (name, name), 0)
         self.emit("{", 0)
         self.emit("switch(o) {", 1)
         for t in sum.types:
             self.emit("case %s:" % t.name, 2)
-            self.emit("Py_INCREF(state->%s_singleton);" % t.name, 3)
-            self.emit("return state->%s_singleton;" % t.name, 3)
+            self.emit("return Py_NewRef(state->%s_singleton);" % t.name, 3)
         self.emit("}", 1)
         self.emit("Py_UNREACHABLE();", 1);
         self.emit("}", 0)
@@ -1316,7 +1327,7 @@ class ObjVisitor(PickleVisitor):
         for field in prod.fields:
             self.visitField(field, name, 1, True)
         for a in prod.attributes:
-            self.emit("value = ast2obj_%s(state, o->%s);" % (a.type, a.name), 1)
+            self.emit("value = ast2obj_%s(state, vstate, o->%s);" % (a.type, a.name), 1)
             self.emit("if (!value) goto failed;", 1)
             self.emit("if (PyObject_SetAttr(result, state->%s, value) < 0)" % a.name, 1)
             self.emit('goto failed;', 2)
@@ -1357,7 +1368,7 @@ class ObjVisitor(PickleVisitor):
                 self.emit("for(i = 0; i < n; i++)", depth+1)
                 # This cannot fail, so no need for error handling
                 self.emit(
-                    "PyList_SET_ITEM(value, i, ast2obj_{0}(state, ({0}_ty)asdl_seq_GET({1}, i)));".format(
+                    "PyList_SET_ITEM(value, i, ast2obj_{0}(state, vstate, ({0}_ty)asdl_seq_GET({1}, i)));".format(
                         field.type,
                         value
                     ),
@@ -1366,9 +1377,9 @@ class ObjVisitor(PickleVisitor):
                 )
                 self.emit("}", depth)
             else:
-                self.emit("value = ast2obj_list(state, (asdl_seq*)%s, ast2obj_%s);" % (value, field.type), depth)
+                self.emit("value = ast2obj_list(state, vstate, (asdl_seq*)%s, ast2obj_%s);" % (value, field.type), depth)
         else:
-            self.emit("value = ast2obj_%s(state, %s);" % (field.type, value), depth, reflow=False)
+            self.emit("value = ast2obj_%s(state, vstate, %s);" % (field.type, value), depth, reflow=False)
 
 
 class PartingShots(StaticVisitor):
@@ -1381,29 +1392,26 @@ PyObject* PyAST_mod2obj(mod_ty t)
         return NULL;
     }
 
-    int recursion_limit = Py_GetRecursionLimit();
     int starting_recursion_depth;
     /* Be careful here to prevent overflow. */
-    int COMPILER_STACK_FRAME_SCALE = 3;
     PyThreadState *tstate = _PyThreadState_GET();
     if (!tstate) {
-        return 0;
+        return NULL;
     }
-    state->recursion_limit = (recursion_limit < INT_MAX / COMPILER_STACK_FRAME_SCALE) ?
-        recursion_limit * COMPILER_STACK_FRAME_SCALE : recursion_limit;
-    int recursion_depth = tstate->recursion_limit - tstate->recursion_remaining;
-    starting_recursion_depth = (recursion_depth < INT_MAX / COMPILER_STACK_FRAME_SCALE) ?
-        recursion_depth * COMPILER_STACK_FRAME_SCALE : recursion_depth;
-    state->recursion_depth = starting_recursion_depth;
+    struct validator vstate;
+    vstate.recursion_limit = C_RECURSION_LIMIT;
+    int recursion_depth = C_RECURSION_LIMIT - tstate->c_recursion_remaining;
+    starting_recursion_depth = recursion_depth;
+    vstate.recursion_depth = starting_recursion_depth;
 
-    PyObject *result = ast2obj_mod(state, t);
+    PyObject *result = ast2obj_mod(state, &vstate, t);
 
     /* Check that the recursion depth counting balanced correctly */
-    if (result && state->recursion_depth != starting_recursion_depth) {
+    if (result && vstate.recursion_depth != starting_recursion_depth) {
         PyErr_Format(PyExc_SystemError,
             "AST constructor recursion depth mismatch (before=%d, after=%d)",
-            starting_recursion_depth, state->recursion_depth);
-        return 0;
+            starting_recursion_depth, vstate.recursion_depth);
+        return NULL;
     }
     return result;
 }
@@ -1471,8 +1479,8 @@ class ChainOfVisitors:
 def generate_ast_state(module_state, f):
     f.write('struct ast_state {\n')
     f.write('    int initialized;\n')
-    f.write('    int recursion_depth;\n')
-    f.write('    int recursion_limit;\n')
+    f.write('    int unused_recursion_depth;\n')
+    f.write('    int unused_recursion_limit;\n')
     for s in module_state:
         f.write('    PyObject *' + s + ';\n')
     f.write('};')
@@ -1488,6 +1496,8 @@ def generate_ast_fini(module_state, f):
     for s in module_state:
         f.write("    Py_CLEAR(state->" + s + ');\n')
     f.write(textwrap.dedent("""
+                Py_CLEAR(_Py_INTERP_CACHED_OBJECT(interp, str_replace_inf));
+
             #if !defined(NDEBUG)
                 state->initialized = -1;
             #else
@@ -1535,6 +1545,11 @@ def generate_module_def(mod, metadata, f, internal_h):
         #include "pycore_pystate.h"       // _PyInterpreterState_GET()
         #include "structmember.h"
         #include <stddef.h>
+
+        struct validator {
+            int recursion_depth;            /* current recursion depth */
+            int recursion_limit;            /* recursion limit */
+        };
 
         // Forward declaration
         static int init_types(struct ast_state *state);

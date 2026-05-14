@@ -7,7 +7,6 @@ import time
 import base64
 import unittest
 import textwrap
-import warnings
 
 from io import StringIO, BytesIO
 from itertools import chain
@@ -40,13 +39,14 @@ from email import iterators
 from email import quoprimime
 from email import utils
 
+from test import support
 from test.support import threading_helper
 from test.support.os_helper import unlink
 from test.test_email import openfile, TestEmailBase
 
 # These imports are documented to work, but we are testing them using a
 # different path, so we import them here just to make sure they are importable.
-from email.parser import FeedParser, BytesFeedParser
+from email.parser import FeedParser
 
 NL = '\n'
 EMPTYSTRING = ''
@@ -334,6 +334,21 @@ class TestMessageAPI(TestEmailBase):
             can be as_string'd:
             F=F6=F6 b=E4r
             """)
+        msg = email.message_from_bytes(source)
+        self.assertEqual(msg.as_string(), expected)
+
+    def test_nonascii_as_string_with_ascii_charset(self):
+        m = textwrap.dedent("""\
+            MIME-Version: 1.0
+            Content-type: text/plain; charset="us-ascii"
+            Content-Transfer-Encoding: 8bit
+
+            Test if non-ascii messages with no Content-Transfer-Encoding set
+            can be as_string'd:
+            Föö bär
+            """)
+        source = m.encode('iso-8859-1')
+        expected = source.decode('ascii', 'replace')
         msg = email.message_from_bytes(source)
         self.assertEqual(msg.as_string(), expected)
 
@@ -794,6 +809,16 @@ class TestMessageAPI(TestEmailBase):
 
             w4kgdGVzdGFiYwo=
             """))
+
+    def test_string_payload_with_base64_cte(self):
+        msg = email.message_from_string(textwrap.dedent("""\
+        Content-Transfer-Encoding: base64
+
+        SGVsbG8uIFRlc3Rpbmc=
+        """), policy=email.policy.default)
+        self.assertEqual(msg.get_payload(decode=True), b"Hello. Testing")
+        self.assertDefectsEqual(msg['content-transfer-encoding'].defects, [])
+
 
 
 # Test the email.encoders module
@@ -2337,6 +2362,40 @@ counter to RFC 2822, there's no separating newline here
         self.assertDefectsEqual(msg.defects,
                                 [errors.MissingHeaderBodySeparatorDefect])
 
+    def test_string_payload_with_extra_space_after_cte(self):
+        # https://github.com/python/cpython/issues/98188
+        cte = "base64 "
+        msg = email.message_from_string(textwrap.dedent(f"""\
+        Content-Transfer-Encoding: {cte}
+
+        SGVsbG8uIFRlc3Rpbmc=
+        """), policy=email.policy.default)
+        self.assertEqual(msg.get_payload(decode=True), b"Hello. Testing")
+        self.assertDefectsEqual(msg['content-transfer-encoding'].defects, [])
+
+    def test_string_payload_with_extra_text_after_cte(self):
+        msg = email.message_from_string(textwrap.dedent("""\
+        Content-Transfer-Encoding: base64 some text
+
+        SGVsbG8uIFRlc3Rpbmc=
+        """), policy=email.policy.default)
+        self.assertEqual(msg.get_payload(decode=True), b"Hello. Testing")
+        cte = msg['content-transfer-encoding']
+        self.assertDefectsEqual(cte.defects, [email.errors.InvalidHeaderDefect])
+
+    def test_string_payload_with_extra_space_after_cte_compat32(self):
+        cte = "base64 "
+        msg = email.message_from_string(textwrap.dedent(f"""\
+        Content-Transfer-Encoding: {cte}
+
+        SGVsbG8uIFRlc3Rpbmc=
+        """), policy=email.policy.compat32)
+        pasted_cte = msg['content-transfer-encoding']
+        self.assertEqual(pasted_cte, cte)
+        self.assertEqual(msg.get_payload(decode=True), b"Hello. Testing")
+        self.assertDefectsEqual(msg.defects, [])
+
+
 
 # Test RFC 2047 header encoding and decoding
 class TestRFC2047(TestEmailBase):
@@ -3320,7 +3379,7 @@ Foo
                                'Bud Person <bperson@dom.ain>']),
            [('Al Person', 'aperson@dom.ain'),
             ('Bud Person', 'bperson@dom.ain')])
-    
+
     def test_getaddresses_comma_in_name(self):
         """GH-106669 regression test."""
         self.assertEqual(
@@ -3482,6 +3541,7 @@ Foo
         self.assertEqual(addrs[0][1], 'aperson@dom.ain')
 
     @threading_helper.requires_working_threading()
+    @support.requires_resource('cpu')
     def test_make_msgid_collisions(self):
         # Test make_msgid uniqueness, even with multiple threads
         class MsgidsThread(Thread):
@@ -3706,6 +3766,7 @@ multipart/report
         # Ignore real name between quotes
         self.assertTrue(utils._check_parenthesis(f'")Alice((" {addr}'))
 
+
 # Test the iterator/generators
 class TestIterators(TestEmailBase):
     def test_body_line_iterator(self):
@@ -3882,6 +3943,16 @@ class TestParsers(TestEmailBase):
         self.assertFalse(msg.is_multipart())
         self.assertIsInstance(msg.get_payload(), str)
         self.assertIsInstance(msg.get_payload(decode=True), bytes)
+
+    def test_header_parser_multipart_is_valid(self):
+        # Don't flag valid multipart emails as having defects
+        with openfile('msg_47.txt', encoding="utf-8") as fp:
+            msgdata = fp.read()
+
+        parser = email.parser.Parser(policy=email.policy.default)
+        parsed_msg = parser.parsestr(msgdata, headersonly=True)
+
+        self.assertEqual(parsed_msg.defects, [])
 
     def test_bytes_parser_does_not_close_file(self):
         with openfile('msg_02.txt', 'rb') as fp:
@@ -4153,6 +4224,21 @@ class Test8BitBytesHandling(TestEmailBase):
         msg = email.message_from_bytes(m)
         self.assertEqual(msg.get_payload(decode=True),
                          '<,.V<W1A; á \n'.encode('utf-8'))
+
+    def test_rfc2231_charset_8bit_CTE(self):
+        m = textwrap.dedent("""\
+        From: foo@bar.com
+        To: baz
+        Mime-Version: 1.0
+        Content-Type: text/plain; charset*=ansi-x3.4-1968''utf-8
+        Content-Transfer-Encoding: 8bit
+
+        pöstal
+        """).encode('utf-8')
+        msg = email.message_from_bytes(m)
+        self.assertEqual(msg.get_payload(), "pöstal\n")
+        self.assertEqual(msg.get_payload(decode=True),
+                         "pöstal\n".encode('utf-8'))
 
 
     headertest_headers = (
