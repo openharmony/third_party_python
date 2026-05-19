@@ -3,9 +3,9 @@
     "Name": "python",
     "License": "Python Software Foundation License V2",
     "License File": "LICENSE",
-    "Version Number": "3.11.4",
+    "Version Number": "v3.12.10",
     "Owner": "anguanglin@huawei.com",
-    "Upstream URL": "https://www.python.org/ftp/python/3.11.4/Python-3.11.4.tgz",
+    "Upstream URL": "https://www.python.org/ftp/python/3.12.10/Python-3.12.10.tgz",
     "Description": "Python is a programming language that lets you work quickly and integrate systems more effectively."
   }
 ]
