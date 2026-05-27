@@ -21,10 +21,10 @@ index d74fb6d..e5e15e4 100755
  		# Blank kernel with real OS is always fine.
  		;;
 diff --git a/configure.ac b/configure.ac
-index 1c25abd..1f5a417 100644
+index 1a02d19..f234c89 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -941,6 +941,8 @@ cat > conftest.c <<EOF
+@@ -950,6 +950,8 @@ cat > conftest.c <<EOF
  # elif defined(__aarch64__) && defined(__AARCH64EL__)
  #  if defined(__ILP32__)
          aarch64_ilp32-linux-gnu
@@ -33,7 +33,7 @@ index 1c25abd..1f5a417 100644
  #  else
          aarch64-linux-gnu
  #  endif
-@@ -959,8 +961,10 @@ cat > conftest.c <<EOF
+@@ -968,8 +970,10 @@ cat > conftest.c <<EOF
          armeb-linux-gnueabihf
  #  endif
  # elif defined(__ARM_EABI__) && !defined(__ARM_PCS_VFP)
@@ -45,7 +45,7 @@ index 1c25abd..1f5a417 100644
  #  else
          armeb-linux-gnueabi
  #  endif
-@@ -1096,7 +1100,7 @@ AC_MSG_CHECKING([for multiarch])
+@@ -1123,7 +1127,7 @@ AC_MSG_CHECKING([for multiarch])
  AS_CASE([$ac_sys_system],
    [Darwin*], [MULTIARCH=""],
    [FreeBSD*], [MULTIARCH=""],
@@ -54,6 +54,15 @@ index 1c25abd..1f5a417 100644
  )
  AC_SUBST([MULTIARCH])
  AC_MSG_RESULT([$MULTIARCH])
+@@ -7604,7 +7608,7 @@ fi
+ AC_MSG_NOTICE([creating Makefile])
+ $SHELL $srcdir/Modules/makesetup -c $srcdir/Modules/config.c.in \
+ 			-s Modules \
+-			Modules/Setup.local Modules/Setup.stdlib Modules/Setup.bootstrap $srcdir/Modules/Setup
++			Modules/Setup.local Modules/Setup.bootstrap $srcdir/Modules/Setup
+ if test $? -ne 0; then
+   AC_MSG_ERROR([makesetup failed])
+ fi
 diff --git a/setup.py b/setup.py
 index 4f122b6..fbff78a 100644
 --- a/setup.py
