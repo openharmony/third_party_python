@@ -289,7 +289,7 @@ class PythonBuilder:
         so_pattern = re.compile(r'.+\.so(\.\d+)*$')
         directories = [
             self._install_dir / 'lib',
-            self._install_dir / 'lib' / 'python3.11' / 'lib-dynload'
+            self._install_dir / 'lib' / f'python{self._lldb_py_version.rsplit(".", 1)[0]}' / 'lib-dynload'
         ]
         
         for root_dir in directories:
@@ -475,7 +475,7 @@ class PythonBuilder:
                 with open(file_path, 'r') as f:
                     lines = f.readlines()
                 
-                lines[0] = '#!./python3.11\n'
+                lines[0] = f'#!./python{self._lldb_py_version.rsplit(".", 1)[0]}\n'
                 
                 # 写回文件
                 with open(file_path, 'w') as f:

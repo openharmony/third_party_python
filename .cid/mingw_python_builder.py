@@ -18,6 +18,7 @@
 
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from typing import List, Mapping
 from python_builder import PythonBuilder, run_command
@@ -53,6 +54,7 @@ class MinGWPythonBuilder(PythonBuilder):
             'LDFLAGS': ' '.join(self._ldflags),
             'RCFLAGS': ' '.join(self._rcflags),
             'CPPFLAGS': ' '.join(self._cflags),
+            'PKG_CONFIG': '/bin/false',
             'LIBS': '-lffi'
         })
         return env
@@ -78,9 +80,11 @@ class MinGWPythonBuilder(PythonBuilder):
             f'--sysroot={self._mingw_install_dir}',
             f'-fstack-protector-strong',
             f'-I{str(self._deps_dir / "ffi" / "include")}',
+            f'-I{str(self._deps_dir / "zlib" / "include")}',
             f'-nostdinc',
             f'-I{str(self._mingw_install_dir / "include")}',
-            f'-I{str(self._clang_toolchain_dir / "lib" / "clang" / "15.0.4" / "include")}'
+            f'-I{str(self._clang_toolchain_dir / "lib" / "clang" / "15.0.4" / "include")}',
+            f'-Wno-error=implicit-function-declaration',
         ]
         return cflags
 
@@ -94,6 +98,7 @@ class MinGWPythonBuilder(PythonBuilder):
             f'-lucrtbase',
             f'-fuse-ld=lld',
             f'-L{str(self._deps_dir / "ffi" / "lib")}',
+            f'-L{str(self._deps_dir / "zlib" / "lib")}',
         ]
         return ldflags
 
@@ -143,6 +148,40 @@ class MinGWPythonBuilder(PythonBuilder):
         make_install_cmd = ['make', 'install']
         run_command(make_install_cmd, env=env, cwd=libffi_inner_dir)
 
+        self._build_zlib(env)
+
+    def _build_zlib(self, env) -> None:
+        self._logger.info("Building zlib for MinGW...")
+        zlib_src_dir = self.repo_root / 'third_party' / 'zlib'
+        if not zlib_src_dir.is_dir():
+            raise FileNotFoundError(f"zlib source not found: {zlib_src_dir}")
+
+        zlib_build_dir = self._out_dir / 'zlib-build'
+        if zlib_build_dir.exists():
+            shutil.rmtree(zlib_build_dir)
+        shutil.copytree(zlib_src_dir, zlib_build_dir)
+
+        zlib_install_dir = self._deps_dir / 'zlib'
+        if zlib_install_dir.exists():
+            shutil.rmtree(zlib_install_dir)
+
+        zlib_env = os.environ.copy()
+        zlib_env.update({
+            'CC': "/bin/x86_64-w64-mingw32-gcc",
+            'CFLAGS': "--sysroot=/usr/x86_64-w64-mingw32 -fstack-protector-strong",
+            'LDFLAGS': "--sysroot=/usr/x86_64-w64-mingw32",
+        })
+
+        configure_cmd = [
+            "./configure",
+            f"--prefix={zlib_install_dir}",
+            "--static",
+        ]
+        run_command(configure_cmd, env=zlib_env, cwd=zlib_build_dir)
+
+        run_command(['make', '-j16'], env=zlib_env, cwd=zlib_build_dir)
+        run_command(['make', 'install'], env=zlib_env, cwd=zlib_build_dir)
+
     def _configure(self) -> None:
         self._logger.info("Starting MinGW configuration...")
         run_command(['autoreconf', '-vfi'], cwd=self._source_dir)
@@ -161,6 +200,25 @@ class MinGWPythonBuilder(PythonBuilder):
         ]
         cmd = [str(self._source_dir / 'configure')] + config_flags
         run_command(cmd, env=self._env, cwd=self._build_dir)
+
+    def _install(self) -> None:
+        makefile = self._build_dir / 'Makefile'
+        if makefile.is_file():
+            self._logger.info("Patching Makefile to fix clang-mingw linking...")
+            lines = makefile.read_text().splitlines(True)
+            patched = []
+            for line in lines:
+                if '-static-libgcc' in line or '-static-libstdc++' in line:
+                    line = line.replace('-static-libgcc', '').replace('-static-libstdc++', '')
+                if line.startswith('\t') and '$(LINKCC)' in line and ('venvlauncher.o' in line or 'venvwlauncher.o' in line):
+                    line = line.replace(' -static ', ' ')
+                    if '-rtlib=compiler-rt' not in line:
+                        line = line.replace('$(PY_STDMODULE_CFLAGS)', '$(PY_STDMODULE_CFLAGS) -rtlib=compiler-rt -fuse-ld=lld')
+                if line.startswith('altbininstall: $(BUILDPYTHON)'):
+                    line = 'altbininstall: $(BUILDPYTHON) $(BUILDVENVLAUNCHER) $(BUILDVENVWLAUNCHER)\n'
+                patched.append(line)
+            makefile.write_text(''.join(patched))
+        super()._install()
     
 
     def _copy_external_libs(self) -> None:
@@ -168,7 +226,7 @@ class MinGWPythonBuilder(PythonBuilder):
         # 定义源文件路径
         _external_libs = [self._deps_dir / 'ffi' / 'bin' / 'libffi-8.dll', self._clang_toolchain_dir / self.target_platform / 'bin' / 'libssp-0.dll']
         # 定义目标目录
-        target_dir = self._install_dir / 'lib' / 'python3.11' / 'lib-dynload'
+        target_dir = self._install_dir / 'lib' / f'python{self._lldb_py_version.rsplit(".", 1)[0]}' / 'lib-dynload'
         # 创建目标目录（如果不存在）
         target_dir.mkdir(parents=True, exist_ok=True)
 

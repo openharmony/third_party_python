@@ -29,7 +29,11 @@ function ubuntu_build() {
     apt install -y mingw-w64
     cd third_party
     echo "进入third_part预制 libffi"
-    git clone https://gitcode.com/openharmony/third_party_libffi.git libffi
+    if [ ! -d "libffi" ]; then
+        git clone https://gitcode.com/openharmony/third_party_libffi.git libffi
+    else
+        echo "libffi 目录已存在，跳过 clone"
+    fi
         $APPHOME/prebuilts/python/linux-x86/current/bin/python3 $APPHOME/third_party/python/.cid/build.py  --repo-root  $APPHOME  --out-path $APPHOME/out  --lldb-py-version  3.12.10 --target-os  mingw  --target-arch x86
     else
         CPU=$(case "$(uname -m)" in *aarch64*|*arm64*) echo arm64 ;; *) echo x86 ;; esac)
@@ -40,7 +44,8 @@ function ubuntu_build() {
             --out-path $APPHOME/out  \
             --lldb-py-version  3.12.10 \
             --target-os  linux  \
-            --target-arch $CPU    fi
+            --target-arch $CPU
+    fi
     # remove_redundancy_for_out
 }
 
